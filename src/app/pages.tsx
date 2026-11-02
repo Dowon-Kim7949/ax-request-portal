@@ -1,13 +1,7 @@
-import { Construction } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { isRouteErrorResponse, Link, useRouteError } from 'react-router'
 import { Button } from '@/components/ui/button'
-import { EmptyState, ErrorState } from '@/components/ui/feedback'
-
-export function ComingSoonPage() {
-  const { t } = useTranslation()
-  return <EmptyState icon={<Construction className="size-6" aria-hidden />} title={t('common.comingSoon')} />
-}
+import { ErrorState } from '@/components/ui/feedback'
 
 export function NotFoundPage() {
   const { t } = useTranslation()

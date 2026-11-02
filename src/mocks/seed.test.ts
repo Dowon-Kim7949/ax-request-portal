@@ -88,4 +88,18 @@ describe('seed data', () => {
     expect(engine.state.requests.find((r) => r.id === 1025)?.status).toBe('code_review')
     expect(engine.state.requests.find((r) => r.id === 1027)?.status).toBe('review')
   })
+
+  it('compares an unfinished month with the same span of the previous one', () => {
+    const engine = new MockEngine(structuredClone(state), OPTS)
+    const exec = state.users.find((u) => u.role === 'executive')!
+    const today = localDate(NOW) // 2026-11-02 in any timezone east of UTC-3
+    const current = engine.dashboard(exec, today.slice(0, 7), NOW)
+    const previous = engine.dashboard(exec, '2026-10', NOW)
+    const sameSpan = state.requests.filter((r) => {
+      const d = localDate(new Date(r.createdAt))
+      return d.startsWith('2026-10') && d.slice(8, 10) <= today.slice(8, 10)
+    }).length
+    expect(current.receivedPrevMonth).toBe(sameSpan)
+    expect(current.receivedPrevMonth).toBeLessThan(previous.received)
+  })
 })

@@ -1,19 +1,21 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router'
 import { ApiError } from '@/api/client'
 import { useRequest } from '@/api/queries'
 import { useCan, useCurrentUser, useDirectory } from '@/app/hooks'
 import { PageHeader } from '@/app/page'
-import { usePageTitle } from '@/app/title'
 import { NotFoundPage } from '@/app/pages'
+import { usePageTitle } from '@/app/title'
 import { StatusBadge, Stepper } from '@/components/request/status'
 import { Timeline } from '@/components/request/timeline'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { ErrorState, Skeleton } from '@/components/ui/feedback'
 import { appConfig } from '@/config/app.config'
-import { availableEvents } from '@/domain/lifecycle'
+import { availableEvents, isResponsibleDeveloper, isTerminal } from '@/domain/lifecycle'
 import { formatDate } from '@/lib/format'
+import { DecisionCard, RegressionChecks, ReleasePanel, ReportPanel, WorkPanel } from './developer-panels'
 import { ReleaseCard, RequestContent } from './request-content'
 import { CancelRequest, InfoAnswerCard, StatusExplainer, VerificationCard } from './requester-panels'
 
@@ -28,6 +30,8 @@ function DetailSkeleton() {
   )
 }
 
+const RELEASE_EDITABLE = ['code_review', 'verification', 'changes_requested', 'release_scheduled'] as const
+
 export default function RequestDetailPage() {
   const { t } = useTranslation()
   const params = useParams()
@@ -36,6 +40,7 @@ export default function RequestDetailPage() {
   const user = useCurrentUser()
   const can = useCan()
   const dir = useDirectory()
+  const [sheet, setSheet] = useState<'run' | 'ask' | 'reject' | null>(null)
   const request = query.data
   usePageTitle(request ? `#${request.id} ${request.title}` : undefined)
 
@@ -58,7 +63,15 @@ export default function RequestDetailPage() {
   const project = dir.project(request.projectId)
   const requester = dir.user(request.requesterId)
   const isRequester = request.requesterId === user.id
-  const events = availableEvents({ user, request, project, rolePermissions: appConfig.rolePermissions })
+  const ctx = { user, request, project, rolePermissions: appConfig.rolePermissions }
+  const events = availableEvents(ctx)
+  const responsible = isResponsibleDeveloper(ctx)
+  const technical = can('report:read')
+  const showDecision = events.includes('runWork')
+  const showRelease =
+    responsible &&
+    (RELEASE_EDITABLE as readonly string[]).includes(request.status) &&
+    !isTerminal(request.status)
   const back = isRequester
     ? { to: '/requests', label: t('nav.myRequests') }
     : can('request:review')
@@ -97,12 +110,49 @@ export default function RequestDetailPage() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-4">
-          <StatusExplainer request={request} />
+          {technical ? null : <StatusExplainer request={request} />}
 
+          {/* Developer: the decision comes first on every screen size */}
+          {showDecision ? (
+            <DecisionCard
+              request={request}
+              canAsk={events.includes('requestInfo')}
+              canReject={events.includes('reject')}
+              askPrefill={request.report?.openQuestions ?? []}
+              sheet={sheet}
+              setSheet={setSheet}
+            />
+          ) : null}
+
+          {/* Requester: what needs my action */}
           {events.includes('provideInfo') ? <InfoAnswerCard request={request} /> : null}
           {events.includes('confirmResult') ? <VerificationCard request={request} /> : null}
 
-          {request.infoRequest?.answer && !events.includes('provideInfo') ? (
+          {technical && request.work ? (
+            <WorkPanel request={request} project={project} canReview={responsible} />
+          ) : null}
+
+          {technical && request.regression.length ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>{t('regression.title')}</CardTitle>
+              </CardHeader>
+              <RegressionChecks
+                requestId={request.id}
+                checks={request.regression}
+                editable={responsible && !isTerminal(request.status)}
+              />
+            </Card>
+          ) : null}
+
+          {technical && request.type !== 'non_code' ? (
+            <ReportPanel
+              request={request}
+              onAsk={events.includes('requestInfo') ? () => setSheet('ask') : undefined}
+            />
+          ) : null}
+
+          {request.infoRequest && !events.includes('provideInfo') ? (
             <Card>
               <CardHeader>
                 <CardTitle>{t('detail.info.title')}</CardTitle>
@@ -112,12 +162,16 @@ export default function RequestDetailPage() {
                   <li key={q}>{q}</li>
                 ))}
               </ul>
-              <p className="rounded-xl bg-muted px-3.5 py-2.5 text-sm">
-                <span className="font-semibold">{t('detail.info.yourAnswer')}: </span>
-                {request.infoRequest.answer}
-              </p>
+              {request.infoRequest.answer ? (
+                <p className="rounded-xl bg-muted px-3.5 py-2.5 text-sm">
+                  <span className="font-semibold">{t('detail.info.yourAnswer')}: </span>
+                  {request.infoRequest.answer}
+                </p>
+              ) : null}
             </Card>
           ) : null}
+
+          {request.status === 'rejected' && technical ? <StatusExplainer request={request} /> : null}
 
           <RequestContent request={request} />
 
@@ -129,7 +183,11 @@ export default function RequestDetailPage() {
         </div>
 
         <aside className="flex min-w-0 flex-col gap-4">
-          <ReleaseCard request={request} />
+          {showRelease ? (
+            <ReleasePanel request={request} canRelease={events.includes('markReleased')} />
+          ) : (
+            <ReleaseCard request={request} />
+          )}
           <Card>
             <CardHeader>
               <CardTitle>{t('detail.timeline')}</CardTitle>

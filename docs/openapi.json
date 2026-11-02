@@ -1998,7 +1998,8 @@
           "receivedPrevMonth": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 9007199254740991
+            "maximum": 9007199254740991,
+            "description": "Received in the previous month over the same span of days (month-to-date while `month` is in progress)"
           },
           "inProgress": {
             "type": "integer",

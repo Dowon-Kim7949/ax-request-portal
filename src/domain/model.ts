@@ -439,7 +439,12 @@ export const DashboardSummary = named(
   z.object({
     month: z.string().regex(/^\d{4}-\d{2}$/),
     received: z.int().nonnegative(),
-    receivedPrevMonth: z.int().nonnegative(),
+    receivedPrevMonth: z
+      .int()
+      .nonnegative()
+      .describe(
+        'Received in the previous month over the same span of days (month-to-date while `month` is in progress)',
+      ),
     inProgress: z.int().nonnegative(),
     delayed: z.int().nonnegative(),
     done: z.int().nonnegative(),

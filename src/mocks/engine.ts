@@ -648,6 +648,14 @@ export class MockEngine {
       return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`
     })()
     const reqs = this.state.requests
+    // While a month is in progress, compare it with the same span of the previous month,
+    // not the whole of it — otherwise every month looks like a collapse on day 2.
+    const lastDay = month === today.slice(0, 7) ? today.slice(8, 10) : '31'
+    const filed = (r: WorkRequest) => localDate(new Date(r.createdAt))
+    const receivedPrevMonth = reqs.filter((r) => {
+      const d = filed(r)
+      return d.startsWith(prev) && d.slice(8, 10) <= lastDay
+    }).length
     const open = reqs.filter((r) => !isTerminal(r.status))
     const doneInMonth = reqs.filter((r) => r.status === 'done' && r.release?.releasedAt?.startsWith(month))
     const leads = doneInMonth.map((r) => (Date.parse(r.release!.releasedAt!) - Date.parse(r.createdAt)) / DAY)
@@ -666,8 +674,8 @@ export class MockEngine {
 
     return {
       month,
-      received: reqs.filter((r) => r.createdAt.startsWith(month)).length,
-      receivedPrevMonth: reqs.filter((r) => r.createdAt.startsWith(prev)).length,
+      received: reqs.filter((r) => filed(r).startsWith(month)).length,
+      receivedPrevMonth,
       inProgress: open.length,
       delayed: delayed.length,
       done: doneInMonth.length,

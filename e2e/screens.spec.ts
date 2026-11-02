@@ -36,3 +36,27 @@ test('capture requester screens', async ({ page }, info) => {
   await page.getByRole('heading', { name: '이번 주' }).waitFor()
   await shot('schedule')
 })
+
+test('capture developer, executive and admin screens', async ({ page }, info) => {
+  const shot = async (name: string) => {
+    await page.evaluate(() => document.fonts.ready)
+    await page.screenshot({ path: `${OUT}/${info.project.name}-${name}.png`, fullPage: true })
+  }
+  await loginAs(page, '담당자')
+  await page.goto('/requests/1024')
+  await page.getByRole('button', { name: '승인하고 반영' }).waitFor()
+  await shot('dev-1024')
+  await page.goto('/requests/1026')
+  await page.getByRole('heading', { name: '구현 확인 보고서' }).waitFor()
+  await shot('dev-1026-report')
+
+  await loginAs(page, '경영진')
+  await page.goto('/dashboard')
+  await page.getByRole('heading', { name: '프로젝트별 현황' }).waitFor()
+  await shot('dashboard')
+
+  await loginAs(page, '관리자')
+  await page.goto('/admin/projects')
+  await page.getByText('고객 포털 웹').first().waitFor()
+  await shot('admin-projects')
+})

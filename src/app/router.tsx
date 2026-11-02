@@ -2,8 +2,9 @@ import type { ComponentType } from 'react'
 import { createBrowserRouter, type RouteObject } from 'react-router'
 import { env } from '@/config/env'
 import type { Permission } from '@/domain/roles'
+import { BootScreen } from './boot'
 import { RequireAuth, RequirePermission } from './guards'
-import { ComingSoonPage, NotFoundPage, RouteErrorPage } from './pages'
+import { NotFoundPage, RouteErrorPage } from './pages'
 import { AppShell } from './shell'
 
 export interface RouteHandle {
@@ -32,20 +33,11 @@ function page(
   }
 }
 
-const soon = (permission?: Permission): { Component: ComponentType } => ({
-  Component: permission
-    ? () => (
-        <RequirePermission permission={permission}>
-          <ComingSoonPage />
-        </RequirePermission>
-      )
-    : ComingSoonPage,
-})
-
 export const routes: RouteObject[] = [
-  { path: '/login', ...page(() => import('@/features/auth/login-page')) },
+  { path: '/login', HydrateFallback: BootScreen, ...page(() => import('@/features/auth/login-page')) },
   {
     path: '/',
+    HydrateFallback: BootScreen,
     element: (
       <RequireAuth>
         <AppShell />
@@ -62,14 +54,17 @@ export const routes: RouteObject[] = [
       },
       { path: 'requests/:id', ...page(() => import('@/features/detail/request-detail-page')) },
       { path: 'schedule', ...page(() => import('@/features/schedule/schedule-page'), 'schedule:view') },
-      { path: 'work', ...soon('request:review') },
-      { path: 'work/regression', ...soon('regression:view') },
-      { path: 'dashboard', ...soon('dashboard:view') },
-      { path: 'admin/projects', ...soon('project:manage') },
-      { path: 'admin/users', ...soon('user:manage') },
-      { path: 'admin/budget', ...soon('budget:manage') },
-      { path: 'notifications', ...soon() },
-      { path: 'settings/notifications', ...soon() },
+      { path: 'work', ...page(() => import('@/features/work/assigned-page'), 'request:review') },
+      {
+        path: 'work/regression',
+        ...page(() => import('@/features/work/regression-page'), 'regression:view'),
+      },
+      { path: 'dashboard', ...page(() => import('@/features/dashboard/dashboard-page'), 'dashboard:view') },
+      { path: 'admin/projects', ...page(() => import('@/features/admin/projects-page'), 'project:manage') },
+      { path: 'admin/users', ...page(() => import('@/features/admin/users-page'), 'user:manage') },
+      { path: 'admin/budget', ...page(() => import('@/features/admin/budget-page'), 'budget:manage') },
+      { path: 'notifications', ...page(() => import('@/features/notifications/notifications-page')) },
+      { path: 'settings/notifications', ...page(() => import('@/features/notifications/settings-page')) },
       { path: '*', Component: NotFoundPage },
     ],
   },
