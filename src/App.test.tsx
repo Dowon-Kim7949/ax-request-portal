@@ -1,10 +1,16 @@
 import { QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { createQueryClient } from './api/query-client'
 import App from './App'
 
 describe('App', () => {
+  // The login screen imports the mock API modules on mount to list the demo
+  // accounts. Load them first, or that import can outlive the test environment.
+  beforeAll(async () => {
+    await Promise.all([import('./mocks/browser'), import('./mocks/seed')])
+  })
+
   it('sends signed-out visitors to the login screen', async () => {
     render(
       <QueryClientProvider client={createQueryClient()}>
