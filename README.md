@@ -78,7 +78,7 @@ npm ci
 npm run dev
 ```
 
-Open the printed URL and pick a demo account. Node 20.19+ is required (`.nvmrc` pins 22).
+Open the printed URL and pick a demo account. Node 22.13+ or 24+ is required (`.nvmrc` pins 22; Vitest 5, MSW 3 and jsdom set that floor). CI checks both ends: 22.13 and 24.
 
 | Script             | What it does                                                         |
 | ------------------ | -------------------------------------------------------------------- |

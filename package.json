@@ -12,7 +12,7 @@
   "bugs": "https://github.com/Dowon-Kim7949/ax-request-portal/issues",
   "type": "module",
   "engines": {
-    "node": ">=20.19.0"
+    "node": "^22.13.0 || >=24.0.0"
   },
   "scripts": {
     "dev": "vite",
