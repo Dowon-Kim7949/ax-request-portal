@@ -88,6 +88,38 @@
     @apply outline-2 outline-offset-2 outline-brand-500;
   }
 
+  /*
+   * Cursor contract. Tailwind v4 no longer gives buttons a pointer, so every
+   * element that does something on click gets one here, once, for all screens.
+   * Links already have it. Non-clickable focusable things (chart segments)
+   * deliberately keep the default arrow.
+   */
+  button,
+  summary,
+  select,
+  [role='button'],
+  [role='switch'],
+  [role='radio'],
+  [role='checkbox'],
+  [role='tab'],
+  [role='option'],
+  [role='menuitem'],
+  input:is([type='file'], [type='checkbox'], [type='radio'], [type='range'], [type='color']),
+  input:is([type='submit'], [type='button'], [type='reset']) {
+    cursor: pointer;
+  }
+  ::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+  }
+  /* Order matters: these come after the pointer rule and win on equal specificity. */
+  :disabled,
+  [aria-disabled='true'] {
+    cursor: not-allowed;
+  }
+  [aria-busy='true'] {
+    cursor: progress;
+  }
+
   /* iOS zooms into inputs below 16px; keep form text at 16px on touch devices. */
   @media (pointer: coarse) {
     input,

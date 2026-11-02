@@ -4,17 +4,19 @@ import { Slot } from 'radix-ui'
 import type { ComponentProps } from 'react'
 import { cn } from '@/lib/cn'
 
+// Disabled buttons keep pointer events so the not-allowed cursor (index.css) and
+// any title tooltip still show; hover/active styles apply only when not disabled.
 const buttonVariants = cva(
-  'inline-flex shrink-0 items-center justify-center gap-2 rounded-xl font-semibold whitespace-nowrap transition-colors select-none disabled:pointer-events-none disabled:opacity-45 [&_svg]:size-[1.15em] [&_svg]:shrink-0',
+  'inline-flex shrink-0 items-center justify-center gap-2 rounded-xl font-semibold whitespace-nowrap transition-colors select-none disabled:opacity-45 [&_svg]:size-[1.15em] [&_svg]:shrink-0',
   {
     variants: {
       variant: {
-        primary: 'bg-brand-600 text-white hover:bg-brand-700 active:bg-brand-700',
-        secondary: 'bg-muted text-ink-900 ring-1 ring-line ring-inset hover:bg-line/60',
-        outline: 'bg-surface text-ink-900 ring-1 ring-line-strong ring-inset hover:bg-muted',
-        ghost: 'text-ink-700 hover:bg-muted',
-        danger: 'bg-danger-50 text-danger-600 hover:bg-danger-600 hover:text-white',
-        link: 'h-auto px-0 text-brand-600 underline-offset-4 hover:underline',
+        primary: 'bg-brand-600 text-white not-disabled:hover:bg-brand-700 not-disabled:active:bg-brand-700',
+        secondary: 'bg-muted text-ink-900 ring-1 ring-line ring-inset not-disabled:hover:bg-line/60',
+        outline: 'bg-surface text-ink-900 ring-1 ring-line-strong ring-inset not-disabled:hover:bg-muted',
+        ghost: 'text-ink-700 not-disabled:hover:bg-muted',
+        danger: 'bg-danger-50 text-danger-600 not-disabled:hover:bg-danger-600 not-disabled:hover:text-white',
+        link: 'h-auto px-0 text-brand-600 underline-offset-4 not-disabled:hover:underline',
       },
       size: {
         // 44px minimum touch target on every interactive size except "sm" used inside dense desktop rows
