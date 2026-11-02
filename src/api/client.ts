@@ -55,7 +55,9 @@ export function buildUrl(
     if (v !== undefined && v !== null && v !== '') search.set(k, String(v))
   }
   const qs = search.toString()
-  return `${apiRoot}${filled}${qs ? `?${qs}` : ''}`
+  // Same-origin roots ("/api") are made absolute so non-browser fetch implementations accept them.
+  const origin = apiRoot.startsWith('/') ? (globalThis.location?.origin ?? '') : ''
+  return `${origin}${apiRoot}${filled}${qs ? `?${qs}` : ''}`
 }
 
 /**
