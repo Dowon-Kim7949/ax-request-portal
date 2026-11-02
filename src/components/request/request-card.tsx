@@ -23,7 +23,7 @@ export function RequestCard({ request, myTurn, showRequester }: RequestCardProps
   return (
     <Link
       to={`/requests/${request.id}`}
-      className="group flex items-center gap-3 rounded-(--radius-card) bg-surface p-4 ring-1 ring-line transition-shadow hover:shadow-md hover:ring-line-strong focus-visible:outline-offset-2 sm:p-5"
+      className="group flex items-center gap-3 rounded-(--radius-card) bg-surface p-4 ring-1 ring-line transition-shadow hover:shadow-md hover:ring-field focus-visible:outline-offset-2 sm:p-5"
     >
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex flex-wrap items-center gap-1.5">

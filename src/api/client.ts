@@ -27,9 +27,20 @@ interface ClientHooks {
   getToken: () => string | null
   /** Called on 401 so the app can drop the session and show the login screen */
   onUnauthorized: () => void
+  /** Sent as Accept-Language: the server writes notifications, errors and AI text in it */
+  getLanguage?: () => string
+  /** Messages for errors the client raises itself (no server body to show) */
+  messages?: { network: () => string; http: (status: number) => string; contract: () => string }
+}
+
+const FALLBACK_MESSAGES: NonNullable<ClientHooks['messages']> = {
+  network: () => 'Cannot reach the server.',
+  http: (status) => `The request could not be completed. (HTTP ${status})`,
+  contract: () => 'The server response does not match the API contract.',
 }
 
 let hooks: ClientHooks = { getToken: () => null, onUnauthorized: () => {} }
+const messages = () => hooks.messages ?? FALLBACK_MESSAGES
 
 export function configureClient(next: ClientHooks): void {
   hooks = next
@@ -76,6 +87,8 @@ export async function call<E extends EndpointSpec>(spec: E, ...rest: [Args<E>] |
   const headers = new Headers({ Accept: 'application/json' })
   const token = hooks.getToken()
   if (token) headers.set('Authorization', `Bearer ${token}`)
+  const language = hooks.getLanguage?.()
+  if (language) headers.set('Accept-Language', language)
 
   let body: BodyInit | undefined
   if (spec.multipart && args.file) {
@@ -97,7 +110,7 @@ export async function call<E extends EndpointSpec>(spec: E, ...rest: [Args<E>] |
     })
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') throw err
-    throw new ApiError(0, 'network', '서버에 연결할 수 없습니다. 네트워크 상태를 확인해 주세요.')
+    throw new ApiError(0, 'network', messages().network())
   }
 
   if (!res.ok) {
@@ -105,7 +118,7 @@ export async function call<E extends EndpointSpec>(spec: E, ...rest: [Args<E>] |
     if (res.status === 401 && !spec.public) hooks.onUnauthorized()
     if (parsed.success)
       throw new ApiError(res.status, parsed.data.code, parsed.data.message, parsed.data.issues)
-    throw new ApiError(res.status, 'internal', `요청을 처리하지 못했습니다. (HTTP ${res.status})`)
+    throw new ApiError(res.status, 'internal', messages().http(res.status))
   }
 
   if (spec.response === null || res.status === 204) return undefined as ResponseOf<E>
@@ -115,7 +128,7 @@ export async function call<E extends EndpointSpec>(spec: E, ...rest: [Args<E>] |
   if (!result.success) {
     const issues = result.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message }))
     console.error(`[api] ${spec.method} ${spec.path} response does not match the contract`, issues)
-    throw new ApiError(res.status, 'contract_violation', '서버 응답 형식이 계약과 다릅니다.', issues)
+    throw new ApiError(res.status, 'contract_violation', messages().contract(), issues)
   }
   return result.data as ResponseOf<E>
 }

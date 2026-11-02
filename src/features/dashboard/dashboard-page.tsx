@@ -12,17 +12,12 @@ import { Meter } from '@/components/ui/controls'
 import { ErrorState, Skeleton } from '@/components/ui/feedback'
 import type { DashboardSummary } from '@/domain/model'
 import { cn } from '@/lib/cn'
-import { formatDate, formatKrw, toLocalDate } from '@/lib/format'
+import { formatDate, formatKrw, formatMonth, toLocalDate } from '@/lib/format'
 
 function shiftMonth(month: string, delta: number): string {
   const [y, m] = month.split('-').map(Number) as [number, number]
   const d = new Date(y, m - 1 + delta, 1)
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-
-function monthLabel(month: string): string {
-  const [y, m] = month.split('-').map(Number) as [number, number]
-  return `${y}년 ${m}월`
 }
 
 /** Stat tile: label · value · one supporting line. */
@@ -47,7 +42,7 @@ function StatTile({
           <p
             className={cn(
               'flex items-center gap-1 text-xs font-semibold',
-              noteTone === 'warning' ? 'text-warning-600' : 'text-ink-500',
+              noteTone === 'warning' ? 'text-warning-fg' : 'text-ink-500',
             )}
           >
             {noteTone === 'warning' ? <AlertTriangle className="size-3.5" aria-hidden /> : null}
@@ -113,9 +108,9 @@ function ProjectBars({ rows }: { rows: DashboardSummary['byProject'] }) {
                     style={{ flexGrow: s.value, flexBasis: 0 }}
                   >
                     {active === id ? (
-                      <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 rounded-lg bg-ink-900 px-2.5 py-1.5 text-xs whitespace-nowrap text-white shadow-lg">
+                      <span className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 rounded-lg bg-inverse px-2.5 py-1.5 text-xs whitespace-nowrap text-on-inverse shadow-lg">
                         <strong className="text-sm">{s.value}</strong>{' '}
-                        <span className="text-white/70">{s.label}</span>
+                        <span className="text-on-inverse/70">{s.label}</span>
                       </span>
                     ) : null}
                   </span>
@@ -162,7 +157,7 @@ export default function DashboardPage() {
     <>
       <PageHeader
         title={t('dashboard.title')}
-        description={t('dashboard.subtitle', { month: monthLabel(month) })}
+        description={t('dashboard.subtitle', { month: formatMonth(month) })}
       />
 
       {/* Filters: one row, above everything they scope */}
@@ -175,7 +170,7 @@ export default function DashboardPage() {
         >
           <ChevronLeft aria-hidden />
         </Button>
-        <span className="min-w-28 text-center font-bold">{monthLabel(month)}</span>
+        <span className="min-w-28 text-center font-bold">{formatMonth(month)}</span>
         <Button
           variant="ghost"
           size="icon"
@@ -270,7 +265,7 @@ export default function DashboardPage() {
                 ) : (
                   <p className="text-sm text-ink-500">{t('dashboard.noUpcoming')}</p>
                 )}
-                <Link to="/schedule" className="mt-3 inline-block text-sm font-semibold text-brand-600">
+                <Link to="/schedule" className="mt-3 inline-block text-sm font-semibold text-accent">
                   {t('common.seeAll')} ›
                 </Link>
               </Card>
@@ -281,7 +276,7 @@ export default function DashboardPage() {
               >
                 <h2
                   id="attention"
-                  className="mb-2 flex items-center gap-1.5 text-[15px] font-bold text-warning-600"
+                  className="mb-2 flex items-center gap-1.5 text-[15px] font-bold text-warning-fg"
                 >
                   <AlertTriangle className="size-4" aria-hidden />
                   {t('dashboard.attention')}

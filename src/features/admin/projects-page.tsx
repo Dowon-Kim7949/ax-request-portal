@@ -144,9 +144,7 @@ function ProjectForm({ project, onDone }: { project: Project | null; onDone: () 
                     }
                     className={cn(
                       'h-11 rounded-full px-4 text-sm font-semibold ring-1 ring-inset',
-                      on
-                        ? 'bg-brand-600 text-white ring-brand-600'
-                        : 'bg-surface text-ink-700 ring-line-strong',
+                      on ? 'bg-brand-600 text-white ring-brand-600' : 'bg-surface text-ink-700 ring-field',
                     )}
                   >
                     {u.name}
@@ -157,7 +155,7 @@ function ProjectForm({ project, onDone }: { project: Project | null; onDone: () 
           )}
         />
         {err.ownerIds ? (
-          <p role="alert" className="text-[13px] font-medium text-danger-600">
+          <p role="alert" className="text-[13px] font-medium text-danger-fg">
             {t('common.requiredField')}
           </p>
         ) : null}

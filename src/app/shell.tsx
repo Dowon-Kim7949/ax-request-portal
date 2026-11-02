@@ -15,9 +15,10 @@ import { Link, NavLink, Outlet, ScrollRestoration, useMatches } from 'react-rout
 import { toast } from 'sonner'
 import { useLogout, useNotifications } from '@/api/queries'
 import { Sheet } from '@/components/ui/sheet'
-import { appConfig } from '@/config/app.config'
 import { env } from '@/config/env'
+import { currentLocale } from '@/i18n'
 import { cn } from '@/lib/cn'
+import { useBrand } from './brand'
 import { resetDemoData } from './demo'
 import { useCan, useCurrentUser } from './hooks'
 import { phoneTabs, visibleNav, type NavItem } from './nav'
@@ -28,12 +29,13 @@ import type { RouteHandle } from './router'
 /* ------------------------------------------------------------------ */
 
 function BrandMark({ compact }: { compact?: boolean }) {
+  const brand = useBrand()
   return (
-    <Link to="/" className="flex items-center gap-2.5 rounded-lg" aria-label={appConfig.brand.name}>
-      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-ink-900 text-[13px] font-black tracking-tight text-white">
-        {appConfig.brand.shortName}
+    <Link to="/" className="flex items-center gap-2.5 rounded-lg" aria-label={brand.name}>
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-inverse text-[13px] font-black tracking-tight text-on-inverse">
+        {brand.shortName}
       </span>
-      {compact ? null : <span className="text-[15px] font-bold text-ink-900">{appConfig.brand.name}</span>}
+      {compact ? null : <span className="text-[15px] font-bold text-ink-900">{brand.name}</span>}
     </Link>
   )
 }
@@ -70,7 +72,7 @@ function useAccountActions() {
     logout: () => logout.mutate(),
     resetDemo: env.apiMock
       ? async () => {
-          await resetDemoData()
+          await resetDemoData(currentLocale())
           await qc.invalidateQueries()
           toast.success(t('nav.resetDemoDone'))
         }
@@ -126,7 +128,7 @@ function AccountMenu() {
         onClick={() => setOpen((o) => !o)}
         className="flex h-11 items-center gap-2 rounded-full pr-3 pl-1.5 text-sm font-semibold text-ink-700 hover:bg-muted"
       >
-        <span className="grid size-8 place-items-center rounded-full bg-brand-100 text-[13px] font-bold text-brand-700">
+        <span className="grid size-8 place-items-center rounded-full bg-brand-100 text-[13px] font-bold text-accent-strong">
           {user.name.slice(0, 1)}
         </span>
         <span className="hidden lg:inline">{user.name}</span>
@@ -143,9 +145,9 @@ function AccountMenu() {
             </p>
           </div>
           <div className="my-1 h-px bg-line" aria-hidden />
-          <Link to="/settings/notifications" className={item} onClick={close}>
+          <Link to="/settings" className={item} onClick={close}>
             <Settings className="size-4" aria-hidden />
-            {t('nav.notificationSettings')}
+            {t('nav.settings')}
           </Link>
           {actions.resetDemo ? (
             <button
@@ -202,7 +204,7 @@ function SideLink({
       className={({ isActive }) =>
         cn(
           'flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] font-semibold transition-colors',
-          isActive ? 'bg-brand-50 text-brand-700' : 'text-ink-600 hover:bg-muted hover:text-ink-900',
+          isActive ? 'bg-brand-50 text-accent-strong' : 'text-ink-600 hover:bg-muted hover:text-ink-900',
           !expanded && 'justify-center px-0',
         )
       }
@@ -268,7 +270,7 @@ function Sidebar({ items }: { items: NavItem[] }) {
         <div className="fixed inset-0 z-40 hidden md:block xl:hidden">
           <button
             type="button"
-            className="absolute inset-0 animate-fade-in bg-ink-900/30"
+            className="absolute inset-0 animate-fade-in bg-black/40"
             aria-label={t('nav.collapse')}
             onClick={() => setOpen(false)}
           />
@@ -316,7 +318,7 @@ function BottomNav({ items }: { items: NavItem[] }) {
               key={i.key}
               to={i.to}
               end={i.end}
-              className={({ isActive }) => cn(tab, isActive ? 'text-brand-600' : 'text-ink-500')}
+              className={({ isActive }) => cn(tab, isActive ? 'text-accent' : 'text-ink-500')}
             >
               {i.key === 'newRequest' ? (
                 <span className="grid size-8 place-items-center rounded-full bg-brand-600 text-white">
@@ -363,12 +365,12 @@ function BottomNav({ items }: { items: NavItem[] }) {
           ))}
           <li>
             <Link
-              to="/settings/notifications"
+              to="/settings"
               onClick={close}
               className="flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] font-semibold text-ink-600 hover:bg-muted"
             >
               <Settings className="size-5" aria-hidden />
-              {t('nav.notificationSettings')}
+              {t('nav.settings')}
             </Link>
           </li>
           {actions.resetDemo ? (
@@ -390,7 +392,7 @@ function BottomNav({ items }: { items: NavItem[] }) {
             <button
               type="button"
               onClick={actions.logout}
-              className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-[15px] font-semibold text-danger-600 hover:bg-danger-50"
+              className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-[15px] font-semibold text-danger-fg hover:bg-danger-50"
             >
               <LogOut className="size-5" aria-hidden />
               {t('nav.logout')}

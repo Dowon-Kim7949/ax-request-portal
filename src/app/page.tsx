@@ -29,7 +29,7 @@ export function PageHeader({ title, description, back, actions, eyebrow, classNa
       ) : null}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
-          {eyebrow ? <div className="text-sm font-semibold text-brand-600">{eyebrow}</div> : null}
+          {eyebrow ? <div className="text-sm font-semibold text-accent">{eyebrow}</div> : null}
           <h1 className="text-2xl leading-tight font-bold tracking-tight text-ink-900 sm:text-[28px]">
             {title}
           </h1>

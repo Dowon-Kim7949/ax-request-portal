@@ -11,12 +11,13 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        primary: 'bg-brand-600 text-white not-disabled:hover:bg-brand-700 not-disabled:active:bg-brand-700',
+        primary:
+          'bg-brand-600 text-white not-disabled:hover:bg-brand-hover not-disabled:active:bg-brand-hover',
         secondary: 'bg-muted text-ink-900 ring-1 ring-line ring-inset not-disabled:hover:bg-line/60',
-        outline: 'bg-surface text-ink-900 ring-1 ring-line-strong ring-inset not-disabled:hover:bg-muted',
+        outline: 'bg-surface text-ink-900 ring-1 ring-field ring-inset not-disabled:hover:bg-muted',
         ghost: 'text-ink-700 not-disabled:hover:bg-muted',
-        danger: 'bg-danger-50 text-danger-600 not-disabled:hover:bg-danger-600 not-disabled:hover:text-white',
-        link: 'h-auto px-0 text-brand-600 underline-offset-4 not-disabled:hover:underline',
+        danger: 'bg-danger-50 text-danger-fg not-disabled:hover:bg-danger-600 not-disabled:hover:text-white',
+        link: 'h-auto px-0 text-accent underline-offset-4 not-disabled:hover:underline',
       },
       size: {
         // 44px minimum touch target on every interactive size except "sm" used inside dense desktop rows

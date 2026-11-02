@@ -60,7 +60,7 @@ export function ErrorState({
       role="alert"
       className="flex flex-col items-center gap-3 rounded-(--radius-card) bg-surface px-6 py-12 text-center ring-1 ring-line"
     >
-      <span className="grid size-12 place-items-center rounded-full bg-danger-50 text-danger-600">
+      <span className="grid size-12 place-items-center rounded-full bg-danger-50 text-danger-fg">
         <CircleAlert className="size-6" aria-hidden />
       </span>
       <p className="font-bold text-ink-900">{title}</p>

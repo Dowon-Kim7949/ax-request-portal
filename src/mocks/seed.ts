@@ -1,10 +1,13 @@
 /**
- * Fictional demo data. Every name, project, repository and e-mail here is
- * made up. Requests are produced by running the real lifecycle through the
- * engine, so the seed can never contain a state the rules would not allow.
+ * Fictional demo data in Korean and English. Every name, project, repository
+ * and e-mail here is made up. The structure (ids, who does what, when) is
+ * shared; only the words differ per language. Requests are produced by
+ * running the real lifecycle through the engine, so the seed can never
+ * contain a state the rules would not allow.
  */
 import type { TransitionCommand } from '../domain/lifecycle'
-import type { NotificationSettings, Project, RequestDraft, User } from '../domain/model'
+import type { NotificationSettings, Project, RequestDraft, User, WorkRequest } from '../domain/model'
+import type { ServerLanguage } from './copy'
 import {
   addDays,
   DEFAULT_NOTIFICATION_SETTINGS,
@@ -17,51 +20,56 @@ import {
 
 export const DEMO_PASSWORD = 'demo'
 
-export const SEED_USERS: User[] = [
-  {
-    id: 'u-kim',
-    name: '김기획',
-    email: 'planner@example.com',
-    role: 'requester',
-    team: '기획팀',
-    active: true,
-  },
-  {
-    id: 'u-lee',
-    name: '이영업',
-    email: 'sales@example.com',
-    role: 'requester',
-    team: '영업팀',
-    active: true,
-  },
-  { id: 'u-park', name: '박대표', email: 'ceo@example.com', role: 'executive', team: '경영', active: true },
-  {
-    id: 'u-choi',
-    name: '최개발',
-    email: 'dev1@example.com',
-    role: 'developer',
-    team: '개발팀',
-    active: true,
-  },
-  {
-    id: 'u-jung',
-    name: '정개발',
-    email: 'dev2@example.com',
-    role: 'developer',
-    team: '개발팀',
-    active: true,
-  },
-  { id: 'u-han', name: '한운영', email: 'admin@example.com', role: 'admin', team: '운영팀', active: true },
+/* ------------------------------------------------------------------ */
+/* Users                                                               */
+/* ------------------------------------------------------------------ */
+
+const USERS: Array<Pick<User, 'id' | 'email' | 'role'>> = [
+  { id: 'u-kim', email: 'planner@example.com', role: 'requester' },
+  { id: 'u-lee', email: 'sales@example.com', role: 'requester' },
+  { id: 'u-park', email: 'ceo@example.com', role: 'executive' },
+  { id: 'u-choi', email: 'dev1@example.com', role: 'developer' },
+  { id: 'u-jung', email: 'dev2@example.com', role: 'developer' },
+  { id: 'u-han', email: 'admin@example.com', role: 'admin' },
 ]
 
-/** One demo account per role, shown on the login screen in mock mode. */
-export const DEMO_ACCOUNTS = SEED_USERS.filter((u) => ['u-kim', 'u-park', 'u-choi', 'u-han'].includes(u.id))
+const USER_COPY: Record<ServerLanguage, Record<string, { name: string; team: string }>> = {
+  ko: {
+    'u-kim': { name: '김기획', team: '기획팀' },
+    'u-lee': { name: '이영업', team: '영업팀' },
+    'u-park': { name: '박대표', team: '경영' },
+    'u-choi': { name: '최개발', team: '개발팀' },
+    'u-jung': { name: '정개발', team: '개발팀' },
+    'u-han': { name: '한운영', team: '운영팀' },
+  },
+  en: {
+    'u-kim': { name: 'Mina Kim', team: 'Planning' },
+    'u-lee': { name: 'Leo Lee', team: 'Sales' },
+    'u-park': { name: 'Daniel Park', team: 'Management' },
+    'u-choi': { name: 'Chris Choi', team: 'Engineering' },
+    'u-jung': { name: 'Sam Jung', team: 'Engineering' },
+    'u-han': { name: 'Hana Han', team: 'Operations' },
+  },
+}
 
-const SEED_PROJECTS: Project[] = [
+/** One demo account per role, shown on the login screen in mock mode. */
+export const DEMO_ACCOUNT_IDS = ['u-kim', 'u-park', 'u-choi', 'u-han'] as const
+
+export function seedUsers(lang: ServerLanguage): User[] {
+  return USERS.map((u) => ({ ...u, ...USER_COPY[lang][u.id]!, active: true }))
+}
+
+/* ------------------------------------------------------------------ */
+/* Projects                                                            */
+/* ------------------------------------------------------------------ */
+
+type ProjectBase = Omit<Project, 'name' | 'description' | 'targets'> & {
+  targets: Array<{ id: string; wikiDoc?: string }>
+}
+
+const PROJECTS: ProjectBase[] = [
   {
     id: 'p-portal',
-    name: '고객 포털 웹',
-    description: '고객이 로그인해 계약·결제·공지를 확인하는 웹 서비스',
     icon: 'globe',
     repository: { provider: 'gitlab', url: 'https://gitlab.example.com/acme/customer-portal' },
     wikiPath: 'docs/llm-wiki',
@@ -69,19 +77,17 @@ const SEED_PROJECTS: Project[] = [
     ownerIds: ['u-choi'],
     active: true,
     targets: [
-      { id: 't-login', name: '로그인', wikiDoc: 'domains/auth/login.md' },
-      { id: 't-password-reset', name: '비밀번호 재설정', wikiDoc: 'domains/auth/password-reset.md' },
-      { id: 't-auto-login', name: '자동 로그인', wikiDoc: 'domains/auth/auto-login.md' },
-      { id: 't-signup', name: '회원가입', wikiDoc: 'domains/auth/signup.md' },
-      { id: 't-mypage', name: '마이페이지', wikiDoc: 'domains/account/mypage.md' },
-      { id: 't-notice', name: '공지사항', wikiDoc: 'domains/board/notice.md' },
-      { id: 't-payments', name: '결제 내역', wikiDoc: 'domains/billing/payments.md' },
+      { id: 't-login', wikiDoc: 'domains/auth/login.md' },
+      { id: 't-password-reset', wikiDoc: 'domains/auth/password-reset.md' },
+      { id: 't-auto-login', wikiDoc: 'domains/auth/auto-login.md' },
+      { id: 't-signup', wikiDoc: 'domains/auth/signup.md' },
+      { id: 't-mypage', wikiDoc: 'domains/account/mypage.md' },
+      { id: 't-notice', wikiDoc: 'domains/board/notice.md' },
+      { id: 't-payments', wikiDoc: 'domains/billing/payments.md' },
     ],
   },
   {
     id: 'p-field',
-    name: '현장 작업자 앱',
-    description: '현장 작업자가 작업 지시를 받고 사진으로 결과를 올리는 모바일 앱',
     icon: 'smartphone',
     repository: { provider: 'github', url: 'https://github.com/acme/field-worker-app' },
     wikiPath: 'docs/llm-wiki',
@@ -89,17 +95,15 @@ const SEED_PROJECTS: Project[] = [
     ownerIds: ['u-jung'],
     active: true,
     targets: [
-      { id: 't-task-list', name: '작업 목록', wikiDoc: 'domains/tasks/list.md' },
-      { id: 't-task-detail', name: '작업 상세', wikiDoc: 'domains/tasks/detail.md' },
-      { id: 't-photo', name: '사진 업로드', wikiDoc: 'domains/media/photo-upload.md' },
-      { id: 't-offline', name: '오프라인 동기화', wikiDoc: 'domains/sync/offline.md' },
-      { id: 't-push', name: '푸시 알림' },
+      { id: 't-task-list', wikiDoc: 'domains/tasks/list.md' },
+      { id: 't-task-detail', wikiDoc: 'domains/tasks/detail.md' },
+      { id: 't-photo', wikiDoc: 'domains/media/photo-upload.md' },
+      { id: 't-offline', wikiDoc: 'domains/sync/offline.md' },
+      { id: 't-push' },
     ],
   },
   {
     id: 'p-admin',
-    name: '관리자 대시보드',
-    description: '운영팀이 사용자·권한·통계를 관리하는 내부 화면',
     icon: 'layout-dashboard',
     repository: { provider: 'gitlab', url: 'https://gitlab.example.com/acme/admin-console' },
     wikiPath: 'docs/llm-wiki',
@@ -107,16 +111,14 @@ const SEED_PROJECTS: Project[] = [
     ownerIds: ['u-choi', 'u-jung'],
     active: true,
     targets: [
-      { id: 't-users', name: '사용자 관리', wikiDoc: 'domains/users.md' },
-      { id: 't-stats', name: '통계', wikiDoc: 'domains/stats.md' },
-      { id: 't-roles', name: '권한 설정', wikiDoc: 'domains/roles.md' },
-      { id: 't-announce', name: '공지 작성', wikiDoc: 'domains/announce.md' },
+      { id: 't-users', wikiDoc: 'domains/users.md' },
+      { id: 't-stats', wikiDoc: 'domains/stats.md' },
+      { id: 't-roles', wikiDoc: 'domains/roles.md' },
+      { id: 't-announce', wikiDoc: 'domains/announce.md' },
     ],
   },
   {
     id: 'p-data',
-    name: '데이터 분석 서버',
-    description: '리포트 API와 야간 배치를 제공하는 백엔드',
     icon: 'server',
     repository: { provider: 'github', url: 'https://github.com/acme/analytics-server' },
     wikiPath: 'docs/llm-wiki',
@@ -124,15 +126,115 @@ const SEED_PROJECTS: Project[] = [
     ownerIds: ['u-jung'],
     active: true,
     targets: [
-      { id: 't-report-api', name: '리포트 API', wikiDoc: 'domains/report-api.md' },
-      { id: 't-batch', name: '배치 작업', wikiDoc: 'domains/batch.md' },
-      { id: 't-export', name: '데이터 내보내기', wikiDoc: 'domains/export.md' },
+      { id: 't-report-api', wikiDoc: 'domains/report-api.md' },
+      { id: 't-batch', wikiDoc: 'domains/batch.md' },
+      { id: 't-export', wikiDoc: 'domains/export.md' },
     ],
   },
 ]
 
+const PROJECT_COPY: Record<
+  ServerLanguage,
+  Record<string, { name: string; description: string; targets: Record<string, string> }>
+> = {
+  ko: {
+    'p-portal': {
+      name: '고객 포털 웹',
+      description: '고객이 로그인해 계약·결제·공지를 확인하는 웹 서비스',
+      targets: {
+        't-login': '로그인',
+        't-password-reset': '비밀번호 재설정',
+        't-auto-login': '자동 로그인',
+        't-signup': '회원가입',
+        't-mypage': '마이페이지',
+        't-notice': '공지사항',
+        't-payments': '결제 내역',
+      },
+    },
+    'p-field': {
+      name: '현장 작업자 앱',
+      description: '현장 작업자가 작업 지시를 받고 사진으로 결과를 올리는 모바일 앱',
+      targets: {
+        't-task-list': '작업 목록',
+        't-task-detail': '작업 상세',
+        't-photo': '사진 업로드',
+        't-offline': '오프라인 동기화',
+        't-push': '푸시 알림',
+      },
+    },
+    'p-admin': {
+      name: '관리자 대시보드',
+      description: '운영팀이 사용자·권한·통계를 관리하는 내부 화면',
+      targets: {
+        't-users': '사용자 관리',
+        't-stats': '통계',
+        't-roles': '권한 설정',
+        't-announce': '공지 작성',
+      },
+    },
+    'p-data': {
+      name: '데이터 분석 서버',
+      description: '리포트 API와 야간 배치를 제공하는 백엔드',
+      targets: { 't-report-api': '리포트 API', 't-batch': '배치 작업', 't-export': '데이터 내보내기' },
+    },
+  },
+  en: {
+    'p-portal': {
+      name: 'Customer Portal',
+      description: 'Web service where customers sign in to see contracts, payments and notices',
+      targets: {
+        't-login': 'Sign-in',
+        't-password-reset': 'Password reset',
+        't-auto-login': 'Auto sign-in',
+        't-signup': 'Sign-up',
+        't-mypage': 'My page',
+        't-notice': 'Notices',
+        't-payments': 'Payment history',
+      },
+    },
+    'p-field': {
+      name: 'Field Worker App',
+      description: 'Mobile app where field workers receive jobs and report results with photos',
+      targets: {
+        't-task-list': 'Job list',
+        't-task-detail': 'Job detail',
+        't-photo': 'Photo upload',
+        't-offline': 'Offline sync',
+        't-push': 'Push notifications',
+      },
+    },
+    'p-admin': {
+      name: 'Admin Console',
+      description: 'Internal screens where operations manage users, permissions and statistics',
+      targets: {
+        't-users': 'User management',
+        't-stats': 'Statistics',
+        't-roles': 'Permissions',
+        't-announce': 'Announcements',
+      },
+    },
+    'p-data': {
+      name: 'Analytics Server',
+      description: 'Backend serving the report API and nightly batches',
+      targets: { 't-report-api': 'Report API', 't-batch': 'Batch jobs', 't-export': 'Data export' },
+    },
+  },
+}
+
+function seedProjects(lang: ServerLanguage): Project[] {
+  return PROJECTS.map((p) => {
+    const c = PROJECT_COPY[lang][p.id]!
+    return {
+      ...structuredClone(p),
+      name: c.name,
+      description: c.description,
+      targets: p.targets.map((t) => ({ ...t, name: c.targets[t.id]! })),
+    }
+  })
+}
+
 /* ------------------------------------------------------------------ */
-/* Scenario DSL                                                        */
+/* Scenarios: structure shared, words per language                     */
 /* ------------------------------------------------------------------ */
 
 type Step =
@@ -141,14 +243,33 @@ type Step =
   | { h: number; by: string; command: TransitionCommand }
   | { h: number; by: string; release: string | number }
 
+interface ScenarioCopy {
+  title: string
+  current: string
+  desired: string
+  criteria: string[]
+  targetOther?: string
+  outOfScope?: string
+  dateReason?: string
+  questions?: string[]
+  answer?: string
+  reason?: string
+  memo?: string
+  issueNote?: string
+}
+
 interface Scenario {
   by: string
   /** Hours before seeding when the request was filed */
   h: number
-  draft: Omit<RequestDraft, 'attachmentIds' | 'acceptanceCriteria'> & { criteria: string[] }
-  steps?: Step[]
+  projectId: string
+  type: RequestDraft['type']
+  targetIds: string[]
+  /** Days relative to today, e.g. -3 or 10 */
+  desiredInDays?: number
+  steps?: (c: ScenarioCopy) => Step[]
   /** Final touch-ups to match a showcase screen exactly */
-  patch?: (req: MockState['requests'][number]) => MockState['requests'][number]
+  patch?: (r: WorkRequest, lang: ServerLanguage) => WorkRequest
 }
 
 const passAll = (n: number) =>
@@ -175,140 +296,83 @@ function shipped(
   ]
 }
 
+/** Same order as SCENARIO_COPY. Ids are assigned from 1012 in this order. */
 const SCENARIOS: Scenario[] = [
-  {
+  /* 1012 */ {
     by: 'u-kim',
     h: 24 * 30,
-    draft: {
-      projectId: 'p-portal',
-      type: 'new_feature',
-      title: '공지사항 첨부파일 미리보기',
-      targetIds: ['t-notice'],
-      currentBehavior: '첨부파일을 내려받아야만 내용을 볼 수 있다',
-      desiredBehavior: 'PDF와 이미지 첨부는 공지 화면에서 바로 미리 본다',
-      criteria: ['PDF 첨부를 누르면 새 창 없이 미리보기가 열린다', '이미지 첨부를 누르면 확대 화면이 열린다'],
-    },
-    steps: shipped('u-choi', 'u-kim', 24 * 30, 2, 9),
+    projectId: 'p-portal',
+    type: 'new_feature',
+    targetIds: ['t-notice'],
+    steps: () => shipped('u-choi', 'u-kim', 24 * 30, 2, 9),
   },
-  {
+  /* 1013 */ {
     by: 'u-lee',
     h: 24 * 25,
-    draft: {
-      projectId: 'p-field',
-      type: 'change',
-      title: '사진 업로드 시 자동 압축',
-      targetIds: ['t-photo'],
-      currentBehavior: '고화질 사진은 업로드가 30초 이상 걸린다',
-      desiredBehavior: '올리기 전에 사진 크기를 줄여서 빨리 올라가게 한다',
-      criteria: ['10MB 사진을 올리면 2MB 이하로 줄어서 저장된다'],
-    },
-    steps: shipped('u-jung', 'u-lee', 24 * 25, 1, 12),
+    projectId: 'p-field',
+    type: 'change',
+    targetIds: ['t-photo'],
+    steps: () => shipped('u-jung', 'u-lee', 24 * 25, 1, 12),
   },
-  {
+  /* 1014 */ {
     by: 'u-kim',
     h: 24 * 18,
-    draft: {
-      projectId: 'p-admin',
-      type: 'change',
-      title: '통계 화면 날짜 범위 선택',
-      targetIds: ['t-stats'],
-      currentBehavior: '통계는 최근 7일만 볼 수 있다',
-      desiredBehavior: '시작일과 종료일을 골라서 본다',
-      criteria: ['시작일과 종료일을 고르면 그 기간의 통계가 표시된다'],
-    },
-    steps: shipped('u-choi', 'u-kim', 24 * 18, 1, 11),
+    projectId: 'p-admin',
+    type: 'change',
+    targetIds: ['t-stats'],
+    steps: () => shipped('u-choi', 'u-kim', 24 * 18, 1, 11),
   },
-  {
+  /* 1015 */ {
     by: 'u-lee',
     h: 24 * 14,
-    draft: {
-      projectId: 'p-portal',
-      type: 'new_feature',
-      title: '결제 내역 영수증 다운로드',
-      targetIds: ['t-payments'],
-      currentBehavior: '영수증이 필요하면 고객센터에 요청해야 한다',
-      desiredBehavior: '결제 내역에서 영수증 PDF를 바로 받는다',
-      criteria: ['결제 건의 영수증 버튼을 누르면 PDF가 내려받아진다'],
-      desiredDate: undefined,
-    },
-    steps: shipped('u-choi', 'u-lee', 24 * 14, 1, 12),
+    projectId: 'p-portal',
+    type: 'new_feature',
+    targetIds: ['t-payments'],
+    steps: () => shipped('u-choi', 'u-lee', 24 * 14, 1, 12),
   },
-  {
+  /* 1016 */ {
     by: 'u-lee',
     h: 24 * 12,
-    draft: {
-      projectId: 'p-portal',
-      type: 'non_code',
-      title: '영업 제안서용 화면 캡처 요청',
-      targetIds: [],
-      currentBehavior: '',
-      desiredBehavior: '제안서에 넣을 주요 화면 캡처 10장이 필요합니다',
-      criteria: ['주요 화면 캡처 10장을 받으면 끝난다'],
-    },
-    steps: [
+    projectId: 'p-portal',
+    type: 'non_code',
+    targetIds: [],
+    steps: (c) => [
       { h: 24 * 12 - 1, ai: true },
-      {
-        h: 24 * 11,
-        by: 'u-choi',
-        command: { event: 'reject', reason: '코드 변경이 필요 없는 요청이라 디자인팀에 직접 전달했습니다.' },
-      },
+      { h: 24 * 11, by: 'u-choi', command: { event: 'reject', reason: c.reason! } },
     ],
   },
-  {
+  /* 1017 */ {
     by: 'u-kim',
     h: 24 * 10,
-    draft: {
-      projectId: 'p-admin',
-      type: 'new_feature',
-      title: '통계 화면 엑셀 내보내기',
-      targetIds: ['t-stats'],
-      currentBehavior: '통계 수치를 손으로 옮겨 적는다',
-      desiredBehavior: '보고 있는 통계를 엑셀 파일로 내려받는다',
-      criteria: ['엑셀 버튼을 누르면 화면과 같은 수치의 xlsx 파일이 내려받아진다'],
-      desiredDate: '__DAYS_AGO_3__',
-      desiredDateReason: '월간 경영 보고',
-    },
-    steps: [
+    projectId: 'p-admin',
+    type: 'new_feature',
+    targetIds: ['t-stats'],
+    desiredInDays: -3,
+    steps: () => [
       { h: 24 * 10 - 1, ai: true },
       { h: 24 * 9, by: 'u-choi', command: { event: 'runWork' } },
       { h: 24 * 9 - 1, ai: true },
       { h: 24 * 8, by: 'u-choi', command: { event: 'approveMerge' } },
     ],
   },
-  {
+  /* 1018 */ {
     by: 'u-lee',
     h: 24 * 9,
-    draft: {
-      projectId: 'p-data',
-      type: 'bug',
-      title: '데이터 내보내기 CSV 한글 깨짐',
-      targetIds: ['t-export'],
-      currentBehavior: '1. 데이터 내보내기에서 CSV 선택\n2. 엑셀로 열면 한글이 깨진다',
-      desiredBehavior: '엑셀에서 열어도 한글이 정상으로 보인다',
-      criteria: ['내보낸 CSV를 엑셀로 열면 한글이 깨지지 않는다'],
-    },
-    steps: [
+    projectId: 'p-data',
+    type: 'bug',
+    targetIds: ['t-export'],
+    steps: (c) => [
       { h: 24 * 9 - 1, ai: true },
-      {
-        h: 24 * 8,
-        by: 'u-lee',
-        command: { event: 'cancel', reason: '엑셀 가져오기 기능으로 해결했습니다.' },
-      },
+      { h: 24 * 8, by: 'u-lee', command: { event: 'cancel', reason: c.reason! } },
     ],
   },
-  {
+  /* 1019 */ {
     by: 'u-kim',
     h: 24 * 8,
-    draft: {
-      projectId: 'p-portal',
-      type: 'change',
-      title: '결제 내역 날짜 필터',
-      targetIds: ['t-payments'],
-      currentBehavior: '결제 내역이 전부 한 목록에 나온다',
-      desiredBehavior: '기간을 골라 결제 내역을 본다',
-      criteria: ['기간을 고르면 그 기간의 결제만 목록에 나온다'],
-    },
-    steps: [
+    projectId: 'p-portal',
+    type: 'change',
+    targetIds: ['t-payments'],
+    steps: () => [
       { h: 24 * 8 - 1, ai: true },
       { h: 24 * 7, by: 'u-choi', command: { event: 'runWork' } },
       { h: 24 * 7 - 1, ai: true },
@@ -317,19 +381,13 @@ const SCENARIOS: Scenario[] = [
       { h: 24 * 3, by: 'u-choi', release: 1 },
     ],
   },
-  {
+  /* 1020 */ {
     by: 'u-lee',
     h: 24 * 7,
-    draft: {
-      projectId: 'p-field',
-      type: 'bug',
-      title: '오프라인 동기화 실패 시 재시도 버튼',
-      targetIds: ['t-offline'],
-      currentBehavior: '1. 비행기 모드에서 작업 완료\n2. 온라인이 되어도 동기화 실패 표시만 남는다',
-      desiredBehavior: '실패한 동기화를 다시 시도할 수 있다',
-      criteria: ['동기화 실패 표시에서 다시 시도를 누르면 업로드가 다시 진행된다'],
-    },
-    steps: [
+    projectId: 'p-field',
+    type: 'bug',
+    targetIds: ['t-offline'],
+    steps: () => [
       { h: 24 * 7 - 1, ai: true },
       { h: 24 * 6, by: 'u-jung', command: { event: 'runWork' } },
       { h: 24 * 6 - 1, ai: true },
@@ -338,68 +396,37 @@ const SCENARIOS: Scenario[] = [
       { h: 24 * 2, by: 'u-jung', release: 3 },
     ],
   },
-  {
+  /* 1021 */ {
     by: 'u-kim',
     h: 24 * 5,
-    draft: {
-      projectId: 'p-portal',
-      type: 'copy_design',
-      title: '마이페이지 안내 문구 수정',
-      targetIds: ['t-mypage'],
-      currentBehavior: '“정보 변경은 고객센터로 문의”라고만 나온다',
-      desiredBehavior: '직접 바꿀 수 있는 항목과 문의가 필요한 항목을 나눠 안내한다',
-      criteria: [
-        '마이페이지를 열면 직접 바꿀 수 있는 항목 안내가 보인다',
-        '문의가 필요한 항목 옆에 고객센터 연결 버튼이 보인다',
-      ],
-    },
-    steps: [
+    projectId: 'p-portal',
+    type: 'copy_design',
+    targetIds: ['t-mypage'],
+    steps: () => [
       { h: 24 * 5 - 1, ai: true },
       { h: 24 * 4, by: 'u-choi', command: { event: 'runWork' } },
       { h: 24 * 4 - 1, ai: true },
       { h: 24 * 2, by: 'u-choi', command: { event: 'approveMerge' } },
     ],
   },
-  {
+  /* 1022 */ {
     by: 'u-lee',
     h: 24 * 4,
-    draft: {
-      projectId: 'p-data',
-      type: 'change',
-      title: '리포트 API 응답 속도 개선',
-      targetIds: ['t-report-api'],
-      currentBehavior: '월간 리포트를 열 때 오래 기다린다',
-      desiredBehavior: '좀 빠르게 열렸으면 합니다',
-      criteria: ['월간 리포트가 빠르게 열린다'],
-    },
-    steps: [
+    projectId: 'p-data',
+    type: 'change',
+    targetIds: ['t-report-api'],
+    steps: (c) => [
       { h: 24 * 4 - 1, ai: true },
-      {
-        h: 24 * 3,
-        by: 'u-jung',
-        command: {
-          event: 'requestInfo',
-          questions: ['어느 리포트가 느린가요? (예: 월간 매출 리포트)', '몇 초 안에 열리면 충분할까요?'],
-        },
-      },
+      { h: 24 * 3, by: 'u-jung', command: { event: 'requestInfo', questions: c.questions! } },
     ],
   },
-  {
+  /* 1023 */ {
     by: 'u-lee',
     h: 24 * 4 - 2,
-    draft: {
-      projectId: 'p-field',
-      type: 'new_feature',
-      title: '작업 목록 정렬 옵션 추가',
-      targetIds: ['t-task-list'],
-      currentBehavior: '작업 목록이 등록 순서로만 보인다',
-      desiredBehavior: '마감일 순, 거리 순으로 정렬한다',
-      criteria: [
-        '정렬에서 마감일 순을 고르면 마감이 빠른 작업이 위에 온다',
-        '정렬에서 거리 순을 고르면 가까운 작업이 위에 온다',
-      ],
-    },
-    steps: [
+    projectId: 'p-field',
+    type: 'new_feature',
+    targetIds: ['t-task-list'],
+    steps: (c) => [
       { h: 24 * 4 - 3, ai: true },
       { h: 24 * 3, by: 'u-jung', command: { event: 'runWork' } },
       { h: 24 * 3 - 1, ai: true },
@@ -411,186 +438,452 @@ const SCENARIOS: Scenario[] = [
           event: 'reportIssue',
           checks: [
             { criterionId: 'c1', result: 'passed' },
-            { criterionId: 'c2', result: 'failed', note: '위치 권한을 끄면 거리 순이 아무 반응이 없습니다' },
+            { criterionId: 'c2', result: 'failed', note: c.issueNote! },
           ],
         },
       },
     ],
   },
-  {
+  /* 1024: the showcase work-detail screen (MR !57, 128 tests) */ {
     by: 'u-kim',
     h: 24 * 3,
-    draft: {
-      projectId: 'p-portal',
-      type: 'change',
+    projectId: 'p-portal',
+    type: 'change',
+    targetIds: ['t-login', 't-password-reset'],
+    desiredInDays: 10,
+    steps: (c) => [
+      { h: 24 * 3 - 1, ai: true },
+      { h: 24 * 2 + 6, by: 'u-choi', command: { event: 'requestInfo', questions: c.questions! } },
+      { h: 24 * 2, by: 'u-kim', command: { event: 'provideInfo', answer: c.answer! } },
+      { h: 24 * 2 - 1, ai: true },
+      { h: 24, by: 'u-choi', command: { event: 'runWork', instructions: c.memo! } },
+      { h: 23, ai: true },
+    ],
+    patch: (r, lang) => showcase1024(r, lang),
+  },
+  /* 1025: AI work running when the demo opens */ {
+    by: 'u-kim',
+    h: 26,
+    projectId: 'p-admin',
+    type: 'new_feature',
+    targetIds: ['t-roles'],
+    steps: () => [
+      { h: 25, ai: true },
+      { h: 8 / 3600, by: 'u-choi', command: { event: 'runWork' } },
+    ],
+  },
+  /* 1026 */ {
+    by: 'u-lee',
+    h: 20,
+    projectId: 'p-portal',
+    type: 'change',
+    targetIds: ['t-signup'],
+    steps: () => [{ h: 19, ai: true }],
+  },
+  /* 1027: report being written when the demo opens */ {
+    by: 'u-kim',
+    h: 3 / 3600,
+    projectId: 'p-field',
+    type: 'new_feature',
+    targetIds: ['t-push', 't-task-detail'],
+  },
+]
+
+const SCENARIO_COPY: Record<ServerLanguage, ScenarioCopy[]> = {
+  ko: [
+    {
+      title: '공지사항 첨부파일 미리보기',
+      current: '첨부파일을 내려받아야만 내용을 볼 수 있다',
+      desired: 'PDF와 이미지 첨부는 공지 화면에서 바로 미리 본다',
+      criteria: ['PDF 첨부를 누르면 새 창 없이 미리보기가 열린다', '이미지 첨부를 누르면 확대 화면이 열린다'],
+    },
+    {
+      title: '사진 업로드 시 자동 압축',
+      current: '고화질 사진은 업로드가 30초 이상 걸린다',
+      desired: '올리기 전에 사진 크기를 줄여서 빨리 올라가게 한다',
+      criteria: ['10MB 사진을 올리면 2MB 이하로 줄어서 저장된다'],
+    },
+    {
+      title: '통계 화면 날짜 범위 선택',
+      current: '통계는 최근 7일만 볼 수 있다',
+      desired: '시작일과 종료일을 골라서 본다',
+      criteria: ['시작일과 종료일을 고르면 그 기간의 통계가 표시된다'],
+    },
+    {
+      title: '결제 내역 영수증 다운로드',
+      current: '영수증이 필요하면 고객센터에 요청해야 한다',
+      desired: '결제 내역에서 영수증 PDF를 바로 받는다',
+      criteria: ['결제 건의 영수증 버튼을 누르면 PDF가 내려받아진다'],
+    },
+    {
+      title: '영업 제안서용 화면 캡처 요청',
+      current: '',
+      desired: '제안서에 넣을 주요 화면 캡처 10장이 필요합니다',
+      criteria: ['주요 화면 캡처 10장을 받으면 끝난다'],
+      reason: '코드 변경이 필요 없는 요청이라 디자인팀에 직접 전달했습니다.',
+    },
+    {
+      title: '통계 화면 엑셀 내보내기',
+      current: '통계 수치를 손으로 옮겨 적는다',
+      desired: '보고 있는 통계를 엑셀 파일로 내려받는다',
+      criteria: ['엑셀 버튼을 누르면 화면과 같은 수치의 xlsx 파일이 내려받아진다'],
+      dateReason: '월간 경영 보고',
+    },
+    {
+      title: '데이터 내보내기 CSV 한글 깨짐',
+      current: '1. 데이터 내보내기에서 CSV 선택\n2. 엑셀로 열면 한글이 깨진다',
+      desired: '엑셀에서 열어도 한글이 정상으로 보인다',
+      criteria: ['내보낸 CSV를 엑셀로 열면 한글이 깨지지 않는다'],
+      reason: '엑셀 가져오기 기능으로 해결했습니다.',
+    },
+    {
+      title: '결제 내역 날짜 필터',
+      current: '결제 내역이 전부 한 목록에 나온다',
+      desired: '기간을 골라 결제 내역을 본다',
+      criteria: ['기간을 고르면 그 기간의 결제만 목록에 나온다'],
+    },
+    {
+      title: '오프라인 동기화 실패 시 재시도 버튼',
+      current: '1. 비행기 모드에서 작업 완료\n2. 온라인이 되어도 동기화 실패 표시만 남는다',
+      desired: '실패한 동기화를 다시 시도할 수 있다',
+      criteria: ['동기화 실패 표시에서 다시 시도를 누르면 업로드가 다시 진행된다'],
+    },
+    {
+      title: '마이페이지 안내 문구 수정',
+      current: '“정보 변경은 고객센터로 문의”라고만 나온다',
+      desired: '직접 바꿀 수 있는 항목과 문의가 필요한 항목을 나눠 안내한다',
+      criteria: [
+        '마이페이지를 열면 직접 바꿀 수 있는 항목 안내가 보인다',
+        '문의가 필요한 항목 옆에 고객센터 연결 버튼이 보인다',
+      ],
+    },
+    {
+      title: '리포트 API 응답 속도 개선',
+      current: '월간 리포트를 열 때 오래 기다린다',
+      desired: '좀 빠르게 열렸으면 합니다',
+      criteria: ['월간 리포트가 빠르게 열린다'],
+      questions: ['어느 리포트가 느린가요? (예: 월간 매출 리포트)', '몇 초 안에 열리면 충분할까요?'],
+    },
+    {
+      title: '작업 목록 정렬 옵션 추가',
+      current: '작업 목록이 등록 순서로만 보인다',
+      desired: '마감일 순, 거리 순으로 정렬한다',
+      criteria: [
+        '정렬에서 마감일 순을 고르면 마감이 빠른 작업이 위에 온다',
+        '정렬에서 거리 순을 고르면 가까운 작업이 위에 온다',
+      ],
+      issueNote: '위치 권한을 끄면 거리 순이 아무 반응이 없습니다',
+    },
+    {
       title: '로그인 5회 실패 시 안내 문구 추가',
-      targetIds: ['t-login', 't-password-reset'],
-      currentBehavior: '비밀번호를 여러 번 틀려도 아무 안내가 없다',
-      desiredBehavior: '5번 틀리면 잠시 후 다시 시도하라는 안내가 보인다',
+      current: '비밀번호를 여러 번 틀려도 아무 안내가 없다',
+      desired: '5번 틀리면 잠시 후 다시 시도하라는 안내가 보인다',
       criteria: [
         '비밀번호를 5번 틀리면 ‘10분 후 다시 시도’ 안내가 보인다',
         '로그인하면 첫 화면이 대시보드로 열린다',
       ],
       outOfScope: '비밀번호 정책(길이, 조합) 변경',
-      desiredDate: '__DAYS_AHEAD_10__',
-      desiredDateReason: '고객사 보안 점검 일정',
+      dateReason: '고객사 보안 점검 일정',
+      questions: ['잠긴 계정을 관리자가 풀 수 있어야 하나요?'],
+      answer: '네, 관리자 화면에서 풀 수 있어야 합니다.',
+      memo: '기존 잠금 정책과 겹치지 않게 해 주세요.',
     },
-    steps: [
-      { h: 24 * 3 - 1, ai: true },
-      {
-        h: 24 * 2 + 6,
-        by: 'u-choi',
-        command: { event: 'requestInfo', questions: ['잠긴 계정을 관리자가 풀 수 있어야 하나요?'] },
-      },
-      {
-        h: 24 * 2,
-        by: 'u-kim',
-        command: { event: 'provideInfo', answer: '네, 관리자 화면에서 풀 수 있어야 합니다.' },
-      },
-      { h: 24 * 2 - 1, ai: true },
-      {
-        h: 24,
-        by: 'u-choi',
-        command: { event: 'runWork', instructions: '기존 잠금 정책과 겹치지 않게 해 주세요.' },
-      },
-      { h: 23, ai: true },
-    ],
-    patch: (r) => ({
-      ...r,
-      report: r.report && {
-        ...r.report,
-        evidence: {
-          ...r.report.evidence,
-          wikiDocs: [
-            ...r.report.evidence.wikiDocs,
-            { path: 'docs/llm-wiki/domains/auth/auto-login.md', title: '자동 로그인', verified: true },
-          ],
-        },
-        impact: {
-          changedScreens: ['로그인', '비밀번호 안내'],
-          recheck: ['자동 로그인', '비밀번호 재설정', '관리자 잠금 해제'],
-        },
-        plan: ['실패 횟수 저장', '안내 문구 표시', '테스트 추가'],
-        risks: ['기존 잠금 정책과 겹칠 수 있음'],
-      },
-      work: r.work && {
-        ...r.work,
-        summary:
-          '실패 횟수를 저장하고 5회째에 안내 문구를 보여 주도록 바꿨습니다. 잠금 해제 버튼은 관리자 화면에 추가했습니다.',
-        mergeRequest: r.work.mergeRequest && {
-          ...r.work.mergeRequest,
-          number: 57,
-          url: 'https://gitlab.example.com/acme/customer-portal/-/merge_requests/57',
-          filesChanged: 4,
-          additions: 86,
-          deletions: 12,
-        },
-        tests: { existingPassed: 128, existingTotal: 128, criteriaPassed: 2, criteriaTotal: 2 },
-      },
-      regression: [
-        {
-          id: 'rg-1024-1',
-          label: '자동 로그인',
-          source: 'docs/llm-wiki/domains/auth/auto-login.md',
-          result: 'pending',
-        },
-        {
-          id: 'rg-1024-2',
-          label: '비밀번호 재설정',
-          source: 'docs/llm-wiki/domains/auth/password-reset.md',
-          result: 'pending',
-        },
-        {
-          id: 'rg-1024-3',
-          label: '관리자 잠금 해제',
-          source: 'docs/llm-wiki/domains/auth/login.md',
-          result: 'pending',
-        },
-      ],
-    }),
-  },
-  {
-    by: 'u-kim',
-    h: 26,
-    draft: {
-      projectId: 'p-admin',
-      type: 'new_feature',
+    {
       title: "권한 설정에 '읽기 전용' 역할 추가",
-      targetIds: ['t-roles'],
-      currentBehavior: '역할이 관리자와 일반 사용자 두 가지뿐이다',
-      desiredBehavior: '조회만 가능한 읽기 전용 역할을 만들 수 있다',
+      current: '역할이 관리자와 일반 사용자 두 가지뿐이다',
+      desired: '조회만 가능한 읽기 전용 역할을 만들 수 있다',
       criteria: ['읽기 전용 역할로 로그인하면 저장·삭제 버튼이 보이지 않는다'],
     },
-    steps: [
-      { h: 25, ai: true },
-      { h: 8 / 3600, by: 'u-choi', command: { event: 'runWork' } },
-    ],
-  },
-  {
-    by: 'u-lee',
-    h: 20,
-    draft: {
-      projectId: 'p-portal',
-      type: 'change',
+    {
       title: '회원가입 약관 동의 화면 개선',
-      targetIds: ['t-signup'],
-      targetOther: '약관 전문 팝업',
-      currentBehavior: '약관 5개를 하나씩 눌러 동의해야 한다',
-      desiredBehavior: '전체 동의 체크박스로 한 번에 동의할 수 있다',
+      current: '약관 5개를 하나씩 눌러 동의해야 한다',
+      desired: '전체 동의 체크박스로 한 번에 동의할 수 있다',
       criteria: [
         '전체 동의를 누르면 필수와 선택 약관이 모두 체크된다',
         '필수 약관을 하나라도 풀면 가입 버튼이 비활성화된다',
       ],
+      targetOther: '약관 전문 팝업',
     },
-    steps: [{ h: 19, ai: true }],
-  },
-  {
-    by: 'u-kim',
-    h: 3 / 3600,
-    draft: {
-      projectId: 'p-field',
-      type: 'new_feature',
+    {
       title: '푸시 알림 받을 항목 고르기',
-      targetIds: ['t-push', 't-task-detail'],
-      currentBehavior: '모든 알림이 한꺼번에 온다',
-      desiredBehavior: '작업 배정, 마감 임박, 공지 중 받을 알림을 고른다',
+      current: '모든 알림이 한꺼번에 온다',
+      desired: '작업 배정, 마감 임박, 공지 중 받을 알림을 고른다',
       criteria: ['설정에서 마감 임박을 끄면 마감 임박 알림이 오지 않는다'],
     },
+  ],
+  en: [
+    {
+      title: 'Preview attachments on notices',
+      current: 'Attachments have to be downloaded before you can see them',
+      desired: 'PDF and image attachments can be previewed right on the notice',
+      criteria: [
+        'When I tap a PDF attachment, a preview opens without a new window',
+        'When I tap an image attachment, a zoomed view opens',
+      ],
+    },
+    {
+      title: 'Compress photos before upload',
+      current: 'High-resolution photos take more than 30 seconds to upload',
+      desired: 'Shrink photos before upload so they go up quickly',
+      criteria: ['When I upload a 10 MB photo, it is saved at 2 MB or less'],
+    },
+    {
+      title: 'Date range on the statistics screen',
+      current: 'Statistics only show the last 7 days',
+      desired: 'Pick a start and end date',
+      criteria: ['When I pick a start and end date, statistics for that range are shown'],
+    },
+    {
+      title: 'Download receipts from payment history',
+      current: 'Customers have to ask support for a receipt',
+      desired: 'Download a PDF receipt straight from payment history',
+      criteria: ['When I tap the receipt button on a payment, a PDF downloads'],
+    },
+    {
+      title: 'Screenshots for a sales proposal',
+      current: '',
+      desired: 'We need 10 screenshots of the main screens for a proposal',
+      criteria: ['When I receive 10 screenshots of the main screens, this is done'],
+      reason: 'No code change is needed, so this went straight to the design team.',
+    },
+    {
+      title: 'Export statistics to Excel',
+      current: 'People copy the numbers by hand',
+      desired: 'Download the statistics on screen as an Excel file',
+      criteria: ['When I click Excel, an xlsx with the same numbers as the screen downloads'],
+      dateReason: 'Monthly management report',
+    },
+    {
+      title: 'Broken Korean text in CSV export',
+      current: '1. Choose CSV in data export\n2. Open it in Excel and the Korean text is garbled',
+      desired: 'Korean text looks right when opened in Excel',
+      criteria: ['When I open the exported CSV in Excel, the Korean text is readable'],
+      reason: 'Solved with the Excel import feature instead.',
+    },
+    {
+      title: 'Date filter on payment history',
+      current: 'All payments are shown in one list',
+      desired: 'Filter payment history by date range',
+      criteria: ['When I pick a range, only payments in that range are listed'],
+    },
+    {
+      title: 'Retry button when offline sync fails',
+      current: '1. Finish a job in airplane mode\n2. Back online, only a "sync failed" label remains',
+      desired: 'Failed syncs can be retried',
+      criteria: ['When I tap Retry on a failed sync, the upload runs again'],
+    },
+    {
+      title: 'Clearer guidance on My page',
+      current: 'It only says "Contact support to change your details"',
+      desired: 'Separate what people can change themselves from what needs support',
+      criteria: [
+        'When I open My page, the items I can change myself are explained',
+        'When an item needs support, a button to contact support is shown next to it',
+      ],
+    },
+    {
+      title: 'Faster report API',
+      current: 'Monthly reports take a long time to open',
+      desired: 'It would be nice if it opened somehow faster',
+      criteria: ['Monthly report opens fast'],
+      questions: ['Which report is slow? (e.g. monthly sales)', 'How many seconds would be fast enough?'],
+    },
+    {
+      title: 'Sort options for the job list',
+      current: 'Jobs are listed in the order they were created',
+      desired: 'Sort by due date or by distance',
+      criteria: [
+        'When I sort by due date, the jobs due soonest are on top',
+        'When I sort by distance, the closest jobs are on top',
+      ],
+      issueNote: 'With location permission off, sorting by distance does nothing',
+    },
+    {
+      title: 'Show a message after 5 failed sign-ins',
+      current: 'Nothing tells you anything after several wrong passwords',
+      desired: 'After 5 failures, a message says to try again later',
+      criteria: [
+        'When the password is wrong 5 times, "Try again in 10 minutes" is shown',
+        'When I sign in, the dashboard opens first',
+      ],
+      outOfScope: 'Password rules (length, characters)',
+      dateReason: 'Customer security audit',
+      questions: ['Should admins be able to unlock locked accounts?'],
+      answer: 'Yes, from the admin screen.',
+      memo: 'Do not overlap with the existing lockout policy.',
+    },
+    {
+      title: 'Add a read-only role to permissions',
+      current: 'There are only two roles: admin and regular user',
+      desired: 'Create a read-only role that can only view',
+      criteria: ['When I sign in with the read-only role, Save and Delete buttons are not shown'],
+    },
+    {
+      title: 'Simpler terms consent on sign-up',
+      current: 'People have to tick 5 terms one by one',
+      desired: 'Agree to everything with one "agree to all" checkbox',
+      criteria: [
+        'When I tick "agree to all", every required and optional term is ticked',
+        'When any required term is unticked, the sign-up button is disabled',
+      ],
+      targetOther: 'Full terms pop-up',
+    },
+    {
+      title: 'Choose which push notifications to get',
+      current: 'Every notification arrives, all at once',
+      desired: 'Pick between job assigned, due soon and announcements',
+      criteria: ['When I turn off "due soon" in settings, due-soon notifications stop'],
+    },
+  ],
+}
+
+const SHOWCASE_COPY: Record<
+  ServerLanguage,
+  { autoLogin: string; changed: string[]; recheck: string[]; plan: string[]; risk: string; summary: string }
+> = {
+  ko: {
+    autoLogin: '자동 로그인',
+    changed: ['로그인', '비밀번호 안내'],
+    recheck: ['자동 로그인', '비밀번호 재설정', '관리자 잠금 해제'],
+    plan: ['실패 횟수 저장', '안내 문구 표시', '테스트 추가'],
+    risk: '기존 잠금 정책과 겹칠 수 있음',
+    summary:
+      '실패 횟수를 저장하고 5회째에 안내 문구를 보여 주도록 바꿨습니다. 잠금 해제 버튼은 관리자 화면에 추가했습니다.',
   },
-]
+  en: {
+    autoLogin: 'Auto sign-in',
+    changed: ['Sign-in', 'Password message'],
+    recheck: ['Auto sign-in', 'Password reset', 'Admin unlock'],
+    plan: ['Store the failure count', 'Show the message', 'Add tests'],
+    risk: 'May overlap with the existing lockout policy',
+    summary:
+      'Failed attempts are now counted and the message appears on the fifth. An unlock button was added to the admin screen.',
+  },
+}
+
+function showcase1024(r: WorkRequest, lang: ServerLanguage): WorkRequest {
+  const c = SHOWCASE_COPY[lang]
+  const docs = ['domains/auth/auto-login.md', 'domains/auth/password-reset.md', 'domains/auth/login.md']
+  return {
+    ...r,
+    report: r.report && {
+      ...r.report,
+      evidence: {
+        ...r.report.evidence,
+        wikiDocs: [
+          ...r.report.evidence.wikiDocs,
+          { path: 'docs/llm-wiki/domains/auth/auto-login.md', title: c.autoLogin, verified: true },
+        ],
+      },
+      impact: { changedScreens: c.changed, recheck: c.recheck },
+      plan: c.plan,
+      risks: [c.risk],
+    },
+    work: r.work && {
+      ...r.work,
+      summary: c.summary,
+      mergeRequest: r.work.mergeRequest && {
+        ...r.work.mergeRequest,
+        number: 57,
+        url: 'https://gitlab.example.com/acme/customer-portal/-/merge_requests/57',
+        filesChanged: 4,
+        additions: 86,
+        deletions: 12,
+      },
+      tests: { existingPassed: 128, existingTotal: 128, criteriaPassed: 2, criteriaTotal: 2 },
+    },
+    regression: c.recheck.map((label, i) => ({
+      id: `rg-1024-${i + 1}`,
+      label,
+      source: `docs/llm-wiki/${docs[i]}`,
+      result: 'pending' as const,
+    })),
+  }
+}
 
 /** Older finished requests so the dashboard has a believable history. */
-const BACKGROUND: Array<[string, RequestDraft['type'], string, string]> = [
-  ['p-portal', 'bug', '공지사항 목록 페이지 번호 오류', 't-notice'],
-  ['p-field', 'change', '작업 상세 지도 확대 단계 조정', 't-task-detail'],
-  ['p-admin', 'copy_design', '사용자 관리 버튼 문구 통일', 't-users'],
-  ['p-portal', 'change', '마이페이지 연락처 형식 검사', 't-mypage'],
-  ['p-data', 'bug', '야간 배치 실패 알림 누락', 't-batch'],
-  ['p-field', 'new_feature', '작업 완료 사진 여러 장 선택', 't-photo'],
-  ['p-portal', 'copy_design', '로그인 화면 오류 문구 정리', 't-login'],
-  ['p-admin', 'change', '공지 작성 미리보기 추가', 't-announce'],
-  ['p-portal', 'bug', '결제 내역 금액 쉼표 누락', 't-payments'],
-  ['p-field', 'change', '작업 목록 새로고침 당겨서 하기', 't-task-list'],
-  ['p-admin', 'bug', '통계 그래프 범례 겹침', 't-stats'],
-  ['p-data', 'change', '리포트 API 페이지 크기 조정', 't-report-api'],
-  ['p-portal', 'new_feature', '회원가입 이메일 인증 재발송', 't-signup'],
-  ['p-field', 'bug', '오프라인 작업 시간 표시 오류', 't-offline'],
+const BACKGROUND: Array<[string, RequestDraft['type'], string]> = [
+  ['p-portal', 'bug', 't-notice'],
+  ['p-field', 'change', 't-task-detail'],
+  ['p-admin', 'copy_design', 't-users'],
+  ['p-portal', 'change', 't-mypage'],
+  ['p-data', 'bug', 't-batch'],
+  ['p-field', 'new_feature', 't-photo'],
+  ['p-portal', 'copy_design', 't-login'],
+  ['p-admin', 'change', 't-announce'],
+  ['p-portal', 'bug', 't-payments'],
+  ['p-field', 'change', 't-task-list'],
+  ['p-admin', 'bug', 't-stats'],
+  ['p-data', 'change', 't-report-api'],
+  ['p-portal', 'new_feature', 't-signup'],
+  ['p-field', 'bug', 't-offline'],
 ]
+
+const BACKGROUND_COPY: Record<
+  ServerLanguage,
+  { titles: string[]; current: string; desired: string; criterion: string }
+> = {
+  ko: {
+    titles: [
+      '공지사항 목록 페이지 번호 오류',
+      '작업 상세 지도 확대 단계 조정',
+      '사용자 관리 버튼 문구 통일',
+      '마이페이지 연락처 형식 검사',
+      '야간 배치 실패 알림 누락',
+      '작업 완료 사진 여러 장 선택',
+      '로그인 화면 오류 문구 정리',
+      '공지 작성 미리보기 추가',
+      '결제 내역 금액 쉼표 누락',
+      '작업 목록 새로고침 당겨서 하기',
+      '통계 그래프 범례 겹침',
+      '리포트 API 페이지 크기 조정',
+      '회원가입 이메일 인증 재발송',
+      '오프라인 작업 시간 표시 오류',
+    ],
+    current: '현재 동작에 대한 설명',
+    desired: '원하는 동작에 대한 설명',
+    criterion: '화면을 열면 바뀐 동작이 보인다',
+  },
+  en: {
+    titles: [
+      'Wrong page numbers on the notice list',
+      'Adjust map zoom on job detail',
+      'Consistent button labels in user management',
+      'Validate the phone format on My page',
+      'Missing alert when the nightly batch fails',
+      'Select several photos when finishing a job',
+      'Tidy up error messages on the sign-in screen',
+      'Preview when writing an announcement',
+      'Missing thousands separator in payment amounts',
+      'Pull to refresh on the job list',
+      'Overlapping legend on the statistics chart',
+      'Adjust the page size of the report API',
+      'Resend the sign-up verification email',
+      'Wrong times shown for offline jobs',
+    ],
+    current: 'What happens now',
+    desired: 'What should happen',
+    criterion: 'When I open the screen, the new behaviour is shown',
+  },
+}
 
 /* ------------------------------------------------------------------ */
 /* Build                                                               */
 /* ------------------------------------------------------------------ */
 
-function emptyState(now: Date): MockState {
+function emptyState(now: Date, lang: ServerLanguage): MockState {
+  const users = seedUsers(lang)
   const settings: Record<string, NotificationSettings> = {}
-  for (const u of SEED_USERS) settings[u.id] = { ...DEFAULT_NOTIFICATION_SETTINGS }
+  for (const u of users) settings[u.id] = { ...DEFAULT_NOTIFICATION_SETTINGS }
   return {
     version: STATE_VERSION,
     seededAt: now.toISOString(),
+    language: lang,
+    dirty: false,
     seq: 0,
     nextRequestId: 990,
-    users: structuredClone(SEED_USERS),
-    projects: structuredClone(SEED_PROJECTS),
+    users,
+    projects: seedProjects(lang),
     requests: [],
     notifications: [],
     notificationSettings: settings,
@@ -600,17 +893,8 @@ function emptyState(now: Date): MockState {
   }
 }
 
-function resolveDate(value: string | undefined, today: string): string | undefined {
-  if (!value) return undefined
-  const ago = /^__DAYS_AGO_(\d+)__$/.exec(value)
-  if (ago) return addDays(today, -Number(ago[1]))
-  const ahead = /^__DAYS_AHEAD_(\d+)__$/.exec(value)
-  if (ahead) return addDays(today, Number(ahead[1]))
-  return value
-}
-
-export function buildSeedState(now: Date, opts: EngineOptions): MockState {
-  const state = emptyState(now)
+export function buildSeedState(now: Date, opts: EngineOptions, lang: ServerLanguage = 'ko'): MockState {
+  const state = emptyState(now, lang)
   const engine = new MockEngine(state, opts)
   const at = (hoursAgo: number) => new Date(now.getTime() - hoursAgo * 3_600_000)
   const today = localDate(now)
@@ -624,7 +908,7 @@ export function buildSeedState(now: Date, opts: EngineOptions): MockState {
    * duration, so `t` only has to be later than that.
    */
   const finishAi = (id: number, t: Date) => {
-    engine.advanceRequest(id, new Date(t.getTime() + 7 * 86_400_000))
+    engine.advanceRequest(id, new Date(t.getTime() + 7 * 86_400_000), lang)
   }
 
   const runStep = (id: number, step: Step): void => {
@@ -635,49 +919,56 @@ export function buildSeedState(now: Date, opts: EngineOptions): MockState {
       engine.updateRelease(user(step.by), id, { scheduledDate: date }, t)
       return
     }
-    engine.transition(user(step.by), id, step.command, t)
+    engine.transition(user(step.by), id, step.command, t, lang)
   }
 
   // Background history first (ids 990–1003), two to fifty days old.
-  BACKGROUND.forEach(([projectId, type, title, target], i) => {
+  const bg = BACKGROUND_COPY[lang]
+  BACKGROUND.forEach(([projectId, type, target], i) => {
     const filed = 24 * (6 + i * 3.2)
     const req = engine.createRequest(
       user(i % 2 ? 'u-lee' : 'u-kim'),
       {
         projectId,
         type,
-        title,
+        title: bg.titles[i]!,
         targetIds: [target],
-        currentBehavior: '현재 동작에 대한 설명',
-        desiredBehavior: '원하는 동작에 대한 설명',
-        acceptanceCriteria: [{ text: '화면을 열면 바뀐 동작이 보인다' }],
+        currentBehavior: bg.current,
+        desiredBehavior: bg.desired,
+        acceptanceCriteria: [{ text: bg.criterion }],
         attachmentIds: [],
       },
       at(filed),
+      lang,
     )
     const dev = state.projects.find((p) => p.id === projectId)!.ownerIds[0]!
     for (const step of shipped(dev, req.requesterId, filed, 1, 2 + (i % 4))) runStep(req.id, step)
   })
 
   state.nextRequestId = 1012
-  for (const s of SCENARIOS) {
-    const { criteria, ...rest } = s.draft
-    const req = engine.createRequest(
-      user(s.by),
-      {
-        ...rest,
-        desiredDate: resolveDate(rest.desiredDate, today),
-        acceptanceCriteria: criteria.map((text) => ({ text })),
-        attachmentIds: [],
-      } as RequestDraft,
-      at(s.h),
-    )
-    for (const step of s.steps ?? []) runStep(req.id, step)
-    if (s.patch) {
-      const i = state.requests.findIndex((r) => r.id === req.id)
-      state.requests[i] = s.patch(state.requests[i]!)
+  SCENARIOS.forEach((s, i) => {
+    const c = SCENARIO_COPY[lang][i]!
+    const draft: RequestDraft = {
+      projectId: s.projectId,
+      type: s.type,
+      title: c.title,
+      targetIds: s.targetIds,
+      ...(c.targetOther ? { targetOther: c.targetOther } : {}),
+      currentBehavior: c.current,
+      desiredBehavior: c.desired,
+      acceptanceCriteria: c.criteria.map((text) => ({ text })),
+      ...(c.outOfScope ? { outOfScope: c.outOfScope } : {}),
+      attachmentIds: [],
+      ...(s.desiredInDays !== undefined ? { desiredDate: addDays(today, s.desiredInDays) } : {}),
+      ...(c.dateReason ? { desiredDateReason: c.dateReason } : {}),
     }
-  }
+    const req = engine.createRequest(user(s.by), draft, at(s.h), lang)
+    for (const step of s.steps?.(c) ?? []) runStep(req.id, step)
+    if (s.patch) {
+      const idx = state.requests.findIndex((r) => r.id === req.id)
+      state.requests[idx] = s.patch(state.requests[idx]!, lang)
+    }
+  })
 
   // Older costs so the budget screen is not empty at the start of a month.
   for (let d = 1; d <= 45; d++) {

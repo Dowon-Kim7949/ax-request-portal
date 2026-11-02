@@ -36,7 +36,7 @@ export function RequestContent({ request }: { request: WorkRequest }) {
           <ol className="flex flex-col gap-1.5">
             {request.acceptanceCriteria.map((c, i) => (
               <li key={c.id} className="flex gap-2">
-                <span className="grid size-5 shrink-0 translate-y-0.5 place-items-center rounded-full bg-brand-50 text-[11px] font-bold text-brand-700">
+                <span className="grid size-5 shrink-0 translate-y-0.5 place-items-center rounded-full bg-brand-50 text-[11px] font-bold text-accent-strong">
                   {i + 1}
                 </span>
                 {c.text}
@@ -94,7 +94,7 @@ export function ReleaseCard({ request }: { request: WorkRequest }) {
       </CardHeader>
       <p className="flex items-start gap-2.5 text-[15px]">
         <Icon
-          className={released || scheduled ? 'size-5 text-success-600' : 'size-5 text-ink-400'}
+          className={released || scheduled ? 'size-5 text-success-fg' : 'size-5 text-ink-400'}
           aria-hidden
         />
         <span className={released || scheduled ? 'font-semibold' : 'text-ink-500'}>

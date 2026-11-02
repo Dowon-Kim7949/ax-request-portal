@@ -1,6 +1,7 @@
 /**
  * Deterministic stand-ins for the two AI jobs. A real backend replaces these
- * with model calls; the shapes they return are the contract.
+ * with model calls; the shapes they return are the contract. The text is
+ * written in the request's language (Accept-Language), like a model would.
  */
 import type {
   FeasibilityReport,
@@ -12,6 +13,53 @@ import type {
   WorkRun,
 } from '../domain/model'
 import { deriveWikiTrust } from '../domain/report'
+import type { ServerLanguage } from './copy'
+
+const COPY = {
+  ko: {
+    summary: {
+      feasible: '근거 위키와 코드가 충분합니다. 바로 작업할 수 있습니다.',
+      conditional: '추가 확인이 풀리면 바로 작업할 수 있습니다.',
+      out_of_scope: '코드를 바꾸지 않아도 되는 요청입니다. 담당자가 직접 처리하는 편이 빠릅니다.',
+      undetermined: '관련 위키를 찾지 못해 판단하지 못했습니다. 담당자가 직접 확인해 주세요.',
+    },
+    whichScreen: (other: string) => `‘${other}’이 어느 화면인지 확인이 필요합니다.`,
+    vagueCriteria:
+      '완료 기준 중 확인 방법이 모호한 항목이 있습니다. 요청자에게 구체적인 결과를 물어봐 주세요.',
+    unverifiedRisk: '근거 위키 중 사람이 확인하지 않은 문서가 있어, 영향 범위가 실제보다 넓을 수 있습니다.',
+    overlapRisk: (name: string) => `${name} 기능과 코드를 함께 쓰고 있어 동작이 겹칠 수 있습니다.`,
+    implement: (text: string) => `${text} — 구현`,
+    addTests: '완료 기준별 테스트 추가',
+    updateWiki: '관련 위키 문서 갱신',
+    autoMethod: '화면 동작을 자동 테스트(E2E)로 확인',
+    manualMethod: '변경 전후 화면을 비교해 사람이 확인',
+    done: (n: number) => `완료 기준 ${n}개를 반영했습니다.`,
+    followedMemo: (memo: string) => `담당자 메모(“${memo}”)를 따랐습니다.`,
+    testFailed: '기존 테스트 1개가 실패해 확인이 필요합니다.',
+  },
+  en: {
+    summary: {
+      feasible: 'The wiki and code give enough to go on. Work can start right away.',
+      conditional: 'Work can start once the open questions are answered.',
+      out_of_scope: 'No code change is needed. The developer can handle this directly, faster.',
+      undetermined: 'No related wiki was found, so feasibility cannot be judged. Please check manually.',
+    },
+    whichScreen: (other: string) => `Confirm which screen “${other}” refers to.`,
+    vagueCriteria:
+      'Some acceptance criteria cannot be checked as written. Ask the requester for a concrete result.',
+    unverifiedRisk:
+      'Some evidence docs were not reviewed by a person, so the impact may be wider than it looks.',
+    overlapRisk: (name: string) => `Shares code with ${name}, so the behaviour may overlap.`,
+    implement: (text: string) => `Implement: ${text}`,
+    addTests: 'Add a test for each acceptance criterion',
+    updateWiki: 'Update the related wiki docs',
+    autoMethod: 'Automated end-to-end test of the screen',
+    manualMethod: 'A person compares the screen before and after',
+    done: (n: number) => `Implemented the ${n} acceptance criteria.`,
+    followedMemo: (memo: string) => `Followed the developer's note (“${memo}”).`,
+    testFailed: 'One existing test fails and needs a look.',
+  },
+} satisfies Record<ServerLanguage, { summary: Record<ReportVerdict, string> } & Record<string, unknown>>
 
 function selectedTargets(req: WorkRequest, project: Project) {
   return project.targets.filter((t) => req.targetIds.includes(t.id))
@@ -37,14 +85,13 @@ function neighbours(req: WorkRequest, project: Project): string[] {
   return [...out].slice(0, 2)
 }
 
-const SUMMARY: Record<ReportVerdict, string> = {
-  feasible: '근거 위키와 코드가 충분합니다. 바로 작업할 수 있습니다.',
-  conditional: '추가 확인이 풀리면 바로 작업할 수 있습니다.',
-  out_of_scope: '코드를 바꾸지 않아도 되는 요청입니다. 담당자가 직접 처리하는 편이 빠릅니다.',
-  undetermined: '관련 위키를 찾지 못해 판단하지 못했습니다. 담당자가 직접 확인해 주세요.',
-}
-
-export function generateReport(req: WorkRequest, project: Project, now: Date): FeasibilityReport {
+export function generateReport(
+  req: WorkRequest,
+  project: Project,
+  now: Date,
+  lang: ServerLanguage = 'ko',
+): FeasibilityReport {
+  const c = COPY[lang]
   const targets = selectedTargets(req, project)
   const verified = verifiedTargetIds(project)
   const wikiDocs = targets
@@ -60,15 +107,9 @@ export function generateReport(req: WorkRequest, project: Project, now: Date): F
   const answered = Boolean(req.infoRequest?.answer)
   const openQuestions: string[] = []
   if (!answered) {
-    if (req.targetOther?.trim())
-      openQuestions.push(`‘${req.targetOther.trim()}’이 어느 화면인지 확인이 필요합니다.`)
-    for (const issue of req.precheck.filter((i) => i.severity === 'warning')) {
-      if (issue.field.startsWith('acceptanceCriteria')) {
-        openQuestions.push(
-          '완료 기준 중 확인 방법이 모호한 항목이 있습니다. 요청자에게 구체적인 결과를 물어봐 주세요.',
-        )
-        break
-      }
+    if (req.targetOther?.trim()) openQuestions.push(c.whichScreen(req.targetOther.trim()))
+    if (req.precheck.some((i) => i.severity === 'warning' && i.field.startsWith('acceptanceCriteria'))) {
+      openQuestions.push(c.vagueCriteria)
     }
   }
 
@@ -82,30 +123,24 @@ export function generateReport(req: WorkRequest, project: Project, now: Date): F
   const automatable = req.type !== 'copy_design'
   const score = criteria.length + targets.length
   const risks: string[] = []
-  if (wikiTrust !== 'high' && wikiDocs.length > 0) {
-    risks.push('근거 위키 중 사람이 확인하지 않은 문서가 있어, 영향 범위가 실제보다 넓을 수 있습니다.')
-  }
-  if (recheck[0]) risks.push(`${recheck[0]} 기능과 코드를 함께 쓰고 있어 동작이 겹칠 수 있습니다.`)
+  if (wikiTrust !== 'high' && wikiDocs.length > 0) risks.push(c.unverifiedRisk)
+  if (recheck[0]) risks.push(c.overlapRisk(recheck[0]))
 
   return {
     revision: (req.report?.revision ?? 0) + 1,
     generatedAt: now.toISOString(),
     verdict,
-    summary: SUMMARY[verdict],
+    summary: c.summary[verdict],
     evidence: { wikiDocs, codeFiles },
     impact: { changedScreens: targets.map((t) => t.name), recheck },
     plan:
       verdict === 'out_of_scope' || verdict === 'undetermined'
         ? []
-        : [
-            ...criteria.map((c) => c.text.replace(/\.$/, '') + ' — 구현'),
-            '완료 기준별 테스트 추가',
-            '관련 위키 문서 갱신',
-          ],
-    verification: criteria.map((c) => ({
-      criterionId: c.id,
+        : [...criteria.map((cr) => c.implement(cr.text.replace(/\.$/, ''))), c.addTests, c.updateWiki],
+    verification: criteria.map((cr) => ({
+      criterionId: cr.id,
       automatable,
-      method: automatable ? '화면 동작을 자동 테스트(E2E)로 확인' : '변경 전후 화면을 비교해 사람이 확인',
+      method: automatable ? c.autoMethod : c.manualMethod,
     })),
     openQuestions,
     wikiTrust,
@@ -134,7 +169,9 @@ export function finishWork(
   req: WorkRequest,
   project: Project,
   now: Date,
+  lang: ServerLanguage = 'ko',
 ): { work: WorkRun; regression: RegressionCheck[] } {
+  const c = COPY[lang]
   const prev = req.work
   if (!prev) throw new Error(`request #${req.id} has no work run`)
   const criteria = req.acceptanceCriteria.length
@@ -148,9 +185,9 @@ export function finishWork(
       : `${project.repository.url}/pull/${number}`
   const wikiDocs = req.report?.evidence.wikiDocs.map((d) => d.path) ?? []
 
-  const summaryParts = [`완료 기준 ${criteria}개를 반영했습니다.`]
-  if (prev.instructions) summaryParts.push(`담당자 메모(“${prev.instructions}”)를 따랐습니다.`)
-  if (failed) summaryParts.push('기존 테스트 1개가 실패해 확인이 필요합니다.')
+  const summaryParts = [c.done(criteria)]
+  if (prev.instructions) summaryParts.push(c.followedMemo(prev.instructions))
+  if (failed) summaryParts.push(c.testFailed)
 
   const work: WorkRun = {
     ...prev,

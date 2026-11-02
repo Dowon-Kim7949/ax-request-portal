@@ -61,7 +61,7 @@ function OptionCard({
       onClick={onSelect}
       className={cn(
         'flex w-full items-center gap-3 rounded-2xl bg-surface p-4 text-left ring-1 transition',
-        selected ? 'bg-brand-50/60 ring-2 ring-brand-500' : 'ring-line hover:ring-line-strong',
+        selected ? 'bg-brand-50/60 ring-2 ring-brand-500' : 'ring-line hover:ring-field',
       )}
     >
       {icon}
@@ -69,7 +69,7 @@ function OptionCard({
       <span
         className={cn(
           'grid size-6 shrink-0 place-items-center rounded-full',
-          selected ? 'bg-brand-600 text-white' : 'ring-1 ring-line-strong',
+          selected ? 'bg-brand-600 text-white' : 'ring-1 ring-field',
         )}
         aria-hidden
       >
@@ -110,7 +110,7 @@ export function ProjectStep({ onPicked }: { onPicked: () => void }) {
             </OptionCard>
           ))}
       </div>
-      {error ? <p className="mt-3 text-sm font-medium text-danger-600">{error}</p> : null}
+      {error ? <p className="mt-3 text-sm font-medium text-danger-fg">{error}</p> : null}
     </>
   )
 }
@@ -140,7 +140,7 @@ export function TypeStep({ onPicked }: { onPicked: () => void }) {
           </OptionCard>
         ))}
       </div>
-      {error ? <p className="mt-3 text-sm font-medium text-danger-600">{error}</p> : null}
+      {error ? <p className="mt-3 text-sm font-medium text-danger-fg">{error}</p> : null}
     </>
   )
 }
@@ -176,7 +176,7 @@ export function TargetsStep({ advice }: { advice: Map<string, PrecheckIssue[]> }
                 'inline-flex h-11 items-center gap-1.5 rounded-full px-4 text-[15px] font-semibold ring-1 transition ring-inset',
                 on
                   ? 'bg-brand-600 text-white ring-brand-600'
-                  : 'bg-surface text-ink-700 ring-line-strong hover:bg-muted',
+                  : 'bg-surface text-ink-700 ring-field hover:bg-muted',
               )}
             >
               {on ? <Check className="size-4" aria-hidden /> : null}
@@ -210,7 +210,7 @@ function AdviceList({ items }: { items: Advice[] | undefined }) {
           key={a.message}
           className={cn(
             'flex gap-1.5 text-[13px]',
-            a.severity === 'warning' ? 'text-warning-600' : 'text-ink-500',
+            a.severity === 'warning' ? 'text-warning-fg' : 'text-ink-500',
           )}
         >
           <CircleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
@@ -283,7 +283,7 @@ export function CriteriaStep({ advice }: { advice: Map<string, PrecheckIssue[]> 
       <StepTitle hint={t('wizard.criteria.hint')}>{t('wizard.criteria.title')}</StepTitle>
       <div className="mb-5 grid gap-2 sm:grid-cols-2">
         <p className="rounded-2xl bg-success-50 px-4 py-3 text-sm text-ink-700">
-          <span className="mb-0.5 block text-xs font-bold text-success-600">{t('wizard.criteria.good')}</span>
+          <span className="mb-0.5 block text-xs font-bold text-success-fg">{t('wizard.criteria.good')}</span>
           {t('wizard.criteria.goodExample')}
         </p>
         <p className="rounded-2xl bg-muted px-4 py-3 text-sm text-ink-500 line-through decoration-ink-400/60">
@@ -328,7 +328,7 @@ export function CriteriaStep({ advice }: { advice: Map<string, PrecheckIssue[]> 
           </li>
         ))}
       </ol>
-      {error ? <p className="mt-3 text-sm font-medium text-danger-600">{error}</p> : null}
+      {error ? <p className="mt-3 text-sm font-medium text-danger-fg">{error}</p> : null}
       {fields.length < ACCEPTANCE_CRITERIA_MAX ? (
         <Button variant="secondary" className="mt-4" onClick={() => append({ text: '' })}>
           <Plus aria-hidden />
@@ -436,7 +436,7 @@ export function ExtraStep({ advice }: { advice: Map<string, PrecheckIssue[]> }) 
           />
           <label
             htmlFor="wizard-files"
-            className="flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line-strong px-4 text-[15px] font-semibold text-ink-600 hover:border-brand-500 hover:text-brand-600"
+            className="flex min-h-14 cursor-pointer items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-field px-4 text-[15px] font-semibold text-ink-600 hover:border-brand-500 hover:text-accent"
           >
             {upload.isPending ? (
               <Spinner label={t('wizard.extra.uploading')} />
@@ -496,7 +496,7 @@ function ReviewRow({
       <button
         type="button"
         onClick={onEdit}
-        className="-my-1.5 h-9 shrink-0 rounded-lg px-2.5 text-sm font-semibold text-brand-600 hover:bg-brand-50"
+        className="-my-1.5 h-9 shrink-0 rounded-lg px-2.5 text-sm font-semibold text-accent hover:bg-brand-50"
       >
         {t('common.edit')}
       </button>
@@ -539,7 +539,7 @@ export function ReviewStep({
         <Sparkles
           className={cn(
             'mt-0.5 size-5 shrink-0',
-            checking ? 'animate-pulse text-ai-600' : issues.length ? 'text-warning-600' : 'text-success-600',
+            checking ? 'animate-pulse text-ai-600' : issues.length ? 'text-warning-fg' : 'text-success-fg',
           )}
           aria-hidden
         />
@@ -550,13 +550,13 @@ export function ReviewStep({
             <p className="font-semibold text-ink-700">{t('wizard.review.checkFailed')}</p>
           ) : issues.length ? (
             <>
-              <p className="font-bold text-warning-600">
+              <p className="font-bold text-warning-fg">
                 {t('wizard.review.issues', { count: issues.length })}
               </p>
               <p className="text-ink-600">{t('wizard.review.issuesHint')}</p>
             </>
           ) : (
-            <p className="font-semibold text-success-600">{t('wizard.review.clean')}</p>
+            <p className="font-semibold text-success-fg">{t('wizard.review.clean')}</p>
           )}
         </div>
       </div>
@@ -573,12 +573,12 @@ export function ReviewStep({
                 <CircleAlert
                   className={cn(
                     'mt-0.5 size-4 shrink-0',
-                    issue.severity === 'warning' ? 'text-warning-600' : 'text-ink-400',
+                    issue.severity === 'warning' ? 'text-warning-fg' : 'text-ink-400',
                   )}
                   aria-hidden
                 />
                 <span className="flex-1 text-ink-700">{issue.message}</span>
-                <span className="shrink-0 font-semibold text-brand-600">{t('common.edit')}</span>
+                <span className="shrink-0 font-semibold text-accent">{t('common.edit')}</span>
               </button>
             </li>
           ))}

@@ -18,7 +18,7 @@ const TONE: Record<RequestStatus, BadgeTone> = {
   verification: 'warning',
   changes_requested: 'warning',
   release_scheduled: 'success',
-  done: 'dark',
+  done: 'strong',
   cancelled: 'neutral',
 }
 
@@ -29,7 +29,7 @@ const REQUESTER_TONE: Record<RequesterStatus, BadgeTone> = {
   please_check: 'warning',
   fixing: 'ai',
   release_scheduled: 'success',
-  done: 'dark',
+  done: 'strong',
   rejected: 'danger',
   cancelled: 'neutral',
 }

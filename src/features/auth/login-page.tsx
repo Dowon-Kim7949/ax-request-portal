@@ -7,11 +7,12 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import * as z from 'zod'
 import { ApiError } from '@/api/client'
 import { useLogin } from '@/api/queries'
+import { useBrand } from '@/app/brand'
 import { loadDemoAccounts } from '@/app/demo'
+import { QuickDisplayToggles } from '@/app/display-controls'
 import { usePageTitle } from '@/app/title'
 import { Button } from '@/components/ui/button'
 import { Field, Input } from '@/components/ui/field'
-import { appConfig } from '@/config/app.config'
 import type { Role, User } from '@/domain/model'
 import { useSession } from '@/stores/session'
 
@@ -31,8 +32,9 @@ function safeNext(next: string | null): string {
 }
 
 export default function LoginPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   usePageTitle(t('auth.title'))
+  const brand = useBrand()
   const token = useSession((s) => s.token)
   const navigate = useNavigate()
   const [params] = useSearchParams()
@@ -40,9 +42,10 @@ export default function LoginPage() {
   const login = useLogin()
   const [demo, setDemo] = useState<{ accounts: User[]; password: string } | null>(null)
 
+  // Reload on language change: untouched demo data is rebuilt in the new language.
   useEffect(() => {
     void loadDemoAccounts().then(setDemo)
-  }, [])
+  }, [i18n.language])
 
   const form = useForm<LoginForm>({
     resolver: zodResolver(LoginForm),
@@ -58,14 +61,17 @@ export default function LoginPage() {
     login.error instanceof ApiError ? login.error.message : login.error ? t('errors.generic') : undefined
 
   return (
-    <main className="flex min-h-dvh items-center justify-center px-4 py-10 pt-safe">
+    <main className="relative flex min-h-dvh items-center justify-center px-4 py-16 pt-safe">
+      <div className="absolute top-[max(1rem,env(safe-area-inset-top))] right-4">
+        <QuickDisplayToggles />
+      </div>
       <div className="flex w-full max-w-md flex-col gap-6">
         <div className="flex flex-col gap-3">
-          <span className="grid size-12 place-items-center rounded-2xl bg-ink-900 text-base font-black text-white">
-            {appConfig.brand.shortName}
+          <span className="grid size-12 place-items-center rounded-2xl bg-inverse text-base font-black text-on-inverse">
+            {brand.shortName}
           </span>
-          <h1 className="text-[28px] leading-tight font-bold tracking-tight">{appConfig.brand.name}</h1>
-          <p className="text-[15px] text-ink-500">{appConfig.brand.tagline}</p>
+          <h1 className="text-[28px] leading-tight font-bold tracking-tight">{brand.name}</h1>
+          <p className="text-[15px] text-ink-500">{brand.tagline}</p>
         </div>
 
         <form
@@ -93,7 +99,7 @@ export default function LoginPage() {
             )}
           </Field>
           {errorMessage ? (
-            <p role="alert" className="text-sm font-medium text-danger-600">
+            <p role="alert" className="text-sm font-medium text-danger-fg">
               {errorMessage}
             </p>
           ) : null}
@@ -126,7 +132,7 @@ export default function LoginPage() {
                       }
                       className="flex w-full items-center gap-3 rounded-2xl bg-surface p-3.5 text-left ring-1 ring-line transition hover:ring-brand-500 disabled:opacity-50"
                     >
-                      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600">
+                      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-accent">
                         <Icon className="size-5" aria-hidden />
                       </span>
                       <span className="flex min-w-0 flex-1 flex-col">

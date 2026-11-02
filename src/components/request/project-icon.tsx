@@ -14,10 +14,7 @@ export function ProjectIcon({ icon, className }: { icon: ProjectIconName | undef
   const Icon = ICONS[icon ?? 'box']
   return (
     <span
-      className={cn(
-        'grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600',
-        className,
-      )}
+      className={cn('grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-accent', className)}
     >
       <Icon className="size-5" aria-hidden />
     </span>

@@ -1,3 +1,5 @@
+// i18n first: the language decides the mock seed and every text below.
+import i18n, { currentLocale } from './i18n'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -5,6 +7,7 @@ import { configureClient } from './api/client'
 import { createQueryClient } from './api/query-client'
 import App from './App.tsx'
 import { BootError } from './app/boot'
+import { startThemeSync } from './app/theme'
 import { env } from './config/env'
 import './index.css'
 import { useSession } from './stores/session'
@@ -24,7 +27,7 @@ async function startMockOrRecover(): Promise<void> {
   const { startMockApi } = await import('./mocks/browser')
   try {
     await Promise.race([
-      startMockApi(),
+      startMockApi(currentLocale()),
       new Promise<never>((_, reject) =>
         setTimeout(
           () => reject(new Error(`mock API did not start within ${MOCK_START_TIMEOUT_MS} ms`)),
@@ -48,10 +51,17 @@ async function bootstrap() {
   const container = document.getElementById('root')
   if (!container) throw new Error('#root element is missing from index.html')
   const root = createRoot(container)
+  startThemeSync()
 
   configureClient({
     getToken: () => useSession.getState().token,
     onUnauthorized: () => useSession.getState().clear(),
+    getLanguage: currentLocale,
+    messages: {
+      network: () => i18n.t('errors.network'),
+      http: (status) => i18n.t('errors.http', { status }),
+      contract: () => i18n.t('errors.contract'),
+    },
   })
 
   if (env.apiMock) {

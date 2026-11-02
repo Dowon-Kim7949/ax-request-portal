@@ -6,18 +6,29 @@ export function viewportOf(info: TestInfo): Viewport {
   return info.project.name as Viewport
 }
 
+/**
+ * Opens the login screen, signed out. The session is dropped from a static
+ * file of the same origin, where the app is not running: inside the app a
+ * /me response still in flight would save the session again.
+ */
+async function openLoginScreen(page: Page, brandName: string) {
+  await page.goto('/favicon.svg')
+  await page.evaluate(() => localStorage.removeItem('ax-request-portal:session'))
+  await page.goto('/login')
+  await expect(page.getByRole('heading', { level: 1, name: brandName })).toBeVisible()
+}
+
 /** Signs in through the demo buttons on the login screen (mock mode). */
 export async function loginAs(page: Page, role: '요청자' | '경영진' | '담당자' | '관리자') {
-  await page.goto('/login')
-  const demo = page.getByRole('button', { name: new RegExp(`${role}로 시작`) })
-  const loginHeading = page.getByRole('heading', { level: 1, name: 'AX 업무 요청' })
-  await expect(loginHeading.or(page.getByRole('navigation').first())).toBeVisible()
-  if (!(await loginHeading.isVisible())) {
-    // Already signed in: /login sends us away, so drop the session and come back.
-    await page.evaluate(() => localStorage.removeItem('ax-request-portal:session'))
-    await page.goto('/login')
-  }
-  await demo.click()
+  await openLoginScreen(page, 'AX 업무 요청')
+  await page.getByRole('button', { name: new RegExp(`${role}로 시작`) }).click()
+  await expect(page).not.toHaveURL(/\/login/)
+}
+
+/** Same as loginAs, for a browser whose language is English. */
+export async function loginAsEnglish(page: Page, role: 'Requester' | 'Executive' | 'Developer' | 'Admin') {
+  await openLoginScreen(page, 'AX Request Portal')
+  await page.getByRole('button', { name: new RegExp(`Sign in as ${role}`) }).click()
   await expect(page).not.toHaveURL(/\/login/)
 }
 

@@ -47,9 +47,9 @@ const VERDICT_TONE: Record<ReportVerdict, BadgeTone> = {
   undetermined: 'warning',
 }
 const TRUST_TONE: Record<WikiTrust, string> = {
-  high: 'text-success-600',
-  medium: 'text-warning-600',
-  low: 'text-danger-600',
+  high: 'text-success-fg',
+  medium: 'text-warning-fg',
+  low: 'text-danger-fg',
 }
 
 function Tile({ title, children, tone }: { title: ReactNode; children: ReactNode; tone?: 'warn' }) {
@@ -291,7 +291,7 @@ export function DecisionCard({
 
       {rerun && failed.length ? (
         <div className="mb-3 rounded-2xl bg-danger-50 px-4 py-3 text-sm">
-          <p className="mb-1 font-bold text-danger-600">{t('decide.failedChecks')}</p>
+          <p className="mb-1 font-bold text-danger-fg">{t('decide.failedChecks')}</p>
           <ul className="flex flex-col gap-1 text-ink-700">
             {failed.map((c) => (
               <li key={c.criterionId}>
@@ -516,11 +516,11 @@ export function WorkPanel({
               aria-current={current ? 'step' : undefined}
             >
               {done ? (
-                <Check className="size-4 text-brand-600" aria-hidden />
+                <Check className="size-4 text-accent" aria-hidden />
               ) : current ? (
                 <Bot className="size-4 animate-pulse" aria-hidden />
               ) : (
-                <span className="size-4 rounded-full ring-1 ring-line-strong" aria-hidden />
+                <span className="size-4 rounded-full ring-1 ring-field" aria-hidden />
               )}
               {t(`phase.${p}`, { term })}
             </li>
@@ -566,8 +566,8 @@ export function WorkPanel({
                   <GitPullRequestArrow className="size-4 text-ink-400" aria-hidden />
                   {t('workRun.mr', { term, n: work.mergeRequest.number })} ·{' '}
                   {t('workRun.files', { n: work.mergeRequest.filesChanged })}
-                  <span className="text-success-600">+{work.mergeRequest.additions}</span>
-                  <span className="text-danger-600">−{work.mergeRequest.deletions}</span>
+                  <span className="text-success-fg">+{work.mergeRequest.additions}</span>
+                  <span className="text-danger-fg">−{work.mergeRequest.deletions}</span>
                 </p>
                 {work.wikiChanges?.docs.length ? (
                   <p className="mt-0.5 pl-5.5 text-sm text-ink-600">
@@ -714,7 +714,7 @@ export function RegressionChecks({
                         ? r === 'passed'
                           ? 'bg-success-600 text-white ring-success-600'
                           : 'bg-danger-600 text-white ring-danger-600'
-                        : 'bg-surface text-ink-600 ring-line-strong',
+                        : 'bg-surface text-ink-600 ring-field',
                     )}
                   >
                     {r === 'passed' ? (

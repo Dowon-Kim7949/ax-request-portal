@@ -33,6 +33,8 @@ export default defineConfig(({ mode }) => {
                 name: 'vendor-ui',
                 test: /node_modules[\\/](radix-ui|@radix-ui|@floating-ui|react-remove-scroll[^\\/]*|aria-hidden|use-callback-ref|use-sidecar|sonner|tailwind-merge|clsx|class-variance-authority)[\\/]/,
               },
+              // UI dictionaries: a copy change only touches this chunk.
+              { name: 'messages', test: /[\\/]src[\\/]i18n[\\/][a-z]{2}\.ts$/ },
             ],
           },
         },

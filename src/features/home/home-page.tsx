@@ -24,7 +24,7 @@ function RequesterSection() {
       <div className="flex flex-col gap-4">
         <Link
           to="/requests"
-          className="flex items-center justify-between rounded-2xl bg-surface px-4 py-4 ring-1 ring-line hover:ring-line-strong"
+          className="flex items-center justify-between rounded-2xl bg-surface px-4 py-4 ring-1 ring-line hover:ring-field"
         >
           <span className="font-bold text-ink-900">
             {mine.isPending ? (
@@ -33,7 +33,7 @@ function RequesterSection() {
               t('home.inProgress', { count: open.length })
             )}
           </span>
-          <span className="flex items-center text-sm font-semibold text-brand-600">
+          <span className="flex items-center text-sm font-semibold text-accent">
             {t('home.view')}
             <ChevronRight className="size-4" aria-hidden />
           </span>
@@ -67,7 +67,7 @@ function RequesterSection() {
               <li key={p.id}>
                 <Link
                   to={`/requests/new?project=${encodeURIComponent(p.id)}`}
-                  className="flex items-center gap-3 rounded-2xl px-3 py-3 ring-1 ring-line hover:bg-muted hover:ring-line-strong"
+                  className="flex items-center gap-3 rounded-2xl px-3 py-3 ring-1 ring-line hover:bg-muted hover:ring-field"
                 >
                   <ProjectIcon icon={p.icon} />
                   <span className="flex min-w-0 flex-1 flex-col">
@@ -97,9 +97,9 @@ function DeveloperSection() {
     <section aria-labelledby="dev-queue" className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 id="dev-queue" className="font-bold text-ink-900">
-          {t('home.devTitle')} {assigned.data ? <span className="text-brand-600">{queue.length}</span> : null}
+          {t('home.devTitle')} {assigned.data ? <span className="text-accent">{queue.length}</span> : null}
         </h2>
-        <Link to="/work" className="text-sm font-semibold text-brand-600">
+        <Link to="/work" className="text-sm font-semibold text-accent">
           {t('common.seeAll')}
         </Link>
       </div>
@@ -136,7 +136,7 @@ function AdminSection() {
           <Link
             key={l.to}
             to={l.to}
-            className="flex items-center gap-3 rounded-2xl bg-surface p-4 font-bold ring-1 ring-line hover:ring-line-strong"
+            className="flex items-center gap-3 rounded-2xl bg-surface p-4 font-bold ring-1 ring-line hover:ring-field"
           >
             <span className="grid size-10 place-items-center rounded-xl bg-muted text-ink-600">
               <l.icon className="size-5" aria-hidden />
@@ -169,7 +169,7 @@ export default function HomePage() {
       {can('dashboard:view') ? (
         <Link
           to="/dashboard"
-          className="flex items-center gap-3 rounded-2xl bg-ink-900 px-4 py-4 text-white hover:bg-ink-700"
+          className="flex items-center gap-3 rounded-2xl bg-inverse px-4 py-4 text-on-inverse hover:opacity-90"
         >
           <ChartColumn className="size-5" aria-hidden />
           <span className="flex-1 font-bold">{t('home.dashboardCta')}</span>

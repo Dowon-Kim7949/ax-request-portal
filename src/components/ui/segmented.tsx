@@ -3,7 +3,8 @@ import { cn } from '@/lib/cn'
 interface SegmentedProps<T extends string> {
   value: T
   onChange: (value: T) => void
-  options: ReadonlyArray<{ value: T; label: string; count?: number }>
+  /** `lang` marks a label written in another language (e.g. "한국어" in the English UI) */
+  options: ReadonlyArray<{ value: T; label: string; count?: number; lang?: string }>
   label: string
   className?: string
 }
@@ -33,17 +34,18 @@ export function Segmented<T extends string>({
             type="button"
             role="radio"
             aria-checked={active}
+            lang={o.lang}
             onClick={() => onChange(o.value)}
             className={cn(
               'inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full px-4 text-sm font-semibold transition-colors',
               active
-                ? 'bg-ink-900 text-white'
+                ? 'bg-inverse text-on-inverse'
                 : 'bg-surface text-ink-600 ring-1 ring-line ring-inset hover:bg-muted',
             )}
           >
             {o.label}
             {o.count !== undefined ? (
-              <span className={cn('text-xs', active ? 'text-white/70' : 'text-ink-400')}>{o.count}</span>
+              <span className={cn('text-xs', active ? 'text-on-inverse/70' : 'text-ink-400')}>{o.count}</span>
             ) : null}
           </button>
         )

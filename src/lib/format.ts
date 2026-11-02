@@ -1,50 +1,59 @@
-/** Formatting helpers for Korean UI. All take ISO strings from the API. */
+/** Locale-aware formatting. Every function follows the current UI language. */
+import i18n, { currentLocale } from '@/i18n'
+import { INTL_LOCALE } from '@/i18n/locales'
 
-const LOCALE = 'ko-KR'
+const tag = () => INTL_LOCALE[currentLocale()]
 
-/** YYYY-MM-DD → "11월 6일 (금)" */
+/** YYYY-MM-DD → "11월 6일 (금)" / "Fri, Nov 6" */
 export function formatDate(date: string, opts: { weekday?: boolean; year?: boolean } = {}): string {
   const d = date.length === 10 ? new Date(`${date}T00:00:00`) : new Date(date)
-  return new Intl.DateTimeFormat(LOCALE, {
+  return new Intl.DateTimeFormat(tag(), {
     ...(opts.year ? { year: 'numeric' } : {}),
-    month: 'long',
+    month: currentLocale() === 'ko' ? 'long' : 'short',
     day: 'numeric',
     ...(opts.weekday !== false ? { weekday: 'short' } : {}),
-  })
-    .format(d)
-    .replace(/\((.)\)/, '($1)')
+  }).format(d)
 }
 
-/** ISO timestamp → "11월 2일 오후 3:04" */
+/** ISO timestamp → "11월 2일 오후 3:04" / "Nov 2, 3:04 PM" */
 export function formatDateTime(iso: string): string {
-  return new Intl.DateTimeFormat(LOCALE, {
-    month: 'long',
+  return new Intl.DateTimeFormat(tag(), {
+    month: currentLocale() === 'ko' ? 'long' : 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
   }).format(new Date(iso))
 }
 
-const rtf = new Intl.RelativeTimeFormat(LOCALE, { numeric: 'auto' })
+/** YYYY-MM → "2026년 10월" / "October 2026" */
+export function formatMonth(month: string): string {
+  const [y, m] = month.split('-').map(Number) as [number, number]
+  return new Intl.DateTimeFormat(tag(), { year: 'numeric', month: 'long' }).format(new Date(y, m - 1, 1))
+}
 
-/** ISO timestamp → "방금 전", "3시간 전", "어제" */
+/** ISO timestamp → "방금 전", "3시간 전" / "just now", "3 hours ago" */
 export function formatRelative(iso: string, now = Date.now()): string {
   const diff = (Date.parse(iso) - now) / 1000
   const abs = Math.abs(diff)
-  if (abs < 45) return '방금 전'
+  if (abs < 45) return i18n.t('common.justNow')
+  const rtf = new Intl.RelativeTimeFormat(tag(), { numeric: 'auto' })
   if (abs < 3600) return rtf.format(Math.round(diff / 60), 'minute')
   if (abs < 86_400) return rtf.format(Math.round(diff / 3600), 'hour')
   if (abs < 86_400 * 7) return rtf.format(Math.round(diff / 86_400), 'day')
   return formatDate(iso.slice(0, 10), { weekday: false })
 }
 
-/** 184000 → "18.4만 원", 9800 → "9,800원" */
+/** Korean won: "18.4만 원" / "9,800원" in Korean, "₩184K" / "₩9,800" in English */
 export function formatKrw(value: number): string {
-  if (value >= 10_000) {
-    const man = Math.round(value / 1_000) / 10
-    return `${man.toLocaleString(LOCALE)}만 원`
+  if (currentLocale() === 'ko') {
+    if (value >= 10_000) return `${(Math.round(value / 1_000) / 10).toLocaleString('ko-KR')}만 원`
+    return `${Math.round(value).toLocaleString('ko-KR')}원`
   }
-  return `${Math.round(value).toLocaleString(LOCALE)}원`
+  return new Intl.NumberFormat(tag(), {
+    style: 'currency',
+    currency: 'KRW',
+    ...(value >= 10_000 ? { notation: 'compact', maximumFractionDigits: 1 } : {}),
+  }).format(value)
 }
 
 export function formatBytes(bytes: number): string {

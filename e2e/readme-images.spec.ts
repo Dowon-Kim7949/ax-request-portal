@@ -3,7 +3,7 @@
  * Run: README_IMAGES=1 npx playwright test e2e/readme-images.spec.ts
  */
 import { test, type Page } from '@playwright/test'
-import { loginAs } from './helpers.ts'
+import { loginAs, loginAsEnglish } from './helpers.ts'
 
 test.skip(!process.env.README_IMAGES, 'set README_IMAGES=1 to regenerate docs/images')
 
@@ -56,4 +56,31 @@ test('readme images', async ({ page }, info) => {
     await page.waitForTimeout(500)
     await shot(page, 'tablet-dashboard')
   }
+})
+
+test.describe('dark mode', () => {
+  test.use({ colorScheme: 'dark' })
+
+  test('readme image: dark', async ({ page }, info) => {
+    test.skip(info.project.name !== 'phone')
+    await loginAs(page, '요청자')
+    await page.getByRole('link', { name: /#1021/ }).waitFor()
+    await shot(page, 'phone-home-dark')
+  })
+})
+
+test.describe('English', () => {
+  test.use({ locale: 'en-US' })
+
+  test('readme image: English', async ({ page }, info) => {
+    test.skip(info.project.name !== 'phone')
+    await loginAsEnglish(page, 'Requester')
+    await page.goto('/requests/1021')
+    const checklist = page.getByRole('heading', { name: 'Check the result against each criterion' })
+    await checklist.waitFor()
+    await page.getByRole('button', { name: 'Works', exact: true }).first().click()
+    await checklist.scrollIntoViewIfNeeded()
+    await page.evaluate(() => window.scrollBy(0, -80))
+    await shot(page, 'phone-verify-en')
+  })
 })

@@ -84,7 +84,7 @@ describe('seed data', () => {
 
   it('finishes the live AI jobs shortly after seeding', () => {
     const engine = new MockEngine(structuredClone(state), OPTS)
-    engine.tick(new Date(NOW.getTime() + 30_000))
+    engine.tick(new Date(NOW.getTime() + 30_000), 'ko')
     expect(engine.state.requests.find((r) => r.id === 1025)?.status).toBe('code_review')
     expect(engine.state.requests.find((r) => r.id === 1027)?.status).toBe('review')
   })

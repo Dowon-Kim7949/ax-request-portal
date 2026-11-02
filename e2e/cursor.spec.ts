@@ -63,7 +63,7 @@ test('requester screens', async ({ page }) => {
     '/requests/1021',
     '/schedule',
     '/notifications',
-    '/settings/notifications',
+    '/settings',
   ]) {
     await page.goto(route)
     await expectCursorContract(page, route)

@@ -2,6 +2,10 @@
  * In-memory backend used by the mock API. It applies the same lifecycle
  * rules a real backend must (src/domain/lifecycle.ts) and simulates the AI
  * from timestamps, so progress survives page reloads.
+ *
+ * Language: errors are thrown as keys and rendered per request; notifications
+ * are stored as keys and rendered when read; AI text is written in the
+ * language of the call that makes the AI finish (like a model would).
  */
 import type { ProjectInput, RegressionQueue, RequestScope } from '../api/contract'
 import {
@@ -31,12 +35,14 @@ import type {
 import { precheckDraft } from '../domain/precheck'
 import { hasPermission, type Permission, type RolePermissions } from '../domain/roles'
 import { finishWork, generateReport, phaseAt, PRECHECK_COST_KRW, reportCost } from './ai'
+import { renderNotification, type ErrorKey, type NotificationKey, type ServerLanguage } from './copy'
 
 /* ------------------------------------------------------------------ */
 /* State                                                               */
 /* ------------------------------------------------------------------ */
 
-export const STATE_VERSION = 1
+/** Bump when the stored shape changes: older demo data is discarded and reseeded. */
+export const STATE_VERSION = 2
 
 export interface CostEntry {
   at: string
@@ -45,15 +51,29 @@ export interface CostEntry {
   requestId?: number
 }
 
+export interface StoredNotification {
+  id: string
+  userId: string
+  requestId?: number
+  key: NotificationKey
+  params: Record<string, string | number>
+  createdAt: string
+  readAt?: string
+}
+
 export interface MockState {
   version: typeof STATE_VERSION
   seededAt: string
+  /** Language the demo data was written in */
+  language: ServerLanguage
+  /** Set by the first change a person makes; untouched demo data can be re-seeded in another language */
+  dirty: boolean
   seq: number
   nextRequestId: number
   users: User[]
   projects: Project[]
   requests: WorkRequest[]
-  notifications: Array<Notification & { userId: string }>
+  notifications: StoredNotification[]
   notificationSettings: Record<string, NotificationSettings>
   budget: Pick<Budget, 'monthlyLimitKrw' | 'perRequestLimitKrw' | 'alertThresholdPct'>
   costs: CostEntry[]
@@ -73,15 +93,24 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   onlyActionRequired: false,
 }
 
-/** Thrown by engine operations; the MSW layer turns it into an HTTP error. */
+/** Thrown by engine operations; the MSW layer renders `key` in the request's language. */
 export class HttpError extends Error {
   readonly status: number
   readonly code:
     'bad_request' | 'unauthorized' | 'forbidden' | 'not_found' | 'invalid_transition' | 'guard_failed'
-  constructor(status: number, code: HttpError['code'], message: string) {
-    super(message)
+  readonly key: ErrorKey
+  readonly params: Record<string, string | number>
+  constructor(
+    status: number,
+    code: HttpError['code'],
+    key: ErrorKey,
+    params: Record<string, string | number> = {},
+  ) {
+    super(key)
     this.status = status
     this.code = code
+    this.key = key
+    this.params = params
   }
 }
 
@@ -127,7 +156,7 @@ export class MockEngine {
   }
 
   require(user: User, permission: Permission): void {
-    if (!this.can(user, permission)) throw new HttpError(403, 'forbidden', '이 작업을 할 권한이 없습니다.')
+    if (!this.can(user, permission)) throw new HttpError(403, 'forbidden', 'forbidden')
   }
 
   user(id: string): User | undefined {
@@ -140,7 +169,7 @@ export class MockEngine {
 
   private findRequest(id: number): WorkRequest {
     const req = this.state.requests.find((r) => r.id === id)
-    if (!req) throw new HttpError(404, 'not_found', `요청 #${id}을 찾을 수 없습니다.`)
+    if (!req) throw new HttpError(404, 'not_found', 'requestNotFound', { id })
     return req
   }
 
@@ -180,7 +209,9 @@ export class MockEngine {
 
   private notify(
     userIds: string[],
-    message: { title: string; body: string; requestId?: number },
+    key: NotificationKey,
+    params: Record<string, string | number>,
+    requestId: number,
     actionRequired: boolean,
     now: Date,
     except?: string,
@@ -192,61 +223,77 @@ export class MockEngine {
       this.state.notifications.push({
         id: this.newId('n'),
         userId,
+        requestId,
+        key,
+        params,
         createdAt: now.toISOString(),
-        ...message,
       })
     }
   }
 
   private notifyStatus(req: WorkRequest, now: Date, actorId?: string): void {
-    const tag = `#${req.id}`
     const devs = this.responsibleDevelopers(req)
     const requester = [req.requesterId]
-    const send = (to: string[], title: string, body: string, action: boolean) =>
-      this.notify(to, { title: `[${tag}] ${title}`, body, requestId: req.id }, action, now, actorId)
+    const send = (
+      to: string[],
+      key: NotificationKey,
+      params: Record<string, string | number>,
+      action: boolean,
+    ) => this.notify(to, key, params, req.id, action, now, actorId)
 
     switch (req.status) {
       case 'review':
-        send(devs, '구현 확인 보고서가 준비되었습니다', req.title, true)
+        send(devs, 'reportReady', { title: req.title }, true)
         break
       case 'info_needed':
-        send(requester, '추가 정보가 필요합니다', req.infoRequest?.questions.join(' / ') ?? req.title, true)
-        break
-      case 'reporting':
-        if (req.infoRequest?.answer)
-          send(devs, '요청자가 답변했습니다', '보고서를 다시 쓰고 있습니다.', false)
-        break
-      case 'rejected':
-        send(requester, '진행하지 않기로 했습니다', req.rejectionReason ?? req.title, false)
-        break
-      case 'in_progress':
-        send(requester, '작업을 시작했습니다', req.title, false)
-        break
-      case 'code_review':
-        send(devs, 'AI 작업이 끝났습니다', '변경 내용과 테스트 결과를 검토해 주세요.', true)
-        break
-      case 'verification':
         send(
           requester,
-          '결과를 확인해 주세요',
-          `완료 기준 ${req.acceptanceCriteria.length}개를 하나씩 확인해 주시면 됩니다.`,
+          'infoNeeded',
+          { questions: req.infoRequest?.questions.join(' / ') ?? req.title },
           true,
         )
         break
+      case 'reporting':
+        if (req.infoRequest?.answer) send(devs, 'requesterAnswered', {}, false)
+        break
+      case 'rejected':
+        send(requester, 'rejected', { reason: req.rejectionReason ?? req.title }, false)
+        break
+      case 'in_progress':
+        send(requester, 'workStarted', { title: req.title }, false)
+        break
+      case 'code_review':
+        send(devs, 'workFinished', {}, true)
+        break
+      case 'verification':
+        send(requester, 'pleaseCheck', { count: req.acceptanceCriteria.length }, true)
+        break
       case 'changes_requested':
-        send(devs, '확인에서 문제가 나왔습니다', req.title, true)
+        send(devs, 'issueReported', { title: req.title }, true)
         break
       case 'release_scheduled':
-        send(devs, '배포 일정을 정해 주세요', '요청자가 결과를 확인했습니다.', true)
+        send(devs, 'scheduleRelease', {}, true)
         break
       case 'done':
-        send(requester, '반영되었습니다', req.title, false)
+        send(requester, 'released', { title: req.title }, false)
         break
       case 'cancelled':
-        send(devs, '요청이 취소되었습니다', req.title, false)
+        send(devs, 'cancelled', { title: req.title }, false)
         break
       case 'submitted':
         break
+    }
+  }
+
+  private render(n: StoredNotification, lang: ServerLanguage): Notification {
+    const { title, body } = renderNotification(lang, n.key, n.params, n.requestId)
+    return {
+      id: n.id,
+      ...(n.requestId ? { requestId: n.requestId } : {}),
+      title,
+      body,
+      createdAt: n.createdAt,
+      ...(n.readAt ? { readAt: n.readAt } : {}),
     }
   }
 
@@ -257,8 +304,12 @@ export class MockEngine {
       return applyTransition(req, command, { actor, now, newId: () => this.newId('tl') })
     } catch (err) {
       if (err instanceof LifecycleError) {
-        const status = err.code === 'forbidden' ? 403 : 409
-        throw new HttpError(status, err.code, err.message)
+        if (err.code === 'guard_failed') {
+          const key = command.event === 'reportIssue' ? 'needOneFailed' : 'needAllPassed'
+          throw new HttpError(409, 'guard_failed', key)
+        }
+        if (err.code === 'forbidden') throw new HttpError(403, 'forbidden', 'notYourStep')
+        throw new HttpError(409, 'invalid_transition', 'invalidTransition')
       }
       throw err
     }
@@ -274,7 +325,7 @@ export class MockEngine {
   }
 
   /** Advances one request's AI job to `now`. Returns true when something changed. */
-  advanceRequest(id: number, now: Date): boolean {
+  advanceRequest(id: number, now: Date, lang: ServerLanguage): boolean {
     let req = this.findRequest(id)
     const project = this.project(req.projectId)
     if (!project) return false
@@ -283,7 +334,7 @@ export class MockEngine {
       const done = this.enteredAt(req, 'reporting') + this.opts.reportSeconds * 1000
       if (now.getTime() < done) return false
       const at = new Date(done)
-      const report = generateReport(req, project, at)
+      const report = generateReport(req, project, at, lang)
       this.recordCost({ at: at.toISOString(), tier: 'heavy', krw: reportCost(req), requestId: req.id })
       req = this.apply({ ...req, report }, { event: 'reportReady' }, { type: 'ai' }, at)
       this.replace(req)
@@ -301,7 +352,7 @@ export class MockEngine {
         return true
       }
       const at = new Date(started + this.opts.workSeconds * 1000)
-      const { work, regression } = finishWork(req, project, at)
+      const { work, regression } = finishWork(req, project, at, lang)
       this.recordCost({ at: at.toISOString(), tier: 'heavy', krw: work.costKrw ?? 0, requestId: req.id })
       req = this.apply({ ...req, work, regression }, { event: 'workFinished' }, { type: 'ai' }, at)
       this.replace(req)
@@ -312,11 +363,11 @@ export class MockEngine {
   }
 
   /** Advances every running AI job. Called before each API response. */
-  tick(now: Date): boolean {
+  tick(now: Date, lang: ServerLanguage): boolean {
     let changed = false
     for (const req of [...this.state.requests]) {
       if (req.status === 'reporting' || req.status === 'in_progress') {
-        changed = this.advanceRequest(req.id, now) || changed
+        changed = this.advanceRequest(req.id, now, lang) || changed
       }
     }
     return changed
@@ -324,19 +375,18 @@ export class MockEngine {
 
   /* ---------- requests ---------- */
 
-  precheck(user: User, draft: RequestDraft, now: Date): PrecheckIssue[] {
+  precheck(user: User, draft: RequestDraft, now: Date, lang: ServerLanguage): PrecheckIssue[] {
     this.require(user, 'request:create')
     this.recordCost({ at: now.toISOString(), tier: 'light', krw: PRECHECK_COST_KRW })
-    return precheckDraft(draft, localDate(now))
+    return precheckDraft(draft, localDate(now), lang)
   }
 
-  createRequest(user: User, draft: RequestDraft, now: Date): WorkRequest {
+  createRequest(user: User, draft: RequestDraft, now: Date, lang: ServerLanguage): WorkRequest {
     this.require(user, 'request:create')
     const project = this.project(draft.projectId)
-    if (!project || !project.active)
-      throw new HttpError(400, 'bad_request', '선택한 프로젝트를 찾을 수 없습니다.')
+    if (!project || !project.active) throw new HttpError(400, 'bad_request', 'projectNotFound')
     const unknownTarget = draft.targetIds.find((t) => !project.targets.some((pt) => pt.id === t))
-    if (unknownTarget) throw new HttpError(400, 'bad_request', `알 수 없는 대상입니다: ${unknownTarget}`)
+    if (unknownTarget) throw new HttpError(400, 'bad_request', 'unknownTarget', { target: unknownTarget })
 
     const at = now.toISOString()
     const id = this.state.nextRequestId++
@@ -363,7 +413,7 @@ export class MockEngine {
       status: 'submitted',
       createdAt: at,
       updatedAt: at,
-      precheck: precheckDraft(draft, localDate(now)),
+      precheck: precheckDraft(draft, localDate(now), lang),
       regression: [],
       verification: [],
       timeline: [
@@ -381,19 +431,23 @@ export class MockEngine {
     return req
   }
 
-  transition(user: User, id: number, command: TransitionCommand, now: Date): WorkRequest {
-    this.tick(now)
+  transition(
+    user: User,
+    id: number,
+    command: TransitionCommand,
+    now: Date,
+    lang: ServerLanguage,
+  ): WorkRequest {
+    this.tick(now, lang)
     const req = this.findRequest(id)
-    if (!this.canRead(user, req)) throw new HttpError(404, 'not_found', `요청 #${id}을 찾을 수 없습니다.`)
+    if (!this.canRead(user, req)) throw new HttpError(404, 'not_found', 'requestNotFound', { id })
     const ctx = {
       user,
       request: req,
       project: this.project(req.projectId),
       rolePermissions: this.opts.rolePermissions,
     }
-    if (!isAuthorized(command.event, ctx)) {
-      throw new HttpError(403, 'forbidden', '이 단계에서 할 수 있는 작업이 아닙니다.')
-    }
+    if (!isAuthorized(command.event, ctx)) throw new HttpError(403, 'forbidden', 'notYourStep')
     let next = this.apply(req, command, { type: 'user', userId: user.id }, now)
     if ((command.event === 'runWork' || command.event === 'requestRevision') && !next.assigneeId) {
       next = { ...next, assigneeId: user.id }
@@ -405,7 +459,7 @@ export class MockEngine {
 
   getRequest(user: User, id: number): WorkRequest {
     const req = this.findRequest(id)
-    if (!this.canRead(user, req)) throw new HttpError(404, 'not_found', `요청 #${id}을 찾을 수 없습니다.`)
+    if (!this.canRead(user, req)) throw new HttpError(404, 'not_found', 'requestNotFound', { id })
     return req
   }
 
@@ -452,10 +506,8 @@ export class MockEngine {
 
   saveVerification(user: User, id: number, checks: WorkRequest['verification'], now: Date): WorkRequest {
     const req = this.getRequest(user, id)
-    if (req.requesterId !== user.id)
-      throw new HttpError(403, 'forbidden', '요청자만 결과를 확인할 수 있습니다.')
-    if (req.status !== 'verification')
-      throw new HttpError(409, 'invalid_transition', '지금은 결과 확인 단계가 아닙니다.')
+    if (req.requesterId !== user.id) throw new HttpError(403, 'forbidden', 'requesterOnlyVerify')
+    if (req.status !== 'verification') throw new HttpError(409, 'invalid_transition', 'notInVerification')
     const byId = new Map(checks.map((c) => [c.criterionId, c]))
     return this.replace({
       ...req,
@@ -473,8 +525,7 @@ export class MockEngine {
     now: Date,
   ): WorkRequest {
     const req = this.getRequest(user, id)
-    if (!this.isResponsible(user, req))
-      throw new HttpError(403, 'forbidden', '담당 개발자만 기록할 수 있습니다.')
+    if (!this.isResponsible(user, req)) throw new HttpError(403, 'forbidden', 'developerOnlyRegression')
     const byId = new Map(checks.map((c) => [c.id, c.result]))
     return this.replace({
       ...req,
@@ -490,10 +541,9 @@ export class MockEngine {
     now: Date,
   ): WorkRequest {
     const req = this.getRequest(user, id)
-    if (!this.isResponsible(user, req))
-      throw new HttpError(403, 'forbidden', '담당 개발자만 일정을 정할 수 있습니다.')
+    if (!this.isResponsible(user, req)) throw new HttpError(403, 'forbidden', 'developerOnlySchedule')
     if (!['code_review', 'verification', 'changes_requested', 'release_scheduled'].includes(req.status)) {
-      throw new HttpError(409, 'invalid_transition', '지금 단계에서는 배포 일정을 정할 수 없습니다.')
+      throw new HttpError(409, 'invalid_transition', 'cannotScheduleNow')
     }
     const at = now.toISOString()
     const next = this.replace({
@@ -514,7 +564,9 @@ export class MockEngine {
     if (input.scheduledDate) {
       this.notify(
         [req.requesterId],
-        { title: `[#${req.id}] 배포 예정일이 정해졌습니다`, body: input.scheduledDate, requestId: req.id },
+        'releaseDateSet',
+        { date: input.scheduledDate },
+        req.id,
         false,
         now,
         user.id,
@@ -555,7 +607,7 @@ export class MockEngine {
   createUser(actor: User, input: { name: string; email: string; role: User['role']; team?: string }): User {
     this.require(actor, 'user:manage')
     if (this.state.users.some((u) => u.email.toLowerCase() === input.email.toLowerCase())) {
-      throw new HttpError(400, 'bad_request', '이미 등록된 이메일입니다.')
+      throw new HttpError(400, 'bad_request', 'emailTaken')
     }
     const user: User = { id: this.newId('u'), active: true, ...input }
     this.state.users.push(user)
@@ -565,9 +617,9 @@ export class MockEngine {
   updateUser(actor: User, id: string, patch: Partial<Pick<User, 'role' | 'team' | 'active'>>): User {
     this.require(actor, 'user:manage')
     const i = this.state.users.findIndex((u) => u.id === id)
-    if (i < 0) throw new HttpError(404, 'not_found', '사용자를 찾을 수 없습니다.')
+    if (i < 0) throw new HttpError(404, 'not_found', 'userNotFound')
     if (id === actor.id && (patch.active === false || (patch.role && patch.role !== actor.role))) {
-      throw new HttpError(400, 'bad_request', '자신의 역할이나 활성 상태는 바꿀 수 없습니다.')
+      throw new HttpError(400, 'bad_request', 'cannotChangeSelf')
     }
     const next = { ...this.state.users[i]!, ...patch }
     this.state.users[i] = next
@@ -579,9 +631,9 @@ export class MockEngine {
     const unknownOwner = input.ownerIds.find(
       (o) => this.user(o)?.role !== 'developer' && this.user(o)?.role !== 'admin',
     )
-    if (unknownOwner) throw new HttpError(400, 'bad_request', '담당자는 개발자 또는 관리자여야 합니다.')
+    if (unknownOwner) throw new HttpError(400, 'bad_request', 'ownersMustBeDevelopers')
     const existing = id ? this.project(id) : undefined
-    if (id && !existing) throw new HttpError(404, 'not_found', '프로젝트를 찾을 수 없습니다.')
+    if (id && !existing) throw new HttpError(404, 'not_found', 'projectNotFound')
     const project: Project = {
       id: existing?.id ?? this.newId('p'),
       ...input,
@@ -595,26 +647,24 @@ export class MockEngine {
 
   /* ---------- notifications ---------- */
 
-  notificationsFor(user: User): Notification[] {
+  notificationsFor(user: User, lang: ServerLanguage): Notification[] {
     return this.state.notifications
       .filter((n) => n.userId === user.id)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
       .slice(0, 100)
-      .map(({ userId: _u, ...n }) => n)
+      .map((n) => this.render(n, lang))
   }
 
-  markRead(user: User, id: string | 'all', now: Date): Notification | undefined {
+  markRead(user: User, id: string | 'all', now: Date, lang: ServerLanguage): Notification | undefined {
     const at = now.toISOString()
-    let found: Notification | undefined
+    let found: StoredNotification | undefined
     for (const n of this.state.notifications) {
       if (n.userId !== user.id || (id !== 'all' && n.id !== id)) continue
       n.readAt ??= at
       found = n
     }
-    if (id !== 'all' && !found) throw new HttpError(404, 'not_found', '알림을 찾을 수 없습니다.')
-    if (!found) return undefined
-    const { userId: _u, ...rest } = found as Notification & { userId: string }
-    return rest
+    if (id !== 'all' && !found) throw new HttpError(404, 'not_found', 'notificationNotFound')
+    return found ? this.render(found, lang) : undefined
   }
 
   /* ---------- insights ---------- */

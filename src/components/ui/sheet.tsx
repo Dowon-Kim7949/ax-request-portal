@@ -1,6 +1,7 @@
 import { X } from 'lucide-react'
 import { Dialog } from 'radix-ui'
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/cn'
 
 interface SheetProps {
@@ -27,12 +28,14 @@ export function Sheet({
   children,
   footer,
   side = 'bottom',
-  closeLabel = '닫기',
+  closeLabel,
 }: SheetProps) {
+  const { t } = useTranslation()
+  closeLabel ??= t('common.close')
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 animate-fade-in bg-ink-900/40" />
+        <Dialog.Overlay className="fixed inset-0 z-50 animate-fade-in bg-black/50" />
         <Dialog.Content
           className={cn(
             'fixed z-50 flex flex-col bg-surface shadow-xl focus:outline-none',
@@ -43,10 +46,7 @@ export function Sheet({
           {...(description ? {} : { 'aria-describedby': undefined })}
         >
           {side === 'bottom' ? (
-            <div
-              className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-line-strong sm:hidden"
-              aria-hidden
-            />
+            <div className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-field sm:hidden" aria-hidden />
           ) : null}
           <div className="flex items-start justify-between gap-3 px-5 pt-4 pb-2">
             <div className="flex flex-col gap-1">

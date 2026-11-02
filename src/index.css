@@ -1,14 +1,24 @@
 @import 'tailwindcss';
 
+/* Dark mode is a class on <html> (set before paint by index.html, kept in sync by src/app/theme.ts). */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
  * ─────────────────────────────────────────────────────────────
- *  Design tokens — rebrand the template by editing this block.
+ *  Design tokens — rebrand the template by editing this block
+ *  and its dark-mode counterpart (`.dark` further down).
  * ─────────────────────────────────────────────────────────────
- *  brand  primary actions, links, "my turn" highlights
- *  ai     anything the AI is doing (report, work in progress)
- *  ink    text and icons, from strong (900) to faint (400)
- *  line   borders and dividers
- *  canvas page background behind cards
+ *  Tokens are split by role, because one color cannot serve every role in
+ *  both themes (a blue readable as link text on a dark page is too light to
+ *  carry white button text):
+ *    brand-600 / *-600   fills that carry white text (buttons, pressed toggles)
+ *    accent, *-fg        text and icons in that hue
+ *    *-50 / *-100        tinted backgrounds
+ *    ink-*               text, strong (900) to faint (400); every step passes 4.5:1
+ *    field               borders of form controls (3:1 against the page)
+ *    line                decorative dividers
+ *    inverse             high-emphasis chip/tooltip surface and its text
+ *  src/theme.test.ts checks the contrast of every pair in both themes.
  */
 @theme {
   --font-sans:
@@ -21,7 +31,9 @@
   --color-brand-200: #bcd3fd;
   --color-brand-500: #3b7cf0;
   --color-brand-600: #1d64db;
-  --color-brand-700: #174fb2;
+  --color-brand-hover: #174fb2;
+  --color-accent: #1d64db;
+  --color-accent-strong: #174fb2;
 
   --color-ai-50: #fff4ec;
   --color-ai-100: #fde3d0;
@@ -32,21 +44,27 @@
   --color-ink-900: #172036;
   --color-ink-700: #333d52;
   --color-ink-600: #4e586c;
-  --color-ink-500: #6b7488;
-  --color-ink-400: #98a0b0;
+  --color-ink-500: #5d6679;
+  --color-ink-400: #646d80;
 
   --color-line: #e4e7ec;
   --color-line-strong: #cfd4dc;
+  --color-field: #7c8599;
   --color-canvas: #f3f5f8;
   --color-surface: #ffffff;
   --color-muted: #f6f7f9;
+  --color-inverse: #172036;
+  --color-on-inverse: #ffffff;
 
   --color-success-50: #ecfaf2;
-  --color-success-600: #138a4b;
+  --color-success-600: #0f7d44;
+  --color-success-fg: #0b7a3e;
   --color-warning-50: #fff8e6;
   --color-warning-600: #b26a00;
+  --color-warning-fg: #8a5300;
   --color-danger-50: #fff0f0;
   --color-danger-600: #d12f2f;
+  --color-danger-fg: #c42b2b;
 
   --radius-card: 1.125rem;
 
@@ -72,6 +90,55 @@
 }
 
 @layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  /* Dark theme: same token names, values tuned for a dark page (see src/theme.test.ts). */
+  .dark {
+    color-scheme: dark;
+
+    --color-brand-50: #16233d;
+    --color-brand-100: #1b2d52;
+    --color-brand-200: #24427a;
+    --color-brand-500: #5b93f5;
+    --color-brand-600: #1d64db;
+    --color-brand-hover: #2a6fe6;
+    --color-accent: #7fa9ff;
+    --color-accent-strong: #a9c5ff;
+
+    --color-ai-50: #2a1a10;
+    --color-ai-100: #3a2414;
+    --color-ai-500: #e0702f;
+    --color-ai-600: #f08a4b;
+    --color-ai-700: #ffb27d;
+
+    --color-ink-900: #e7ebf3;
+    --color-ink-700: #ccd2de;
+    --color-ink-600: #b0b8c8;
+    --color-ink-500: #9aa3b6;
+    --color-ink-400: #868fa6;
+
+    --color-line: #262e40;
+    --color-line-strong: #333c50;
+    --color-field: #6a7489;
+    --color-canvas: #0d121d;
+    --color-surface: #151b28;
+    --color-muted: #1c2334;
+    --color-inverse: #e4e8f0;
+    --color-on-inverse: #151b28;
+
+    --color-success-50: #10261b;
+    --color-success-600: #0f7d44;
+    --color-success-fg: #4fd18b;
+    --color-warning-50: #2a2110;
+    --color-warning-600: #c98a1a;
+    --color-warning-fg: #f2b84b;
+    --color-danger-50: #2c1517;
+    --color-danger-600: #d12f2f;
+    --color-danger-fg: #ff8585;
+  }
+
   html {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;

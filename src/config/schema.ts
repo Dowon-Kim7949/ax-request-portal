@@ -1,17 +1,25 @@
 import * as z from 'zod'
 import { RequestType, Role } from '../domain/model'
 import { PERMISSIONS } from '../domain/roles'
+import { LOCALES } from '../i18n/locales'
+
+const Locale = z.enum(LOCALES)
+/** One string per shipped language */
+const Localized = z.record(Locale, z.string().min(1))
 
 export const AppConfigSchema = z
   .object({
     brand: z.object({
-      /** Shown in the header, page titles and notifications */
-      name: z.string().min(1),
-      /** 1–4 characters for the compact logo mark on phones */
+      /** Shown in the header, page titles and on the login screen */
+      name: Localized,
+      /** 1–4 characters for the compact logo mark */
       shortName: z.string().min(1).max(4),
-      tagline: z.string(),
+      tagline: Localized,
     }),
-    locale: z.enum(['ko']),
+    /** Languages offered in the language switcher, in display order */
+    locales: z.array(Locale).min(1),
+    /** Used when neither a saved choice nor the browser language matches `locales` */
+    defaultLocale: Locale,
     /**
      * Roles available in this installation. Drop 'executive' if management
      * should not be a separate role, then grant `dashboard:view` elsewhere.
@@ -37,6 +45,13 @@ export const AppConfigSchema = z
         code: 'custom',
         path: ['rolePermissions'],
         message: 'at least one enabled role needs user:manage',
+      })
+    }
+    if (!cfg.locales.includes(cfg.defaultLocale)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['defaultLocale'],
+        message: 'defaultLocale must be one of locales',
       })
     }
   })

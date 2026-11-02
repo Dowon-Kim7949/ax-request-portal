@@ -14,7 +14,7 @@ import { Meter } from '@/components/ui/controls'
 import { ErrorState, Skeleton } from '@/components/ui/feedback'
 import { Field, Input } from '@/components/ui/field'
 import type { Budget } from '@/domain/model'
-import { formatKrw } from '@/lib/format'
+import { formatKrw, formatMonth } from '@/lib/format'
 
 const LimitsForm = z.object({
   monthlyLimitKrw: z.coerce.number().int().min(0),
@@ -23,11 +23,6 @@ const LimitsForm = z.object({
 })
 type LimitsIn = z.input<typeof LimitsForm>
 type LimitsOut = z.output<typeof LimitsForm>
-
-function monthLabel(month: string) {
-  const [y, m] = month.split('-').map(Number) as [number, number]
-  return `${y}년 ${m}월`
-}
 
 function Limits({ budget }: { budget: Budget }) {
   const { t } = useTranslation()
@@ -139,7 +134,7 @@ export default function BudgetPage() {
         <Card>
           <CardHeader className="items-start">
             <div>
-              <CardTitle>{t('budget.thisMonth', { month: monthLabel(b.month) })}</CardTitle>
+              <CardTitle>{t('budget.thisMonth', { month: formatMonth(b.month) })}</CardTitle>
               <p className="mt-1 text-[32px] leading-tight font-bold tracking-tight">
                 {formatKrw(b.spentKrw)}
               </p>
@@ -148,7 +143,7 @@ export default function BudgetPage() {
               </p>
             </div>
             {over ? (
-              <span className="flex items-center gap-1 rounded-full bg-warning-50 px-2.5 py-1 text-xs font-bold text-warning-600">
+              <span className="flex items-center gap-1 rounded-full bg-warning-50 px-2.5 py-1 text-xs font-bold text-warning-fg">
                 <AlertTriangle className="size-3.5" aria-hidden />
                 {t('budget.over')}
               </span>
@@ -157,7 +152,7 @@ export default function BudgetPage() {
           <Meter
             value={pct}
             warnAt={b.alertThresholdPct}
-            label={t('budget.thisMonth', { month: monthLabel(b.month) })}
+            label={t('budget.thisMonth', { month: formatMonth(b.month) })}
           />
           <dl className="mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
             {b.byModel.map((m) => (

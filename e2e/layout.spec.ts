@@ -4,7 +4,7 @@
  * here, so these run once, in the desktop (Chromium) project.
  */
 import { expect, test, type Page } from '@playwright/test'
-import { expectNoHorizontalScroll, loginAs } from './helpers.ts'
+import { expectNoHorizontalScroll, loginAs, loginAsEnglish } from './helpers.ts'
 
 const VIEWPORTS = [
   { name: 'small phone', width: 320, height: 568, nav: 'tabs' },
@@ -19,7 +19,7 @@ const ROUTES = {
     '/requests/1021',
     '/schedule',
     '/notifications',
-    '/settings/notifications',
+    '/settings',
   ],
   담당자: ['/work', '/work/regression', '/requests/1024', '/requests/1026'],
   경영진: ['/dashboard'],
@@ -55,3 +55,33 @@ for (const vp of VIEWPORTS) {
     }
   })
 }
+
+// English words run longer than Korean ones: check the narrowest phone in English too.
+test.describe('small phone in English', () => {
+  test.use({ viewport: { width: 320, height: 568 }, locale: 'en-US' })
+
+  const EN_ROUTES = {
+    Requester: [
+      '/',
+      '/requests/new?project=p-portal&step=2',
+      '/requests',
+      '/requests/1021',
+      '/schedule',
+      '/settings',
+    ],
+    Developer: ['/work', '/requests/1024', '/requests/1026'],
+    Executive: ['/dashboard'],
+    Admin: ['/admin/projects', '/admin/users', '/admin/budget'],
+  } as const
+
+  for (const [role, routes] of Object.entries(EN_ROUTES)) {
+    test(`${role} screens fit 320px in English`, async ({ page }) => {
+      await loginAsEnglish(page, role as keyof typeof EN_ROUTES)
+      for (const route of routes) {
+        await page.goto(route)
+        await settle(page)
+        await expectNoHorizontalScroll(page)
+      }
+    })
+  }
+})

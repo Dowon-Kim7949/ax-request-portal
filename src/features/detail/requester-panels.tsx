@@ -28,8 +28,8 @@ export function StatusExplainer({ request }: { request: WorkRequest }) {
         aiNow
           ? 'bg-ai-50 text-ai-700'
           : request.status === 'rejected'
-            ? 'bg-danger-50 text-danger-600'
-            : 'bg-brand-50 text-brand-700',
+            ? 'bg-danger-50 text-danger-fg'
+            : 'bg-brand-50 text-accent-strong',
       )}
       aria-live="polite"
     >
@@ -162,7 +162,7 @@ export function VerificationCard({ request }: { request: WorkRequest }) {
                     'flex h-12 items-center justify-center gap-1.5 rounded-xl text-[15px] font-bold ring-1 transition ring-inset',
                     check.result === 'passed'
                       ? 'bg-success-600 text-white ring-success-600'
-                      : 'bg-surface text-ink-600 ring-line-strong hover:bg-success-50',
+                      : 'bg-surface text-ink-600 ring-field hover:bg-success-50',
                   )}
                 >
                   <Check className="size-4.5" aria-hidden />
@@ -176,7 +176,7 @@ export function VerificationCard({ request }: { request: WorkRequest }) {
                     'flex h-12 items-center justify-center gap-1.5 rounded-xl text-[15px] font-bold ring-1 transition ring-inset',
                     check.result === 'failed'
                       ? 'bg-danger-600 text-white ring-danger-600'
-                      : 'bg-surface text-ink-600 ring-line-strong hover:bg-danger-50',
+                      : 'bg-surface text-ink-600 ring-field hover:bg-danger-50',
                   )}
                 >
                   <X className="size-4.5" aria-hidden />
@@ -267,7 +267,7 @@ export function VerificationCard({ request }: { request: WorkRequest }) {
             .filter((c) => c.result === 'failed')
             .map((c) => (
               <li key={c.criterionId} className="rounded-xl bg-danger-50 px-3.5 py-2.5 text-sm">
-                <p className="font-semibold text-danger-600">
+                <p className="font-semibold text-danger-fg">
                   {request.acceptanceCriteria.find((a) => a.id === c.criterionId)?.text}
                 </p>
                 {c.note ? <p className="mt-1 text-ink-700">{c.note}</p> : null}
@@ -289,7 +289,7 @@ export function CancelRequest({ request }: { request: WorkRequest }) {
   const transition = useTransition(request.id)
   return (
     <>
-      <Button variant="ghost" className="text-danger-600 hover:bg-danger-50" onClick={() => setOpen(true)}>
+      <Button variant="ghost" className="text-danger-fg hover:bg-danger-50" onClick={() => setOpen(true)}>
         {t('detail.cancel')}
       </Button>
       <Sheet

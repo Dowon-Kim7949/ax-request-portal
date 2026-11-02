@@ -19,6 +19,10 @@ export default defineConfig({
     baseURL: `http://localhost:${PORT}`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    // The app follows the browser language and color scheme; pin the defaults.
+    // i18n.spec.ts and theme.spec.ts switch them per test.
+    locale: 'ko-KR',
+    colorScheme: 'light',
   },
   projects: [
     { name: 'phone', use: { ...devices['iPhone 14'] }, testIgnore: DESKTOP_ONLY },

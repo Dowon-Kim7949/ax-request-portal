@@ -7,7 +7,7 @@ export function Select({ className, children, ...props }: ComponentProps<'select
   return (
     <span className={cn('relative block', className)}>
       <select
-        className="h-12 w-full appearance-none rounded-xl bg-surface pr-10 pl-3.5 text-[15px] text-ink-900 ring-1 ring-line-strong ring-inset focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-muted"
+        className="h-12 w-full appearance-none rounded-xl bg-surface pr-10 pl-3.5 text-[15px] text-ink-900 ring-1 ring-field ring-inset focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-muted"
         {...props}
       >
         {children}
@@ -47,7 +47,7 @@ export function SwitchRow({ checked, onCheckedChange, label, hint, disabled }: S
         aria-hidden
         className={cn(
           'relative h-7 w-12 shrink-0 rounded-full transition-colors',
-          checked ? 'bg-brand-600' : 'bg-line-strong',
+          checked ? 'bg-brand-600' : 'bg-field',
         )}
       >
         <span

@@ -8,13 +8,13 @@ const badgeVariants = cva(
     variants: {
       tone: {
         neutral: 'bg-muted text-ink-600 ring-1 ring-line ring-inset',
-        brand: 'bg-brand-50 text-brand-700',
+        brand: 'bg-brand-50 text-accent-strong',
         ai: 'bg-ai-50 text-ai-700',
         action: 'bg-brand-600 text-white',
-        warning: 'bg-warning-50 text-warning-600',
-        success: 'bg-success-50 text-success-600',
-        danger: 'bg-danger-50 text-danger-600',
-        dark: 'bg-ink-900 text-white',
+        warning: 'bg-warning-50 text-warning-fg',
+        success: 'bg-success-50 text-success-fg',
+        danger: 'bg-danger-50 text-danger-fg',
+        strong: 'bg-inverse text-on-inverse',
       },
     },
     defaultVariants: { tone: 'neutral' },

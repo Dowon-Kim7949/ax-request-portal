@@ -1,3 +1,4 @@
+import type { ServerLanguage } from './copy'
 import { MockEngine, STATE_VERSION, type EngineOptions, type MockState } from './engine'
 import { buildSeedState } from './seed'
 
@@ -8,14 +9,16 @@ export interface MockStore {
   now: () => Date
   /** Persist after a mutation (no-op without storage) */
   save: () => void
-  /** Throw away all changes and rebuild the demo data */
-  reset: () => void
+  /** Throw away all changes and rebuild the demo data in `lang` */
+  reset: (lang: ServerLanguage) => void
 }
 
 interface StoreOptions extends EngineOptions {
   now?: () => Date
   /** Pass `null` to keep everything in memory (tests) */
   storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'> | null
+  /** Language of freshly seeded demo data */
+  language?: ServerLanguage
 }
 
 function load(storage: StoreOptions['storage']): MockState | null {
@@ -31,8 +34,8 @@ function load(storage: StoreOptions['storage']): MockState | null {
 }
 
 export function createMockStore(options: StoreOptions): MockStore {
-  const { now = () => new Date(), storage = null, ...engineOptions } = options
-  let engine = new MockEngine(load(storage) ?? buildSeedState(now(), engineOptions), engineOptions)
+  const { now = () => new Date(), storage = null, language = 'ko', ...engineOptions } = options
+  let engine = new MockEngine(load(storage) ?? buildSeedState(now(), engineOptions, language), engineOptions)
 
   const save = () => {
     if (!storage) return
@@ -50,9 +53,9 @@ export function createMockStore(options: StoreOptions): MockStore {
     },
     now,
     save,
-    reset() {
+    reset(lang) {
       storage?.removeItem(STORAGE_KEY)
-      engine = new MockEngine(buildSeedState(now(), engineOptions), engineOptions)
+      engine = new MockEngine(buildSeedState(now(), engineOptions, lang), engineOptions)
       save()
     },
   }

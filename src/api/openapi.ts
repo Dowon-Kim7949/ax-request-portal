@@ -146,7 +146,9 @@ export function buildOpenApiDocument(): JsonSchema {
       title: 'AX Request Portal API',
       version: '0.1.0',
       description:
-        'Contract the AX Request Portal frontend expects. Generated from src/api/contract.ts — do not edit by hand.',
+        'Contract the AX Request Portal frontend expects. Generated from src/api/contract.ts — do not edit by hand.\n\n' +
+        'Every request carries `Accept-Language` (`ko` or `en`, the language the user picked). ' +
+        'Error messages, notification texts and AI-written text should come back in that language.',
       license: { name: 'MIT', identifier: 'MIT' },
     },
     servers: [{ url: '/api', description: 'Same-origin (mock or reverse proxy)' }],

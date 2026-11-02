@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { createBrowserRouter, type RouteObject } from 'react-router'
+import { createBrowserRouter, Navigate, type RouteObject } from 'react-router'
 import { env } from '@/config/env'
 import type { Permission } from '@/domain/roles'
 import { BootScreen } from './boot'
@@ -64,7 +64,8 @@ export const routes: RouteObject[] = [
       { path: 'admin/users', ...page(() => import('@/features/admin/users-page'), 'user:manage') },
       { path: 'admin/budget', ...page(() => import('@/features/admin/budget-page'), 'budget:manage') },
       { path: 'notifications', ...page(() => import('@/features/notifications/notifications-page')) },
-      { path: 'settings/notifications', ...page(() => import('@/features/notifications/settings-page')) },
+      { path: 'settings', ...page(() => import('@/features/settings/settings-page')) },
+      { path: 'settings/notifications', element: <Navigate to="/settings" replace /> },
       { path: '*', Component: NotFoundPage },
     ],
   },

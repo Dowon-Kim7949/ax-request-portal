@@ -34,6 +34,13 @@ const ko = {
     ai: 'AI',
     system: '시스템',
     unknownUser: '알 수 없는 사용자',
+    justNow: '방금 전',
+  },
+  boot: {
+    loading: '불러오는 중',
+    title: '화면을 준비하지 못했어요',
+    body: '네트워크가 잠깐 끊겼을 수 있어요. 다시 시도해 주세요.',
+    retry: '다시 시도',
   },
   nav: {
     home: '홈',
@@ -47,7 +54,7 @@ const ko = {
     users: '사용자와 역할',
     budget: 'AI 비용 한도',
     notifications: '알림',
-    notificationSettings: '알림 설정',
+    settings: '설정',
     admin: '관리',
     account: '내 계정',
     logout: '로그아웃',
@@ -76,6 +83,9 @@ const ko = {
     demoHint: '목 API로 동작합니다. 비밀번호는 {{password}}입니다.',
     demoAs: '{{role}}로 시작',
     sessionExpired: '다시 로그인해 주세요.',
+    language: '언어',
+    toDark: '어두운 화면으로 보기',
+    toLight: '밝은 화면으로 보기',
   },
   status: {
     // Developer/admin view: precise
@@ -532,8 +542,17 @@ const ko = {
     unread: '읽지 않음',
   },
   settings: {
-    title: '알림 설정',
-    subtitle: '상태가 바뀔 때 어디로 알려 드릴지 골라 주세요.',
+    title: '설정',
+    subtitle: '화면과 알림을 내게 맞게 바꿔요.',
+    display: '화면',
+    language: '언어',
+    theme: '테마',
+    themeOption: { system: '시스템 설정', light: '밝게', dark: '어둡게' },
+    themeHint: '시스템 설정을 고르면 기기의 밝기 설정을 따라가요.',
+    demoDataNote:
+      '데모 데이터는 처음 만들 때의 언어로 남아 있어요. 데모 데이터를 초기화하면 지금 언어로 다시 만들어요.',
+    notifications: '알림',
+    notificationsHint: '상태가 바뀔 때 어디로 알려 드릴지 골라 주세요.',
     inApp: '서비스 안 알림',
     inAppHint: '오른쪽 위 종 모양에 표시돼요.',
     email: '메일',
@@ -542,13 +561,15 @@ const ko = {
     messengerHint: '연결된 사내 메신저로 받아요.',
     onlyAction: '내 차례일 때만',
     onlyActionHint: '확인이나 답변이 필요할 때만 알려요.',
-    saved: '알림 설정을 저장했어요.',
+    notificationsSaved: '알림 설정을 저장했어요.',
     channelNote: '메일과 메신저 발송은 백엔드가 맡아요. 이 화면은 선택만 저장해요.',
   },
   errors: {
     network: '서버에 연결할 수 없어요. 네트워크를 확인해 주세요.',
     forbidden: '이 작업을 할 권한이 없어요.',
     generic: '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.',
+    http: '요청을 처리하지 못했어요. (HTTP {{status}})',
+    contract: '서버 응답 형식이 API 계약과 달라요.',
   },
 } as const
 

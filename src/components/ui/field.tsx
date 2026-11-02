@@ -3,7 +3,7 @@ import { useId, type ComponentProps, type ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 
 const control =
-  'w-full rounded-xl bg-surface px-3.5 text-[15px] text-ink-900 ring-1 ring-line-strong ring-inset placeholder:text-ink-400 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-muted aria-invalid:ring-danger-600'
+  'w-full rounded-xl bg-surface px-3.5 text-[15px] text-ink-900 ring-1 ring-field ring-inset placeholder:text-ink-500 focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:bg-muted aria-invalid:ring-danger-600'
 
 export function Input({ className, ...props }: ComponentProps<'input'>) {
   return <input className={cn(control, 'h-12', className)} {...props} />
@@ -30,7 +30,7 @@ export function AdviceText({ advice, id }: { advice: Advice; id?: string }) {
       id={id}
       className={cn(
         'flex gap-1.5 text-[13px] leading-snug',
-        advice.severity === 'warning' ? 'text-warning-600' : 'text-ink-500',
+        advice.severity === 'warning' ? 'text-warning-fg' : 'text-ink-500',
       )}
     >
       <Icon className="mt-0.5 size-3.5 shrink-0" aria-hidden />
@@ -73,7 +73,7 @@ export function Field({
       {children({ id, 'aria-describedby': describedBy, 'aria-invalid': error ? true : undefined })}
       <div id={hintId} className="flex flex-col gap-1 empty:hidden">
         {error ? (
-          <p className="text-[13px] font-medium text-danger-600" role="alert">
+          <p className="text-[13px] font-medium text-danger-fg" role="alert">
             {error}
           </p>
         ) : null}

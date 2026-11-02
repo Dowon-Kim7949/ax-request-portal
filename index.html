@@ -6,29 +6,55 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#f3f5f8" />
     <meta name="description" content="AI-assisted work request portal template" />
+    <!--
+      Apply the saved theme before the first paint, so dark-mode users never see a white flash.
+      Mirrors src/app/theme.ts and the storage shape of src/stores/preferences.ts.
+    -->
+    <script>
+      ;(function () {
+        var prefs = {}
+        try {
+          prefs = JSON.parse(localStorage.getItem('ax-request-portal:preferences') || '{}').state || {}
+        } catch (e) {}
+        var dark =
+          prefs.theme === 'dark' ||
+          (prefs.theme !== 'light' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)
+        var root = document.documentElement
+        if (dark) root.classList.add('dark')
+        root.style.colorScheme = dark ? 'dark' : 'light'
+        root.style.backgroundColor = dark ? '#0d121d' : '#f3f5f8'
+        if (prefs.language) root.lang = prefs.language
+        document
+          .querySelector('meta[name="theme-color"]')
+          .setAttribute('content', dark ? '#0d121d' : '#f3f5f8')
+      })()
+    </script>
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
     <link
       rel="stylesheet"
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
     />
-    <title>AX 업무 요청</title>
+    <title>AX Request Portal</title>
   </head>
   <body>
     <div id="root">
       <!-- Shown until React mounts, so a slow start is never a blank page -->
       <div style="min-height: 100dvh; display: grid; place-items: center">
-        <span
-          style="
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            border: 3px solid #e4e7ec;
-            border-top-color: #1d64db;
-            animation: boot-spin 0.8s linear infinite;
-          "
-        ></span>
+        <span class="boot-spinner"></span>
       </div>
       <style>
+        .boot-spinner {
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          border: 3px solid #e4e7ec;
+          border-top-color: #1d64db;
+          animation: boot-spin 0.8s linear infinite;
+        }
+        .dark .boot-spinner {
+          border-color: #262e40;
+          border-top-color: #7fa9ff;
+        }
         @keyframes boot-spin {
           to {
             transform: rotate(360deg);

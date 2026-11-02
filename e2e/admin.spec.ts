@@ -55,7 +55,9 @@ test('notifications can be read and configured', async ({ page }) => {
   await page.getByRole('button', { name: '모두 읽음' }).click()
   await expect(page.getByRole('link', { name: '알림', exact: true })).toBeVisible()
 
+  // The old address still works: notification settings now live on the settings page.
   await page.goto('/settings/notifications')
+  await expect(page).toHaveURL(/\/settings$/)
   const messenger = page.getByRole('switch', { name: /메신저/ })
   await expect(messenger).toHaveAttribute('aria-checked', 'false')
   await messenger.click()

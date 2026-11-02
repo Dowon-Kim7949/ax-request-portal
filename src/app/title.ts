@@ -1,8 +1,9 @@
 import { useEffect } from 'react'
-import { appConfig } from '@/config/app.config'
+import { useBrand } from './brand'
 
 export function usePageTitle(title: string | undefined): void {
+  const brand = useBrand()
   useEffect(() => {
-    document.title = title ? `${title} · ${appConfig.brand.name}` : appConfig.brand.name
-  }, [title])
+    document.title = title ? `${title} · ${brand.name}` : brand.name
+  }, [title, brand.name])
 }

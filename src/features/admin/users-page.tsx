@@ -92,7 +92,7 @@ function UserRow({ user, isMe }: { user: User; isMe: boolean }) {
   return (
     <li className="flex flex-col gap-3 rounded-(--radius-card) bg-surface p-4 ring-1 ring-line sm:flex-row sm:items-center">
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-50 font-bold text-brand-700">
+        <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-50 font-bold text-accent-strong">
           {user.name.slice(0, 1)}
         </span>
         <div className="min-w-0">

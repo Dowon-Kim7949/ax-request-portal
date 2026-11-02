@@ -2,6 +2,7 @@ import { delay, http, HttpResponse, type HttpHandler } from 'msw'
 import type * as z from 'zod'
 import { api, type ApiErrorBody, type EndpointSpec } from '../api/contract'
 import type { User } from '../domain/model'
+import { errorText, serverLanguage, type ErrorKey, type ServerLanguage } from './copy'
 import { HttpError, localDate } from './engine'
 import { DEMO_PASSWORD } from './seed'
 import type { MockStore } from './store'
@@ -19,6 +20,8 @@ interface Ctx<E extends EndpointSpec> {
   store: MockStore
   me: User
   now: Date
+  /** Language of this request (Accept-Language) */
+  lang: ServerLanguage
   params: E extends { params: infer P extends z.ZodType } ? z.output<P> : Record<string, never>
   query: E extends { query: infer Q extends z.ZodType } ? z.output<Q> : Record<string, never>
   body: E extends { body: infer B extends z.ZodType } ? z.output<B> : undefined
@@ -27,15 +30,23 @@ interface Ctx<E extends EndpointSpec> {
 
 type Resolver<E extends EndpointSpec> = (ctx: Ctx<E>) => unknown | Promise<unknown>
 
+interface RouteOptions {
+  /** Persist the state afterwards */
+  mutates?: boolean
+  /** A change a person made: from now on the demo data keeps its language */
+  edits?: boolean
+}
+
 function errorResponse(
+  lang: ServerLanguage,
   status: number,
   code: ApiErrorBody['code'],
-  message: string,
+  key: ErrorKey,
+  params: Record<string, string | number> = {},
   issues?: ApiErrorBody['issues'],
 ) {
-  return HttpResponse.json({ code, message, ...(issues ? { issues } : {}) } satisfies ApiErrorBody, {
-    status,
-  })
+  const body: ApiErrorBody = { code, message: errorText(lang, key, params), ...(issues ? { issues } : {}) }
+  return HttpResponse.json(body, { status })
 }
 
 function zodIssues(error: z.ZodError): ApiErrorBody['issues'] {
@@ -59,11 +70,12 @@ export function tokenFor(userId: string): string {
 /**
  * Builds the mock handlers. Each one is bound to its contract endpoint, so
  * path, method, body validation and auth come from src/api/contract.ts.
+ * Texts follow the request's Accept-Language, as a real backend's should.
  */
 export function createHandlers(store: MockStore, options: HandlerOptions = {}): HttpHandler[] {
   const [minLatency, maxLatency] = options.latency ?? [120, 380]
 
-  function route<E extends EndpointSpec>(spec: E, resolver: Resolver<E>, opts: { mutates?: boolean } = {}) {
+  function route<E extends EndpointSpec>(spec: E, resolver: Resolver<E>, opts: RouteOptions = {}) {
     const method = spec.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete'
     const path = `*/api${spec.path.replace(/\{(\w+)\}/g, ':$1')}`
 
@@ -71,6 +83,7 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
       if (maxLatency > 0) await delay(minLatency + Math.random() * (maxLatency - minLatency))
       const now = store.now()
       const engine = store.engine
+      const lang = serverLanguage(request.headers.get('Accept-Language'))
 
       try {
         let me: User | undefined
@@ -79,58 +92,64 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
           const user = engine.user(header.slice(`Bearer ${TOKEN_PREFIX}`.length))
           if (user?.active) me = user
         }
-        if (!me && !spec.public) return errorResponse(401, 'unauthorized', '다시 로그인해 주세요.')
+        if (!me && !spec.public) return errorResponse(lang, 401, 'unauthorized', 'signInAgain')
 
         const parsedParams = spec.params?.safeParse(coerce(params))
         if (parsedParams && !parsedParams.success) {
-          return errorResponse(404, 'not_found', '찾을 수 없습니다.', zodIssues(parsedParams.error))
+          return errorResponse(lang, 404, 'not_found', 'notFound', {}, zodIssues(parsedParams.error))
         }
         const url = new URL(request.url)
         const parsedQuery = spec.query?.safeParse(Object.fromEntries(url.searchParams))
         if (parsedQuery && !parsedQuery.success) {
-          return errorResponse(400, 'bad_request', '잘못된 조회 조건입니다.', zodIssues(parsedQuery.error))
+          return errorResponse(lang, 400, 'bad_request', 'badQuery', {}, zodIssues(parsedQuery.error))
         }
         let body: unknown
         if (spec.body) {
           const json = await request.json().catch(() => undefined)
           const parsed = spec.body.safeParse(json)
-          if (!parsed.success)
-            return errorResponse(400, 'bad_request', '입력값을 확인해 주세요.', zodIssues(parsed.error))
+          if (!parsed.success) {
+            return errorResponse(lang, 400, 'bad_request', 'checkInput', {}, zodIssues(parsed.error))
+          }
           body = parsed.data
         }
 
         // AI jobs advance on every call, so a reload shows the same progress as polling.
-        const advanced = engine.tick(now)
+        const advanced = engine.tick(now, lang)
 
         const result = await resolver({
           store,
           me: me as User,
           now,
+          lang,
           params: (parsedParams?.data ?? {}) as Ctx<E>['params'],
           query: (parsedQuery?.data ?? {}) as Ctx<E>['query'],
           body: body as Ctx<E>['body'],
           request,
         })
-        if (advanced || opts.mutates) store.save()
+        if (opts.edits) store.engine.state.dirty = true
+        if (advanced || opts.mutates || opts.edits) store.save()
 
         if (spec.response === null) return new HttpResponse(null, { status: 204 })
         return HttpResponse.json(result as never, { status: spec.status ?? 200 })
       } catch (err) {
-        if (err instanceof HttpError) return errorResponse(err.status, err.code, err.message)
+        if (err instanceof HttpError) return errorResponse(lang, err.status, err.code, err.key, err.params)
         console.error('[mock api]', err)
-        return errorResponse(500, 'internal', err instanceof Error ? err.message : '알 수 없는 오류')
+        return errorResponse(lang, 500, 'internal', 'unknown')
       }
     })
   }
 
-  const m = { mutates: true }
+  /** A change a person makes to the demo data */
+  const edit: RouteOptions = { edits: true }
+  /** State changes that are not edits (reading notifications, form checks) */
+  const touch: RouteOptions = { mutates: true }
 
   return [
     /* auth */
     route(api.login, ({ store, body }) => {
       const user = store.engine.state.users.find((u) => u.email.toLowerCase() === body.email.toLowerCase())
       if (!user || !user.active || body.password !== DEMO_PASSWORD) {
-        throw new HttpError(401, 'unauthorized', '이메일 또는 비밀번호가 맞지 않습니다.')
+        throw new HttpError(401, 'unauthorized', 'wrongCredentials')
       }
       return { token: tokenFor(user.id), user }
     }),
@@ -139,55 +158,62 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
 
     /* users */
     route(api.listUsers, ({ store }) => store.engine.state.users),
-    route(api.createUser, ({ store, me, body }) => store.engine.createUser(me, body), m),
-    route(api.updateUser, ({ store, me, params, body }) => store.engine.updateUser(me, params.id, body), m),
+    route(api.createUser, ({ store, me, body }) => store.engine.createUser(me, body), edit),
+    route(
+      api.updateUser,
+      ({ store, me, params, body }) => store.engine.updateUser(me, params.id, body),
+      edit,
+    ),
 
     /* projects */
     route(api.listProjects, ({ store }) => store.engine.state.projects),
-    route(api.createProject, ({ store, me, body }) => store.engine.saveProject(me, body), m),
+    route(api.createProject, ({ store, me, body }) => store.engine.saveProject(me, body), edit),
     route(
       api.updateProject,
       ({ store, me, params, body }) => store.engine.saveProject(me, body, params.id),
-      m,
+      edit,
     ),
 
     /* requests — note: /requests/precheck must be registered before /requests/:id */
     route(
       api.precheckRequest,
-      ({ store, me, body, now }) => ({ issues: store.engine.precheck(me, body, now) }),
-      m,
+      ({ store, me, body, now, lang }) => ({ issues: store.engine.precheck(me, body, now, lang) }),
+      touch,
     ),
     route(api.listRequests, ({ store, me, query }) => store.engine.listRequests(me, query)),
-    route(api.createRequest, ({ store, me, body, now }) => store.engine.createRequest(me, body, now), m),
+    route(
+      api.createRequest,
+      ({ store, me, body, now, lang }) => store.engine.createRequest(me, body, now, lang),
+      edit,
+    ),
     route(api.getRequest, ({ store, me, params }) => store.engine.getRequest(me, params.id)),
     route(
       api.transitionRequest,
-      ({ store, me, params, body, now }) => store.engine.transition(me, params.id, body, now),
-      m,
+      ({ store, me, params, body, now, lang }) => store.engine.transition(me, params.id, body, now, lang),
+      edit,
     ),
     route(
       api.saveVerification,
       ({ store, me, params, body, now }) => store.engine.saveVerification(me, params.id, body.checks, now),
-      m,
+      edit,
     ),
     route(
       api.updateRegression,
       ({ store, me, params, body, now }) => store.engine.updateRegression(me, params.id, body.checks, now),
-      m,
+      edit,
     ),
     route(
       api.updateRelease,
       ({ store, me, params, body, now }) => store.engine.updateRelease(me, params.id, body, now),
-      m,
+      edit,
     ),
     route(
       api.uploadAttachment,
       async ({ store, me, request }) => {
         const form = await request.formData().catch(() => null)
         const file = form?.get('file')
-        if (!(file instanceof File)) throw new HttpError(400, 'bad_request', '파일을 선택해 주세요.')
-        if (file.size > MAX_UPLOAD_BYTES)
-          throw new HttpError(400, 'bad_request', '10MB 이하 파일만 올릴 수 있습니다.')
+        if (!(file instanceof File)) throw new HttpError(400, 'bad_request', 'pickFile')
+        if (file.size > MAX_UPLOAD_BYTES) throw new HttpError(400, 'bad_request', 'fileTooLarge')
         // Small files are inlined so they survive a reload; large ones live for this session only.
         const url =
           file.size <= INLINE_UPLOAD_BYTES
@@ -195,21 +221,21 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
             : URL.createObjectURL(file)
         return store.engine.addAttachment(me, { name: file.name, size: file.size, type: file.type, url })
       },
-      m,
+      touch,
     ),
     route(api.regressionQueue, ({ store, me }) => store.engine.regressionQueue(me)),
 
     /* notifications */
-    route(api.listNotifications, ({ store, me }) => store.engine.notificationsFor(me)),
+    route(api.listNotifications, ({ store, me, lang }) => store.engine.notificationsFor(me, lang)),
     route(
       api.markAllNotificationsRead,
-      ({ store, me, now }) => void store.engine.markRead(me, 'all', now),
-      m,
+      ({ store, me, now, lang }) => void store.engine.markRead(me, 'all', now, lang),
+      touch,
     ),
     route(
       api.markNotificationRead,
-      ({ store, me, params, now }) => store.engine.markRead(me, params.id, now),
-      m,
+      ({ store, me, params, now, lang }) => store.engine.markRead(me, params.id, now, lang),
+      touch,
     ),
     route(api.getNotificationSettings, ({ store, me }) => store.engine.state.notificationSettings[me.id]),
     route(
@@ -218,7 +244,7 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
         store.engine.state.notificationSettings[me.id] = body
         return body
       },
-      m,
+      edit,
     ),
 
     /* insights */
@@ -237,7 +263,7 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
         store.engine.state.budget = body
         return store.engine.budget(localDate(now).slice(0, 7))
       },
-      m,
+      edit,
     ),
   ]
 }
