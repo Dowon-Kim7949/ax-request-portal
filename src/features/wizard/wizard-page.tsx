@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ChevronLeft, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { useNavigate, useSearchParams } from 'react-router'
@@ -109,8 +109,11 @@ export default function WizardPage() {
   }, [])
 
   // Move focus to the new question for screen readers and keep the top in view.
+  // A layout effect, so focus moves before the step is painted: a passive effect
+  // could run after the user (or a test) has already started typing into the
+  // first field, and pull focus away mid-input, dropping what was typed.
   const titleRef = useRef<HTMLDivElement>(null)
-  useEffect(() => {
+  useLayoutEffect(() => {
     window.scrollTo({ top: 0 })
     titleRef.current?.querySelector<HTMLElement>('[data-step-title]')?.focus({ preventScroll: true })
   }, [step])
