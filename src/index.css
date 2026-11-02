@@ -1,0 +1,30 @@
+@import 'tailwindcss';
+
+/*
+ * Design tokens. Rebrand the template by editing these values only.
+ * Full theming (shadcn/ui tokens, dark mode) is added with the app shell.
+ */
+@theme {
+  --font-sans:
+    'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo',
+    'Noto Sans KR', 'Malgun Gothic', sans-serif;
+
+  --color-brand-50: oklch(0.97 0.02 255);
+  --color-brand-100: oklch(0.93 0.04 255);
+  --color-brand-500: oklch(0.6 0.19 258);
+  --color-brand-600: oklch(0.54 0.2 260);
+  --color-brand-700: oklch(0.47 0.18 262);
+
+  --color-ink-500: oklch(0.55 0.02 260);
+  --color-ink-600: oklch(0.45 0.02 260);
+  --color-ink-900: oklch(0.24 0.03 265);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  @apply bg-white font-sans text-ink-900 antialiased;
+}
