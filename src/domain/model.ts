@@ -445,10 +445,14 @@ export const DashboardSummary = named(
       .describe(
         'Received in the previous month over the same span of days (month-to-date while `month` is in progress)',
       ),
-    inProgress: z.int().nonnegative(),
-    delayed: z.int().nonnegative(),
-    done: z.int().nonnegative(),
-    avgLeadTimeDays: z.number().nonnegative().optional(),
+    inProgress: z.int().nonnegative().describe('Open right now, regardless of `month`'),
+    delayed: z.int().nonnegative().describe('Open right now and past the desired or scheduled date'),
+    done: z.int().nonnegative().describe('Released during `month`'),
+    avgLeadTimeDays: z
+      .number()
+      .nonnegative()
+      .optional()
+      .describe('Average days from submission to release, for requests released during `month`'),
     aiCostKrw: z.number().nonnegative(),
     aiBudgetKrw: z.number().nonnegative(),
     byProject: z.array(

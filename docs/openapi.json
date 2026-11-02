@@ -2004,19 +2004,23 @@
           "inProgress": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 9007199254740991
+            "maximum": 9007199254740991,
+            "description": "Open right now, regardless of `month`"
           },
           "delayed": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 9007199254740991
+            "maximum": 9007199254740991,
+            "description": "Open right now and past the desired or scheduled date"
           },
           "done": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 9007199254740991
+            "maximum": 9007199254740991,
+            "description": "Released during `month`"
           },
           "avgLeadTimeDays": {
+            "description": "Average days from submission to release, for requests released during `month`",
             "type": "number",
             "minimum": 0
           },
