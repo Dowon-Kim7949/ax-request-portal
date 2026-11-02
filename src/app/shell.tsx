@@ -9,8 +9,7 @@ import {
   RotateCcw,
   Settings,
 } from 'lucide-react'
-import { DropdownMenu } from 'radix-ui'
-import { useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, NavLink, Outlet, ScrollRestoration, useMatches } from 'react-router'
 import { toast } from 'sonner'
@@ -79,28 +78,63 @@ function useAccountActions() {
   }
 }
 
+/**
+ * Account disclosure (button + panel), not an ARIA menu: three plain links and
+ * buttons don't need roving focus, and dropping the menu primitive removes
+ * ~40 KB (floating-ui, collection, menu) from the first load.
+ */
 function AccountMenu() {
   const { t } = useTranslation()
   const user = useCurrentUser()
   const actions = useAccountActions()
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const panelId = useId()
+
+  useEffect(() => {
+    if (!open) return
+    const onPointer = (e: PointerEvent) => {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false)
+        triggerRef.current?.focus()
+      }
+    }
+    document.addEventListener('pointerdown', onPointer)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('pointerdown', onPointer)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
   const item =
-    'flex h-11 cursor-pointer items-center gap-2.5 rounded-lg px-3 text-sm font-medium text-ink-700 outline-none data-highlighted:bg-muted'
+    'flex h-11 w-full items-center gap-2.5 rounded-lg px-3 text-left text-sm font-medium text-ink-700 hover:bg-muted focus-visible:bg-muted'
+  const close = () => setOpen(false)
+
   return (
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger
-        className="flex h-11 items-center gap-2 rounded-full pr-3 pl-1.5 text-sm font-semibold text-ink-700 hover:bg-muted"
+    <div ref={rootRef} className="relative">
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
         aria-label={t('nav.account')}
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-11 items-center gap-2 rounded-full pr-3 pl-1.5 text-sm font-semibold text-ink-700 hover:bg-muted"
       >
         <span className="grid size-8 place-items-center rounded-full bg-brand-100 text-[13px] font-bold text-brand-700">
           {user.name.slice(0, 1)}
         </span>
         <span className="hidden lg:inline">{user.name}</span>
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          align="end"
-          sideOffset={6}
-          className="z-50 w-60 animate-fade-in rounded-2xl bg-surface p-1.5 shadow-xl ring-1 ring-line"
+      </button>
+      {open ? (
+        <div
+          id={panelId}
+          className="absolute top-full right-0 z-50 mt-1.5 w-60 animate-fade-in rounded-2xl bg-surface p-1.5 shadow-xl ring-1 ring-line"
         >
           <div className="px-3 py-2.5">
             <p className="font-bold text-ink-900">{user.name}</p>
@@ -108,26 +142,38 @@ function AccountMenu() {
               {t(`role.${user.role}`)} · {user.email}
             </p>
           </div>
-          <DropdownMenu.Separator className="my-1 h-px bg-line" />
-          <DropdownMenu.Item asChild className={item}>
-            <Link to="/settings/notifications">
-              <Settings className="size-4" aria-hidden />
-              {t('nav.notificationSettings')}
-            </Link>
-          </DropdownMenu.Item>
+          <div className="my-1 h-px bg-line" aria-hidden />
+          <Link to="/settings/notifications" className={item} onClick={close}>
+            <Settings className="size-4" aria-hidden />
+            {t('nav.notificationSettings')}
+          </Link>
           {actions.resetDemo ? (
-            <DropdownMenu.Item className={item} onSelect={() => void actions.resetDemo?.()}>
+            <button
+              type="button"
+              className={item}
+              onClick={() => {
+                close()
+                void actions.resetDemo?.()
+              }}
+            >
               <RotateCcw className="size-4" aria-hidden />
               {t('nav.resetDemo')}
-            </DropdownMenu.Item>
+            </button>
           ) : null}
-          <DropdownMenu.Item className={item} onSelect={actions.logout}>
+          <button
+            type="button"
+            className={item}
+            onClick={() => {
+              close()
+              actions.logout()
+            }}
+          >
             <LogOut className="size-4" aria-hidden />
             {t('nav.logout')}
-          </DropdownMenu.Item>
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+          </button>
+        </div>
+      ) : null}
+    </div>
   )
 }
 
