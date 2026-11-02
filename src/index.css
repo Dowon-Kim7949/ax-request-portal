@@ -1,30 +1,107 @@
 @import 'tailwindcss';
 
 /*
- * Design tokens. Rebrand the template by editing these values only.
- * Full theming (shadcn/ui tokens, dark mode) is added with the app shell.
+ * ─────────────────────────────────────────────────────────────
+ *  Design tokens — rebrand the template by editing this block.
+ * ─────────────────────────────────────────────────────────────
+ *  brand  primary actions, links, "my turn" highlights
+ *  ai     anything the AI is doing (report, work in progress)
+ *  ink    text and icons, from strong (900) to faint (400)
+ *  line   borders and dividers
+ *  canvas page background behind cards
  */
 @theme {
   --font-sans:
     'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo',
     'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
-  --color-brand-50: oklch(0.97 0.02 255);
-  --color-brand-100: oklch(0.93 0.04 255);
-  --color-brand-500: oklch(0.6 0.19 258);
-  --color-brand-600: oklch(0.54 0.2 260);
-  --color-brand-700: oklch(0.47 0.18 262);
+  --color-brand-50: #eef4ff;
+  --color-brand-100: #dbe7fe;
+  --color-brand-200: #bcd3fd;
+  --color-brand-500: #3b7cf0;
+  --color-brand-600: #1d64db;
+  --color-brand-700: #174fb2;
 
-  --color-ink-500: oklch(0.55 0.02 260);
-  --color-ink-600: oklch(0.45 0.02 260);
-  --color-ink-900: oklch(0.24 0.03 265);
+  --color-ai-50: #fff4ec;
+  --color-ai-100: #fde3d0;
+  --color-ai-500: #e0702f;
+  --color-ai-600: #c2561b;
+  --color-ai-700: #9c4416;
+
+  --color-ink-900: #172036;
+  --color-ink-700: #333d52;
+  --color-ink-600: #4e586c;
+  --color-ink-500: #6b7488;
+  --color-ink-400: #98a0b0;
+
+  --color-line: #e4e7ec;
+  --color-line-strong: #cfd4dc;
+  --color-canvas: #f3f5f8;
+  --color-surface: #ffffff;
+  --color-muted: #f6f7f9;
+
+  --color-success-50: #ecfaf2;
+  --color-success-600: #138a4b;
+  --color-warning-50: #fff8e6;
+  --color-warning-600: #b26a00;
+  --color-danger-50: #fff0f0;
+  --color-danger-600: #d12f2f;
+
+  --radius-card: 1.125rem;
+
+  --animate-fade-in: fade-in 160ms ease-out;
+  --animate-slide-up: slide-up 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-slide-left: slide-left 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes slide-up {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes slide-left {
+    from {
+      transform: translateX(-100%);
+    }
+  }
 }
 
-html {
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-ink-900 antialiased;
+    word-break: keep-all;
+    overflow-wrap: anywhere;
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-brand-500;
+  }
+
+  /* iOS zooms into inputs below 16px; keep form text at 16px on touch devices. */
+  @media (pointer: coarse) {
+    input,
+    textarea,
+    select {
+      font-size: 16px;
+    }
+  }
 }
 
-body {
-  @apply bg-white font-sans text-ink-900 antialiased;
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
 }

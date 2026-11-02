@@ -1,0 +1,151 @@
+import { zodResolver } from '@hookform/resolvers/zod'
+import { ChartColumn, ChevronRight, Code, Settings, Send } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { useTranslation } from 'react-i18next'
+import { Navigate, useNavigate, useSearchParams } from 'react-router'
+import * as z from 'zod'
+import { ApiError } from '@/api/client'
+import { useLogin } from '@/api/queries'
+import { loadDemoAccounts } from '@/app/demo'
+import { usePageTitle } from '@/app/title'
+import { Button } from '@/components/ui/button'
+import { Field, Input } from '@/components/ui/field'
+import { appConfig } from '@/config/app.config'
+import type { Role, User } from '@/domain/model'
+import { useSession } from '@/stores/session'
+
+const LoginForm = z.object({ email: z.email(), password: z.string().min(1) })
+type LoginForm = z.infer<typeof LoginForm>
+
+const ROLE_ICON: Record<Role, typeof Send> = {
+  requester: Send,
+  executive: ChartColumn,
+  developer: Code,
+  admin: Settings,
+}
+
+/** Only allow in-app paths as the post-login destination. */
+function safeNext(next: string | null): string {
+  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/'
+}
+
+export default function LoginPage() {
+  const { t } = useTranslation()
+  usePageTitle(t('auth.title'))
+  const token = useSession((s) => s.token)
+  const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const next = safeNext(params.get('next'))
+  const login = useLogin()
+  const [demo, setDemo] = useState<{ accounts: User[]; password: string } | null>(null)
+
+  useEffect(() => {
+    void loadDemoAccounts().then(setDemo)
+  }, [])
+
+  const form = useForm<LoginForm>({
+    resolver: zodResolver(LoginForm),
+    defaultValues: { email: '', password: '' },
+  })
+
+  const submit = (values: LoginForm) =>
+    login.mutate(values, { onSuccess: () => navigate(next, { replace: true }) })
+
+  if (token && !login.isPending) return <Navigate to={next} replace />
+
+  const errorMessage =
+    login.error instanceof ApiError ? login.error.message : login.error ? t('errors.generic') : undefined
+
+  return (
+    <main className="flex min-h-dvh items-center justify-center px-4 py-10 pt-safe">
+      <div className="flex w-full max-w-md flex-col gap-6">
+        <div className="flex flex-col gap-3">
+          <span className="grid size-12 place-items-center rounded-2xl bg-ink-900 text-base font-black text-white">
+            {appConfig.brand.shortName}
+          </span>
+          <h1 className="text-[28px] leading-tight font-bold tracking-tight">{appConfig.brand.name}</h1>
+          <p className="text-[15px] text-ink-500">{appConfig.brand.tagline}</p>
+        </div>
+
+        <form
+          noValidate
+          onSubmit={form.handleSubmit(submit)}
+          className="flex flex-col gap-4 rounded-(--radius-card) bg-surface p-5 ring-1 ring-line"
+        >
+          <Field
+            label={t('auth.email')}
+            error={form.formState.errors.email ? t('auth.emailInvalid') : undefined}
+          >
+            {(p) => (
+              <Input
+                type="email"
+                autoComplete="username"
+                inputMode="email"
+                {...p}
+                {...form.register('email')}
+              />
+            )}
+          </Field>
+          <Field label={t('auth.password')}>
+            {(p) => (
+              <Input type="password" autoComplete="current-password" {...p} {...form.register('password')} />
+            )}
+          </Field>
+          {errorMessage ? (
+            <p role="alert" className="text-sm font-medium text-danger-600">
+              {errorMessage}
+            </p>
+          ) : null}
+          <Button type="submit" size="lg" block loading={login.isPending}>
+            {login.isPending ? t('auth.submitting') : t('auth.submit')}
+          </Button>
+        </form>
+
+        {demo ? (
+          <section className="flex flex-col gap-3" aria-labelledby="demo-title">
+            <div>
+              <h2 id="demo-title" className="font-bold">
+                {t('auth.demoTitle')}
+              </h2>
+              <p className="text-sm text-ink-500">{t('auth.demoHint', { password: demo.password })}</p>
+            </div>
+            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {demo.accounts.map((u) => {
+                const Icon = ROLE_ICON[u.role]
+                return (
+                  <li key={u.id}>
+                    <button
+                      type="button"
+                      disabled={login.isPending}
+                      onClick={() =>
+                        login.mutate(
+                          { email: u.email, password: demo.password },
+                          { onSuccess: () => navigate(next, { replace: true }) },
+                        )
+                      }
+                      className="flex w-full items-center gap-3 rounded-2xl bg-surface p-3.5 text-left ring-1 ring-line transition hover:ring-brand-500 disabled:opacity-50"
+                    >
+                      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600">
+                        <Icon className="size-5" aria-hidden />
+                      </span>
+                      <span className="flex min-w-0 flex-1 flex-col">
+                        <span className="text-[15px] font-bold">
+                          {t('auth.demoAs', { role: t(`role.${u.role}`) })}
+                        </span>
+                        <span className="truncate text-xs text-ink-500">
+                          {u.name} · {u.team}
+                        </span>
+                      </span>
+                      <ChevronRight className="size-4 text-ink-400" aria-hidden />
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        ) : null}
+      </div>
+    </main>
+  )
+}

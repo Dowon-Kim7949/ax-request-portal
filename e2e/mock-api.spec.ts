@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 test('the in-browser mock API answers contract calls', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/login')
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
 
   const result = await page.evaluate(async () => {
