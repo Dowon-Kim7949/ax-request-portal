@@ -1,0 +1,119 @@
+import type * as z from 'zod'
+import { apiRoot } from '../config/env'
+import {
+  ApiErrorBody,
+  type BodyOf,
+  type EndpointSpec,
+  type ParamsOf,
+  type QueryOf,
+  type ResponseOf,
+} from './contract'
+
+export class ApiError extends Error {
+  readonly status: number
+  readonly code: ApiErrorBody['code'] | 'network' | 'contract_violation'
+  readonly issues: ApiErrorBody['issues']
+
+  constructor(status: number, code: ApiError['code'], message: string, issues?: ApiErrorBody['issues']) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.code = code
+    this.issues = issues
+  }
+}
+
+interface ClientHooks {
+  getToken: () => string | null
+  /** Called on 401 so the app can drop the session and show the login screen */
+  onUnauthorized: () => void
+}
+
+let hooks: ClientHooks = { getToken: () => null, onUnauthorized: () => {} }
+
+export function configureClient(next: ClientHooks): void {
+  hooks = next
+}
+
+type Args<E extends EndpointSpec> = ([ParamsOf<E>] extends [never] ? object : { params: ParamsOf<E> }) &
+  ([BodyOf<E>] extends [never] ? object : { body: BodyOf<E> }) &
+  ([QueryOf<E>] extends [never] ? object : { query?: QueryOf<E> }) &
+  (E extends { multipart: true } ? { file: File } : object) & { signal?: AbortSignal }
+
+export function buildUrl(
+  path: string,
+  params?: Record<string, unknown>,
+  query?: Record<string, unknown>,
+): string {
+  const filled = path.replace(/\{(\w+)\}/g, (_, key: string) => {
+    const value = params?.[key]
+    if (value === undefined || value === null) throw new Error(`Missing path parameter "${key}" for ${path}`)
+    return encodeURIComponent(String(value))
+  })
+  const search = new URLSearchParams()
+  for (const [k, v] of Object.entries(query ?? {})) {
+    if (v !== undefined && v !== null && v !== '') search.set(k, String(v))
+  }
+  const qs = search.toString()
+  return `${apiRoot}${filled}${qs ? `?${qs}` : ''}`
+}
+
+/**
+ * Calls one contract endpoint and validates the response against its schema,
+ * so a backend that drifts from docs/openapi.json fails loudly at the edge.
+ */
+export async function call<E extends EndpointSpec>(spec: E, ...rest: [Args<E>] | []): Promise<ResponseOf<E>> {
+  const args = (rest[0] ?? {}) as {
+    params?: Record<string, unknown>
+    query?: Record<string, unknown>
+    body?: unknown
+    file?: File
+    signal?: AbortSignal
+  }
+
+  const headers = new Headers({ Accept: 'application/json' })
+  const token = hooks.getToken()
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+
+  let body: BodyInit | undefined
+  if (spec.multipart && args.file) {
+    const form = new FormData()
+    form.set('file', args.file)
+    body = form
+  } else if (args.body !== undefined) {
+    headers.set('Content-Type', 'application/json')
+    body = JSON.stringify(args.body)
+  }
+
+  let res: Response
+  try {
+    res = await fetch(buildUrl(spec.path, args.params, args.query), {
+      method: spec.method,
+      headers,
+      body,
+      signal: args.signal,
+    })
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err
+    throw new ApiError(0, 'network', '서버에 연결할 수 없습니다. 네트워크 상태를 확인해 주세요.')
+  }
+
+  if (!res.ok) {
+    const parsed = ApiErrorBody.safeParse(await res.json().catch(() => null))
+    if (res.status === 401 && !spec.public) hooks.onUnauthorized()
+    if (parsed.success)
+      throw new ApiError(res.status, parsed.data.code, parsed.data.message, parsed.data.issues)
+    throw new ApiError(res.status, 'internal', `요청을 처리하지 못했습니다. (HTTP ${res.status})`)
+  }
+
+  if (spec.response === null || res.status === 204) return undefined as ResponseOf<E>
+
+  const json: unknown = await res.json()
+  const result = (spec.response as z.ZodType).safeParse(json)
+  if (!result.success) {
+    const issues = result.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message }))
+    console.error(`[api] ${spec.method} ${spec.path} response does not match the contract`, issues)
+    throw new ApiError(res.status, 'contract_violation', '서버 응답 형식이 계약과 다릅니다.', issues)
+  }
+  return result.data as ResponseOf<E>
+}
