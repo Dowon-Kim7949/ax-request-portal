@@ -66,6 +66,10 @@
   --color-danger-600: #d12f2f;
   --color-danger-fg: #c42b2b;
 
+  /* Chart series for AI providers: fixed per provider, validated for color-vision deficiency. */
+  --color-provider-anthropic: #d95926;
+  --color-provider-openai: #2a78d6;
+
   --radius-card: 1.125rem;
 
   --animate-fade-in: fade-in 160ms ease-out;
@@ -137,6 +141,9 @@
     --color-danger-50: #2c1517;
     --color-danger-600: #d12f2f;
     --color-danger-fg: #ff8585;
+
+    --color-provider-anthropic: #d95926;
+    --color-provider-openai: #3987e5;
   }
 
   html {

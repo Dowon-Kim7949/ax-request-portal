@@ -19,14 +19,17 @@ async function openLoginScreen(page: Page, brandName: string) {
 }
 
 /** Signs in through the demo buttons on the login screen (mock mode). */
-export async function loginAs(page: Page, role: '요청자' | '경영진' | '담당자' | '관리자') {
+export async function loginAs(page: Page, role: '요청자' | '경영진' | '담당자' | '관리자' | '운영자') {
   await openLoginScreen(page, 'AX 업무 요청')
   await page.getByRole('button', { name: new RegExp(`${role}로 시작`) }).click()
   await expect(page).not.toHaveURL(/\/login/)
 }
 
 /** Same as loginAs, for a browser whose language is English. */
-export async function loginAsEnglish(page: Page, role: 'Requester' | 'Executive' | 'Developer' | 'Admin') {
+export async function loginAsEnglish(
+  page: Page,
+  role: 'Requester' | 'Executive' | 'Developer' | 'Admin' | 'Operator',
+) {
   await openLoginScreen(page, 'AX Request Portal')
   await page.getByRole('button', { name: new RegExp(`Sign in as ${role}`) }).click()
   await expect(page).not.toHaveURL(/\/login/)

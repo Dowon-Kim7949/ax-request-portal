@@ -56,6 +56,40 @@ export function formatKrw(value: number): string {
   }).format(value)
 }
 
+/** Like formatKrw, but a cost above zero never shows as "0원". */
+export function formatSmallKrw(value: number): string {
+  if (value > 0 && value < 1) return currentLocale() === 'ko' ? '1원 미만' : '< ₩1'
+  return formatKrw(value)
+}
+
+/** US dollars with cents: "$0.42"; a cost above zero never shows as "$0.00". */
+export function formatUsd(value: number): string {
+  if (value > 0 && value < 0.01) return '< $0.01'
+  return new Intl.NumberFormat(tag(), {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value)
+}
+
+/** Token counts, compact: "1.2K" / "1.2천", "3.4M" / "340만" */
+export function formatTokens(value: number): string {
+  return new Intl.NumberFormat(tag(), {
+    notation: value >= 10_000 ? 'compact' : 'standard',
+    maximumFractionDigits: 1,
+  }).format(value)
+}
+
+/** Plain number in the UI language: "1,234" */
+export function formatNumber(value: number): string {
+  return new Intl.NumberFormat(tag()).format(value)
+}
+
+export function formatPercent(ratio: number): string {
+  return new Intl.NumberFormat(tag(), { style: 'percent', maximumFractionDigits: 0 }).format(ratio)
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
@@ -66,6 +100,19 @@ export function formatBytes(bytes: number): string {
 export function toLocalDate(d = new Date()): string {
   const pad = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+/** YYYY-MM plus or minus whole months */
+export function shiftMonth(month: string, delta: number): string {
+  const [y, m] = month.split('-').map(Number) as [number, number]
+  const d = new Date(y, m - 1 + delta, 1)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+}
+
+/** Number of days in a YYYY-MM month */
+export function daysInMonth(month: string): number {
+  const [y, m] = month.split('-').map(Number) as [number, number]
+  return new Date(y, m, 0).getDate()
 }
 
 export function addDays(date: string, days: number): string {

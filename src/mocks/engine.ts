@@ -15,6 +15,7 @@ import {
   bookUsage,
   normalizeUsage,
   priceOf,
+  overRequestLimit,
   resolveSelection,
   runtimeFor,
   selectionsInUse,
@@ -559,7 +560,7 @@ export class MockEngine {
     if (command.event === 'runWork' || command.event === 'requestRevision') {
       // Both start an AI run, the cost that repeats per request. 0 means no limit.
       const limit = this.state.budget.perRequestLimitKrw
-      if (limit > 0 && this.requestSpentKrw(req.id) >= limit) {
+      if (overRequestLimit(this.requestSpentKrw(req.id), limit)) {
         throw new HttpError(409, 'guard_failed', 'requestBudgetExceeded', { limit })
       }
       if (!next.assigneeId) next = { ...next, assigneeId: user.id }

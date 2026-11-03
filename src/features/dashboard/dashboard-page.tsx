@@ -1,5 +1,5 @@
-import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { AlertTriangle, CalendarDays } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { useDashboard } from '@/api/queries'
@@ -10,51 +10,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Meter } from '@/components/ui/controls'
 import { ErrorState, Skeleton } from '@/components/ui/feedback'
+import { MonthStepper } from '@/components/ui/month-stepper'
+import { StatTile } from '@/components/ui/stat-tile'
 import type { DashboardSummary } from '@/domain/model'
 import { cn } from '@/lib/cn'
 import { formatDate, formatKrw, formatMonth, toLocalDate } from '@/lib/format'
-
-function shiftMonth(month: string, delta: number): string {
-  const [y, m] = month.split('-').map(Number) as [number, number]
-  const d = new Date(y, m - 1 + delta, 1)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
-
-/** Stat tile: label · value · one supporting line. */
-function StatTile({
-  label,
-  value,
-  note,
-  noteTone = 'muted',
-  children,
-}: {
-  label: string
-  value: string
-  note?: ReactNode
-  noteTone?: 'muted' | 'warning'
-  children?: ReactNode
-}) {
-  return (
-    <div className="flex flex-col gap-1 rounded-(--radius-card) bg-surface p-4 ring-1 ring-line">
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="text-sm font-semibold text-ink-500">{label}</p>
-        {note ? (
-          <p
-            className={cn(
-              'flex items-center gap-1 text-xs font-semibold',
-              noteTone === 'warning' ? 'text-warning-fg' : 'text-ink-500',
-            )}
-          >
-            {noteTone === 'warning' ? <AlertTriangle className="size-3.5" aria-hidden /> : null}
-            {note}
-          </p>
-        ) : null}
-      </div>
-      <p className="text-[28px] leading-tight font-bold tracking-tight text-ink-900">{value}</p>
-      {children}
-    </div>
-  )
-}
 
 /**
  * Stacked horizontal bars: done (brand) + in progress (ai), 12px thick,
@@ -161,26 +121,7 @@ export default function DashboardPage() {
       />
 
       {/* Filters: one row, above everything they scope */}
-      <div className="mb-4 flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t('dashboard.prevMonth')}
-          onClick={() => setMonth(shiftMonth(month, -1))}
-        >
-          <ChevronLeft aria-hidden />
-        </Button>
-        <span className="min-w-28 text-center font-bold">{formatMonth(month)}</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t('dashboard.nextMonth')}
-          disabled={month >= current}
-          onClick={() => setMonth(shiftMonth(month, 1))}
-        >
-          <ChevronRight aria-hidden />
-        </Button>
-      </div>
+      <MonthStepper month={month} onChange={setMonth} />
 
       {query.isPending ? (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

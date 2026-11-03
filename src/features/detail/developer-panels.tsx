@@ -13,11 +13,12 @@ import {
   Trash2,
   X,
 } from 'lucide-react'
-import { useState, type ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { ApiError } from '@/api/client'
 import { useTransition, useUpdateRegression, useUpdateRelease } from '@/api/queries'
+import { ModelName } from '@/components/ai/ai'
 import { Badge, type BadgeTone } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
@@ -33,6 +34,8 @@ import type {
 } from '@/domain/model'
 import { cn } from '@/lib/cn'
 import { formatDateTime, formatKrw, toLocalDate } from '@/lib/format'
+import { useAiRunLimit } from './ai-limit'
+import { AiRunLimitReason } from './ai-usage-card'
 
 const errorText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback)
 
@@ -103,6 +106,11 @@ export function ReportPanel({
             {t('report.revision', { n: report.revision })} ·{' '}
             {t('report.generatedAt', { time: formatDateTime(report.generatedAt) })}
           </p>
+          {report.generatedBy ? (
+            <p className="mt-1 flex text-xs text-ink-600">
+              <ModelName selection={report.generatedBy} />
+            </p>
+          ) : null}
         </div>
       </CardHeader>
 
@@ -258,6 +266,8 @@ export function DecisionCard({
 }) {
   const { t } = useTranslation()
   const transition = useTransition(request.id)
+  const limit = useAiRunLimit(request)
+  const limitId = useId()
   const rerun = request.status === 'changes_requested'
   const failed = request.verification.filter((c) => c.result === 'failed')
   const [memo, setMemo] = useState(() =>
@@ -304,9 +314,16 @@ export function DecisionCard({
       ) : null}
 
       <div className="flex flex-col gap-2">
-        <Button size="lg" block onClick={() => setSheet('run')}>
+        <Button
+          size="lg"
+          block
+          disabled={limit.reached}
+          aria-describedby={limit.reached ? limitId : undefined}
+          onClick={() => setSheet('run')}
+        >
           {rerun ? t('decide.rerun') : t('decide.run')}
         </Button>
+        {limit.reached ? <AiRunLimitReason id={limitId} reason={limit.reason} /> : null}
         {canAsk || canReject ? (
           <div className="grid grid-cols-2 gap-2">
             {canAsk ? (
@@ -474,6 +491,8 @@ export function WorkPanel({
 }) {
   const { t } = useTranslation()
   const transition = useTransition(request.id)
+  const limit = useAiRunLimit(request)
+  const limitId = useId()
   const [reviseOpen, setReviseOpen] = useState(false)
   const [note, setNote] = useState('')
   const work = request.work
@@ -493,6 +512,13 @@ export function WorkPanel({
             {t('workRun.attempt', { n: work.attempt })}
             {work.costKrw ? ` · ${t('workRun.cost', { cost: formatKrw(work.costKrw) })}` : ''}
           </p>
+          {work.agent ? (
+            <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-ink-600">
+              <span className="font-semibold">{t(`ai.runtime.${work.agent.runtime}`)}</span>
+              <span aria-hidden>·</span>
+              <ModelName selection={work.agent} />
+            </p>
+          ) : null}
         </div>
         {work.outcome ? (
           <Badge tone={work.outcome === 'success' ? 'success' : 'danger'}>
@@ -612,9 +638,21 @@ export function WorkPanel({
               </a>
             </Button>
           ) : null}
-          <Button variant="secondary" size="lg" className="sm:flex-1" onClick={() => setReviseOpen(true)}>
+          <Button
+            variant="secondary"
+            size="lg"
+            className="sm:flex-1"
+            disabled={limit.reached}
+            aria-describedby={limit.reached ? limitId : undefined}
+            onClick={() => setReviseOpen(true)}
+          >
             {t('workRun.revise')}
           </Button>
+        </div>
+      ) : null}
+      {canReview && request.status === 'code_review' && limit.reached ? (
+        <div className="mt-2">
+          <AiRunLimitReason id={limitId} reason={limit.reason} />
         </div>
       ) : null}
 

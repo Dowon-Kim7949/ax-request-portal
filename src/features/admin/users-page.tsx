@@ -18,6 +18,9 @@ import { Field, Input } from '@/components/ui/field'
 import { Sheet } from '@/components/ui/sheet'
 import { appConfig } from '@/config/app.config'
 import type { Role, User } from '@/domain/model'
+
+/** Operator accounts belong to the service, not the organization: an admin cannot assign the role. */
+const ASSIGNABLE_ROLES = appConfig.enabledRoles.filter((r) => r !== 'operator')
 import type * as z from 'zod'
 
 type InviteValues = z.input<typeof UserCreate>
@@ -59,7 +62,7 @@ function InviteForm({ onDone }: { onDone: () => void }) {
         <Field label={t('users.role')}>
           {(p) => (
             <Select {...p} {...form.register('role')}>
-              {appConfig.enabledRoles.map((r) => (
+              {ASSIGNABLE_ROLES.map((r) => (
                 <option key={r} value={r}>
                   {t(`role.${r}`)}
                 </option>
@@ -81,6 +84,9 @@ function InviteForm({ onDone }: { onDone: () => void }) {
 function UserRow({ user, isMe }: { user: User; isMe: boolean }) {
   const { t } = useTranslation()
   const update = useUpdateUser()
+  const operator = user.role === 'operator'
+  const locked = isMe || operator
+  const lockedReason = isMe ? t('users.selfLocked') : operator ? t('users.operatorLocked') : undefined
   const patch = (body: { role?: Role; active?: boolean }) =>
     update.mutate(
       { id: user.id, body },
@@ -105,17 +111,18 @@ function UserRow({ user, isMe }: { user: User; isMe: boolean }) {
             {user.email}
             {user.team ? ` · ${user.team}` : ''}
           </p>
+          {operator ? <p className="text-[13px] text-ink-500">{t('users.operatorLocked')}</p> : null}
         </div>
       </div>
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:w-72">
         <Select
           aria-label={`${user.name} ${t('users.role')}`}
           value={user.role}
-          disabled={isMe || update.isPending}
-          title={isMe ? t('users.selfLocked') : undefined}
+          disabled={locked || update.isPending}
+          title={lockedReason}
           onChange={(e) => patch({ role: e.target.value as Role })}
         >
-          {appConfig.enabledRoles.map((r) => (
+          {(operator ? appConfig.enabledRoles : ASSIGNABLE_ROLES).map((r) => (
             <option key={r} value={r}>
               {t(`role.${r}`)}
             </option>
@@ -123,7 +130,8 @@ function UserRow({ user, isMe }: { user: User; isMe: boolean }) {
         </Select>
         <Button
           variant="secondary"
-          disabled={isMe || update.isPending}
+          disabled={locked || update.isPending}
+          title={lockedReason}
           onClick={() => patch({ active: !user.active })}
           aria-label={`${user.name} ${user.active ? t('users.inactive') : t('users.active')}`}
         >

@@ -8,6 +8,7 @@ import { ApiError } from '@/api/client'
 import { useBudget, useUpdateBudget } from '@/api/queries'
 import { PageHeader } from '@/app/page'
 import { usePageTitle } from '@/app/title'
+import { ModelName } from '@/components/ai/ai'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Meter } from '@/components/ui/controls'
@@ -158,9 +159,11 @@ export default function BudgetPage() {
             {b.byModel.map((m) => (
               <div
                 key={`${m.provider}/${m.model}`}
-                className="flex items-center justify-between rounded-xl bg-muted px-3.5 py-2.5"
+                className="flex items-center justify-between gap-3 rounded-xl bg-muted px-3.5 py-2.5"
               >
-                <dt className="text-ink-600">{m.model}</dt>
+                <dt className="min-w-0 text-ink-600">
+                  <ModelName selection={m} />
+                </dt>
                 <dd className="font-semibold tabular-nums">{formatKrw(m.spentKrw)}</dd>
               </div>
             ))}

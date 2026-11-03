@@ -161,6 +161,12 @@ export function normalizeUsage(raw: RawUsage): TokenUsage {
   }
 }
 
+/** Share of input tokens served from the prompt cache, 0–1; 0 when there was no input. */
+export function cacheHitRate(tokens: TokenUsage): number {
+  const all = tokens.input + tokens.cacheRead + tokens.cacheWrite
+  return all ? tokens.cacheRead / all : 0
+}
+
 export function addUsage(a: TokenUsage, b: TokenUsage): TokenUsage {
   const reasoning = (a.reasoning ?? 0) + (b.reasoning ?? 0)
   return {
@@ -281,6 +287,15 @@ export function bookUsage(
     costUsd: roundMoney(usd),
     costKrw: roundMoney(usd * pricing.usdKrw),
   }
+}
+
+/**
+ * Whether a request has used up its per-request AI limit, so no further AI
+ * run may start. A limit of 0 means no limit. The server enforces it; the UI
+ * uses the same rule to explain a disabled button before anyone presses it.
+ */
+export function overRequestLimit(spentKrw: number, limitKrw: number): boolean {
+  return limitKrw > 0 && spentKrw >= limitKrw
 }
 
 /* ------------------------------------------------------------------ */

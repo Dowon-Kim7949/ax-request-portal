@@ -3,8 +3,10 @@ import { DEFAULT_AI_PRICING, DEFAULT_AI_SELECTIONS } from '../config/ai'
 import {
   AiPricing,
   bookUsage,
+  cacheHitRate,
   costUsd,
   normalizeUsage,
+  overRequestLimit,
   priceOf,
   resolveSelection,
   runtimeFor,
@@ -142,5 +144,18 @@ describe('default price table', () => {
       expect(priceOf(DEFAULT_AI_PRICING, sel)).toBeDefined()
     const dup = { ...DEFAULT_AI_PRICING, models: [...DEFAULT_AI_PRICING.models, opus] }
     expect(AiPricing.safeParse(dup).success).toBe(false)
+  })
+})
+
+describe('limits and ratios', () => {
+  it('blocks a further AI run once the per-request limit is reached; 0 means no limit', () => {
+    expect(overRequestLimit(29_999, 30_000)).toBe(false)
+    expect(overRequestLimit(30_000, 30_000)).toBe(true)
+    expect(overRequestLimit(1_000_000, 0)).toBe(false)
+  })
+
+  it('measures the cache hit rate over every input token', () => {
+    expect(cacheHitRate({ input: 100, cacheRead: 800, cacheWrite: 100, output: 50 })).toBeCloseTo(0.8)
+    expect(cacheHitRate({ input: 0, cacheRead: 0, cacheWrite: 0, output: 5 })).toBe(0)
   })
 })

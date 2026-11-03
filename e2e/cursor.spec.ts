@@ -86,13 +86,13 @@ test('developer screens and sheets', async ({ page }) => {
   await expectCursorContract(page, 'run-work sheet')
 })
 
-test('executive and admin screens', async ({ page }) => {
+test('executive, admin and operator screens', async ({ page }) => {
   await loginAs(page, '경영진')
   await page.goto('/dashboard')
   await expectCursorContract(page, '/dashboard')
 
   await loginAs(page, '관리자')
-  for (const route of ['/admin/projects', '/admin/users', '/admin/budget']) {
+  for (const route of ['/admin/projects', '/admin/users']) {
     await page.goto(route)
     await expectCursorContract(page, route)
   }
@@ -100,4 +100,17 @@ test('executive and admin screens', async ({ page }) => {
   await page.getByRole('button', { name: '프로젝트 추가' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await expectCursorContract(page, 'project sheet')
+
+  await loginAs(page, '운영자')
+  for (const route of ['/', '/ops/usage', '/ops/agents', '/ops/pricing', '/ops/budget']) {
+    await page.goto(route)
+    await expectCursorContract(page, route)
+  }
+  await page.goto('/ops/usage')
+  await page.getByText('표로 보기').click()
+  await expectCursorContract(page, 'usage table view')
+  await page.goto('/ops/agents')
+  await page.getByRole('button', { name: 'Anthropic 키 바꾸기' }).click()
+  await expect(page.getByRole('dialog')).toBeVisible()
+  await expectCursorContract(page, 'provider key sheet')
 })

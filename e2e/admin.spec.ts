@@ -15,7 +15,7 @@ test('executive reads the company dashboard', async ({ page }) => {
   await expect(page.getByRole('button', { name: '다음 달' })).toBeEnabled()
 })
 
-test('admin changes a role, adds a project and sets the AI budget', async ({ page }) => {
+test('admin changes a role and adds a project', async ({ page }) => {
   await loginAs(page, '관리자')
 
   await page.goto('/admin/users')
@@ -38,13 +38,12 @@ test('admin changes a role, adds a project and sets the AI budget', async ({ pag
   await expect(page.getByText('사내 위키 검색')).toBeVisible()
   await expectNoHorizontalScroll(page)
 
-  await page.goto('/admin/budget')
-  await expect(page.getByRole('meter')).toBeVisible()
-  await page.getByLabel('월 한도 (원)').fill('300000')
-  await page.getByRole('button', { name: '저장' }).click()
-  await expect(page.getByText('한도를 저장했어요.')).toBeVisible()
-  await expect(page.getByText(/한도 30만 원 중/)).toBeVisible()
-  await expectNoHorizontalScroll(page)
+  // The AI side of the service is the operator's: no budget menu, and operator rows are locked.
+  await expect(page.getByRole('link', { name: 'AI 비용 한도' })).toHaveCount(0)
+  await page.goto('/admin/users')
+  await expect(page.getByLabel('윤시스템 역할')).toBeDisabled()
+  await expect(page.getByText('운영자 계정은 서비스가 관리해요.')).toBeVisible()
+  await expect(page.getByLabel('이영업 역할').locator('option[value="operator"]')).toHaveCount(0)
 })
 
 test('notifications can be read and configured', async ({ page }) => {

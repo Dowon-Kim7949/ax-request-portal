@@ -47,7 +47,8 @@ test.describe('English browser', () => {
       ],
       Developer: ['/work', '/work/regression', '/requests/1024', '/requests/1026'],
       Executive: ['/dashboard'],
-      Admin: ['/admin/projects', '/admin/users', '/admin/budget'],
+      Admin: ['/admin/projects', '/admin/users'],
+      Operator: ['/', '/ops/usage', '/ops/agents', '/ops/pricing', '/ops/budget'],
     } as const
     for (const [role, routes] of Object.entries(plan)) {
       await signIn(page, role as keyof typeof plan)
