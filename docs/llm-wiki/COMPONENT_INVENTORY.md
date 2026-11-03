@@ -13,6 +13,7 @@ wiki_block_version: v1
 source_files:
   - src/components/ui
   - src/components/request
+  - src/components/ai
   - src/lib/cn.ts
 evidence:
   - src/components/ui/button.tsx#symbol:Button
@@ -56,6 +57,8 @@ The primitives are written by hand in the shadcn style (Tailwind classes, `class
 | `Input`, `Textarea`, `Label`, `Field`, `AdviceText` | native | `Field` wires label, hint and error with `useId`; the error is a `role="alert"` paragraph. `AdviceText` renders precheck advice next to a field. |
 | `Segmented` | ARIA radio group | Generic over the value type; options are `role="radio"` with `aria-checked`, optional count badges. Used for list filters, theme and language. |
 | `Sheet` | Radix `Dialog` | Bottom sheet on phones, centered dialog on larger screens; focus trap and Escape come from Radix. Close button is 44 px. |
+| `StatTile` | plain elements | Label, value, an optional short note (muted or warning with an icon) and optional children such as a `Meter` or a description. Used by the executive dashboard and the AI usage dashboard. |
+| `MonthStepper` | buttons | Previous / next month above a monthly dashboard; "next" is disabled at the current month. |
 
 ## Request widgets (`src/components/request`)
 
@@ -66,6 +69,14 @@ The primitives are written by hand in the shadcn style (Tailwind classes, `class
 | `Stepper` | Phase progress for a request; the current phase carries `aria-current="step"`. |
 | `Timeline` | Renders a request's timeline entries. |
 | `ProjectIcon` | Project avatar used in cards and pickers. |
+
+## AI widgets (`src/components/ai`)
+
+| Component | Purpose |
+| --- | --- |
+| `ProviderSwatch` | The provider's colour key (`PROVIDER_FILL` in `provider.ts`); always next to the provider or model name, never alone. |
+| `ModelName` | Swatch plus the model's display name from `useModelLabel` (operator labels when the price table is readable, else template defaults, else the id). |
+| `TokenLine` | "input · cache read · cache write · output (reasoning)" counts of one `TokenUsage`. |
 
 ## Conventions
 

@@ -10,7 +10,7 @@ A responsive React template for an **AI-assisted work request portal**. People w
 
 > **AI executes, people decide.** The AI never merges, never approves its own wiki edits, and never moves a request past a human checkpoint.
 
-**[Live demo](https://dowon-kim7949.github.io/ax-request-portal/)**: runs entirely in your browser against a mock API. Sign in with one tap as requester, executive, developer or admin (password `demo`). Use "reset demo data" in the account menu to start over. The demo speaks English or Korean (it follows your browser; switch on the sign-in screen or in Settings) and has light and dark themes.
+**[Live demo](https://dowon-kim7949.github.io/ax-request-portal/)**: runs entirely in your browser against a mock API. Sign in with one tap as requester, executive, developer, admin or operator (password `demo`). Use "reset demo data" in the account menu to start over. The demo speaks English or Korean (it follows your browser; switch on the sign-in screen or in Settings) and has light and dark themes.
 
 |                                 Requester (phone)                                  |                                           Wizard (phone)                                            |                                           QA checklist (phone)                                           |
 | :--------------------------------------------------------------------------------: | :-------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------------------------------------------: |
@@ -30,6 +30,7 @@ A responsive React template for an **AI-assisted work request portal**. People w
 - **A request lifecycle you can trust.** One transition table decides who can move a request where. The UI shows buttons from it, the mock API enforces it, and a backend can port it as-is.
 - **One API contract, three consumers.** `src/api/contract.ts` produces the typed client, the mock API handlers and [`docs/openapi.json`](docs/openapi.json). The client validates every response, so a drifting backend fails loudly.
 - **Works with no backend.** An in-browser mock API (MSW) with fictional demo data and a simulated AI that writes reports and opens merge requests in seconds. Progress survives reloads.
+- **AI usage you can account for, on Claude and GPT.** An operator picks the model for each AI task (Claude or GPT through their APIs; a Claude agent built on the Claude Agent SDK, or Codex, for AI work), per project if needed, and keeps the price table and exchange rate. Every AI call is booked from the provider's own token report, normalized (Claude and OpenAI count cached tokens differently) and priced once. Developers see what each request cost and why a run is blocked at its limit; the operator gets a usage dashboard by provider, day, model, task and request. Costs are estimates; the bill is in each provider's console. Provider keys are write-only.
 - **Plain language for non-developers.** Requesters see "checking / needs your answer / please check the result". Developers see the precise state. All copy lives in one dictionary per language.
 - **English and Korean.** The language follows the browser until the user picks one. Dates and amounts follow it too. Every API call sends `Accept-Language`, and the mock API answers in it the way a real backend should: errors, notifications and the simulated AI's reports come back in the user's language. The type checker fails if the two dictionaries drift apart.
 - **Light and dark.** The theme follows the system unless the user chooses one. It is applied by a tiny script in `<head>` before the app loads, so a dark page never flashes white. Colors are role tokens (text, fill, border, status) with their own dark values, and a unit test checks the text and control color pairs the UI uses against WCAG AA in both themes.
@@ -69,9 +70,10 @@ The table lives in [`src/domain/lifecycle.ts`](src/domain/lifecycle.ts). Unit te
 | Requester | File requests through a one-question-per-screen wizard, answer the developer's questions, check the result against the acceptance criteria, see the release schedule |
 | Executive | Everything a requester can, plus the company-wide dashboard                                                                                                          |
 | Developer | Read the AI's feasibility report, run the AI, ask or reject, review the AI's merge request, record regression checks, schedule and mark releases                     |
-| Admin     | Projects (repository, wiki, owners, screens), users and roles, AI cost limits                                                                                        |
+| Admin     | Projects (repository, wiki, owners, screens), users and roles                                                                                                        |
+| Operator  | Runs the service's AI: provider keys, model per task and project, prices and exchange rate, AI budget, usage dashboard                                               |
 
-Roles are permission sets in [`src/domain/roles.ts`](src/domain/roles.ts). To drop the executive role, remove it from `enabledRoles` in the config and give `dashboard:view` to someone else.
+Roles are permission sets in [`src/domain/roles.ts`](src/domain/roles.ts). To drop the executive role, remove it from `enabledRoles` in the config and give `dashboard:view` to someone else. Operator accounts are created by the service (database, seed or an identity-provider group), never by an admin; the demo has one (`operator@example.com`).
 
 ## Getting started
 
@@ -174,7 +176,7 @@ docs/          openapi.json, README images, llm-wiki/ (agent knowledge base)
 ## Quality gates
 
 - `npm run verify`: oxlint with warnings as errors, Prettier, strict TypeScript (`noUncheckedIndexedAccess`), 158 unit tests (including WCAG contrast in both themes and dictionary parity), production build.
-- E2E: 98 tests on phone, tablet and desktop, including the skip link and reduced motion. Every flow runs on all three. Every main screen of every role is checked at 320 px (in both languages) and on a landscape tablet. Separate runs walk each role's screens in English, failing on any leftover Korean, and in dark mode. Horizontal overflow is checked after data has loaded.
+- E2E: 104 tests on phone, tablet and desktop, including the skip link and reduced motion. Every flow runs on all three. Every main screen of every role is checked at 320 px (in both languages) and on a landscape tablet. Separate runs walk each role's screens in English, failing on any leftover Korean, and in dark mode. Horizontal overflow is checked after data has loaded.
 - CI runs verify, e2e, the nginx check and the LLM-WIKI checks on every push and pull request. Dependabot keeps dependencies and actions current.
 
 ## Known limits

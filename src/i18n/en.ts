@@ -543,7 +543,7 @@ const en: Messages = {
   ai: {
     provider: { anthropic: 'Claude', openai: 'GPT' },
     vendor: { anthropic: 'Anthropic', openai: 'OpenAI' },
-    runtime: { api: 'API', claude_code: 'Claude Code', codex: 'Codex' },
+    runtime: { api: 'API', claude_code: 'Claude Agent', codex: 'Codex' },
     task: { precheck: 'Draft check', report: 'Feasibility report', work: 'AI work' },
     tokens: {
       input: 'Input',
@@ -570,7 +570,7 @@ const en: Messages = {
     subtitle: 'Choose the model for each task and manage provider connections.',
     providers: 'Provider connections',
     providerHint: {
-      anthropic: 'Claude model API · AI work on Claude Code',
+      anthropic: 'Claude model API · AI work on Claude Agent',
       openai: 'GPT model API · AI work on Codex',
     },
     connected: 'Connected',

@@ -49,7 +49,8 @@ Every user workflow is tested end to end against the production build with the i
 | --- | --- |
 | `requester.spec.ts` | Requester files a request through the wizard; the draft survives a reload; confirms acceptance criteria; answers a developer's questions. |
 | `developer.spec.ts` | Developer runs AI work from the report and approves the merge request, asks questions, requests a revision and sees the rework, marks a release done; the assigned and regression queues fit the screen. |
-| `admin.spec.ts` | Executive reads the dashboard; admin changes a role, adds a project and sets the AI budget; notifications are read and their settings changed. |
+| `admin.spec.ts` | Executive reads the dashboard; admin changes a role and adds a project, and cannot assign or change the operator role; notifications are read and their settings changed. |
+| `operator.spec.ts` | Operator replaces a provider key (only the last four characters come back), moves a task to another model, cannot disconnect a provider in use, edits the exchange rate, reads the usage dashboard and its table view, and sets the budget at `/admin/budget` → `/ops/budget`; a developer then sees the request's AI usage and the run button disabled with the reason. |
 | `smoke.spec.ts` | Login screen fits each viewport; per-device navigation (phone tab bar, tablet rail, desktop sidebar) reaches My requests and Schedule. |
 | `layout.spec.ts` | No horizontal scroll on any route for any role at 320 px and on a landscape tablet, in Korean and English. |
 | `i18n.spec.ts` | With an English browser no Korean text appears on any role's screens (elements with an explicit `lang` excluded); a request can be filed in English; switching language at runtime works; edited demo data keeps its language. |

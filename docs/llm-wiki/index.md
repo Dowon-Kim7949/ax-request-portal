@@ -57,6 +57,7 @@ The entry point to this project's LLM-WIKI: what an agent should know about `ax-
 | Requester | [Home](domains/05_home.md), [Request Wizard](domains/11_wizard.md), [My Requests](domains/08_requests.md), [Request Detail](domains/04_detail.md) |
 | Developer | [Developer Work](domains/12_work.md), [Release Schedule](domains/09_schedule.md) |
 | Executive and admin | [Executive Dashboard](domains/03_dashboard.md), [Admin](domains/01_admin.md) |
+| Operator | [AI Operations](domains/13_ops.md) |
 | Everyone | [Notifications](domains/07_notifications.md), [Settings](domains/10_settings.md) |
 | Front-end rules | [Frontend Profile](profiles/frontend.md), [Component Inventory](COMPONENT_INVENTORY.md), [Accessibility](WCAG.md), [E2E Workflows](E2E_WORKFLOWS.md) |
 | Wiki itself | [README](README.md), [Change Log](log.md) |

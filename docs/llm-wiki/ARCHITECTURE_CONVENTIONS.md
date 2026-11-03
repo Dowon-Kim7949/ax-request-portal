@@ -78,7 +78,7 @@ A front-end-only SPA whose backend is a contract. One table of endpoints (`src/a
 
 ## API contract
 
-- `EndpointSpec`: `method`, OpenAPI-style `path` (`/requests/{id}`), `summary`, `tag`, optional `public`, `params`, `query`, `body` (Zod), `multipart`, `status` (200/201) and `response` (`null` → 204). The table is `api`; it has 28 endpoints.
+- `EndpointSpec`: `method`, OpenAPI-style `path` (`/requests/{id}`), `summary`, `tag`, optional `public`, `params`, `query`, `body` (Zod), `multipart`, `status` (200/201) and `response` (`null` → 204). The table is `api`; it has 35 endpoints.
 - `call` in `client.ts` builds the URL from the spec, adds `Authorization: Bearer`, `Accept: application/json` and `Accept-Language`, and validates the response with the spec's schema: a mismatch throws `ApiError` with code `contract_violation`, a network failure `network`. A `401` from a non-public endpoint triggers `onUnauthorized` (session cleared). Error bodies follow `ApiErrorBody` (`bad_request`, `unauthorized`, `forbidden`, `not_found`, `invalid_transition`, `guard_failed`, `internal`) with a localized `message`.
 - Every schema used by the contract is registered with `named()` (`src/domain/registry.ts`); an unregistered schema makes OpenAPI generation throw.
 - `npm run openapi` regenerates `docs/openapi.json`. `src/api/openapi.test.ts` fails when the committed file differs byte for byte, when an endpoint lacks a unique `operationId`, or when a `$ref` is broken. The file is excluded from Prettier for that reason.

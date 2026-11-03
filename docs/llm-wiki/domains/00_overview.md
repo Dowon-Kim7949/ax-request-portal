@@ -85,13 +85,14 @@ Twelve statuses (`RequestStatus`) and thirteen events (`TRANSITIONS` in `src/dom
 | [Developer Work](12_work.md) | `/work`, `/work/regression`, developer panels | `request:review`, `regression:view` |
 | [Release Schedule](09_schedule.md) | `/schedule` | `schedule:view` |
 | [Executive Dashboard](03_dashboard.md) | `/dashboard` | `dashboard:view` |
-| [Admin](01_admin.md) | `/admin/projects`, `/admin/users`, `/admin/budget` | `project:manage`, `user:manage`, `budget:manage` |
+| [Admin](01_admin.md) | `/admin/projects`, `/admin/users` | `project:manage`, `user:manage` |
+| [AI Operations](13_ops.md) | `/ops/usage`, `/ops/agents`, `/ops/pricing`, `/ops/budget` | `usage:view`, `agent:manage`, `budget:manage` |
 | [Notifications](07_notifications.md) | `/notifications` | everyone |
 | [Settings](10_settings.md) | `/settings` | everyone |
 
 ## API Services
 
-All 28 endpoints are declared once in `src/api/contract.ts` and published as `docs/openapi.json`; each domain document lists the ones it uses. Cross-domain cache rule: every mutation that changes a request calls `onRequestChanged`, which replaces that request in the cache and invalidates request lists, the regression queue, notifications, the dashboard and the release schedule. See [Architecture Conventions](../ARCHITECTURE_CONVENTIONS.md).
+All 35 endpoints are declared once in `src/api/contract.ts` and published as `docs/openapi.json`; each domain document lists the ones it uses. Cross-domain cache rule: every mutation that changes a request calls `onRequestChanged`, which replaces that request in the cache and invalidates request lists, the regression queue, notifications, the dashboard and the release schedule. See [Architecture Conventions](../ARCHITECTURE_CONVENTIONS.md).
 
 ## Evidence
 

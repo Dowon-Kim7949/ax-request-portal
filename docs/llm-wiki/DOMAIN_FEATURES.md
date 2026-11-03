@@ -65,7 +65,10 @@ User-facing features by role. Each row names the domain document that holds the 
 | --- | --- | --- |
 | Projects: repository, owners, change targets, wiki path, active flag | [Admin](domains/01_admin.md) | `admin.spec.ts` |
 | Users: invite, change role, deactivate | [Admin](domains/01_admin.md) | `admin.spec.ts` |
-| AI budget: monthly and per-request limits, alert threshold, spending by model tier | [Admin](domains/01_admin.md) | `admin.spec.ts` |
+| AI budget: monthly and per-request limits, alert threshold, spending by provider and model | [AI Operations](domains/13_ops.md) | `operator.spec.ts` |
+| AI agents: provider keys (write-only), model per task, per-project overrides | [AI Operations](domains/13_ops.md) | `operator.spec.ts` |
+| AI prices and exchange rate; AI usage by provider (Claude / GPT), day, model, task and request | [AI Operations](domains/13_ops.md) | `operator.spec.ts` |
+| AI usage of one request, and the run button disabled at the per-request limit | [Request Detail](domains/04_detail.md), [Developer Work](domains/12_work.md) | `operator.spec.ts` |
 
 ## Everyone
 
@@ -78,7 +81,7 @@ User-facing features by role. Each row names the domain document that holds the 
 
 ## API Services
 
-The 28 endpoints of `src/api/contract.ts` are listed per domain in the domain documents; the generated reference is `docs/openapi.json`.
+The 35 endpoints of `src/api/contract.ts` are listed per domain in the domain documents; the generated reference is `docs/openapi.json`.
 
 ## Evidence
 

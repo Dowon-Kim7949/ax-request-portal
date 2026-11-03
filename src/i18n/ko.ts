@@ -545,7 +545,7 @@ const ko = {
   ai: {
     provider: { anthropic: 'Claude', openai: 'GPT' },
     vendor: { anthropic: 'Anthropic', openai: 'OpenAI' },
-    runtime: { api: 'API', claude_code: 'Claude Code', codex: 'Codex' },
+    runtime: { api: 'API', claude_code: 'Claude Agent', codex: 'Codex' },
     task: { precheck: '요청서 점검', report: '구현 확인 보고서', work: 'AI 작업' },
     tokens: {
       input: '입력',
@@ -572,7 +572,7 @@ const ko = {
     subtitle: '작업마다 쓸 모델을 고르고, 제공사 연결을 관리해요.',
     providers: '제공사 연결',
     providerHint: {
-      anthropic: 'Claude 모델 API · AI 작업은 Claude Code',
+      anthropic: 'Claude 모델 API · AI 작업은 Claude Agent',
       openai: 'GPT 모델 API · AI 작업은 Codex',
     },
     connected: '연결됨',
