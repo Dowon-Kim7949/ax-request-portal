@@ -84,7 +84,7 @@ npm ci
 npm run dev
 ```
 
-출력된 주소를 열고 데모 계정을 고르면 됩니다. Node 22.13 이상 또는 24 이상이 필요합니다(`.nvmrc`는 22). Vitest 5, MSW 3, jsdom이 이 하한을 정하며, CI가 22.13과 24 양쪽에서 확인합니다.
+출력된 주소를 열고 데모 계정을 고르면 됩니다. Node 22.22.2 이상 또는 24.15 이상이 필요합니다(`.nvmrc`는 22). React Router 8과 jsdom 30이 이 하한을 정하며, CI가 두 줄기의 하한인 22.22.2와 24.15.0에서 확인합니다.
 
 | 스크립트           | 하는 일                                                         |
 | ------------------ | --------------------------------------------------------------- |
@@ -149,6 +149,8 @@ nginx -t && nginx -s reload
 ## GitHub Pages 데모
 
 [`.github/workflows/pages.yml`](.github/workflows/pages.yml)이 `main`에 push할 때마다 `VITE_BASE=/<저장소 이름>/`, 목 모드로 빌드해 게시합니다. 이 템플릿으로 만든 저장소에서는 **Settings → Pages → Source**를 **GitHub Actions**로 바꿔 주세요. 사용자 사이트나 사용자 도메인이면 `VITE_BASE`를 `/`로 둡니다.
+
+Pages에는 SPA fallback이 없어서 워크플로가 `index.html`을 `404.html`로 복사합니다. 그래서 `/requests/1024` 같은 깊은 링크는 올바른 화면을 열지만 HTTP 상태는 `404`입니다. 브라우저에서는 정상으로 보이지만, 링크 검사기와 크롤러는 없는 페이지로 판단합니다. nginx 배포는 같은 경로에 `200`으로 답합니다.
 
 ## 폴더 구성
 

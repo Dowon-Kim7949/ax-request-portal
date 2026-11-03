@@ -5,10 +5,12 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-    # Major versions change APIs (React Router 8 broke the e2e suite), so they are
-    # upgraded deliberately, not by bot. @types/node follows the Node runtime (22).
+    # Major versions arrive as their own (ungrouped) PRs so CI judges each one and a
+    # person decides; they are never merged automatically. Check a major's "engines"
+    # before merging: raising the Node floor is a breaking change for template users.
+    # @types/node follows the Node runtime (22), not the newest Node.
     ignore:
-      - dependency-name: '*'
+      - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
     groups:
       dev-tooling:

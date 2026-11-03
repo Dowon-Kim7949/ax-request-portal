@@ -21,8 +21,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Both ends of package.json "engines": the floor exactly, and the next major.
-        node: ['22.13', '24']
+        # The floor of each supported line in package.json "engines" (React Router 8 and jsdom 30 set them).
+        node: ['22.22.2', '24.15.0']
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7

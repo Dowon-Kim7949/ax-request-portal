@@ -84,7 +84,7 @@ npm ci
 npm run dev
 ```
 
-Open the printed URL and pick a demo account. Node 22.13+ or 24+ is required (`.nvmrc` pins 22; Vitest 5, MSW 3 and jsdom set that floor). CI checks both ends: 22.13 and 24.
+Open the printed URL and pick a demo account. Node 22.22.2+ or 24.15+ is required (`.nvmrc` pins 22; React Router 8 and jsdom 30 set that floor). CI checks the floor of each line: 22.22.2 and 24.15.0.
 
 | Script             | What it does                                                         |
 | ------------------ | -------------------------------------------------------------------- |
@@ -149,6 +149,8 @@ Vendor code is split into stable chunks (`vendor-react`, `vendor-router`, …), 
 ## GitHub Pages demo
 
 [`.github/workflows/pages.yml`](.github/workflows/pages.yml) builds in mock mode with `VITE_BASE=/<repository>/` and publishes on every push to `main`. In a repository made from this template, set **Settings → Pages → Source** to **GitHub Actions**. For a user site or a custom domain, set `VITE_BASE` to `/`.
+
+Pages has no SPA fallback, so the workflow copies `index.html` to `404.html`. A deep link such as `/requests/1024` therefore opens the right screen but with HTTP status `404`: browsers show it normally, while link checkers and crawlers report it as missing. The nginx deployment answers the same path with `200`.
 
 ## Project layout
 

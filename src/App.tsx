@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { RouterProvider } from 'react-router'
+import { RouterProvider } from 'react-router/dom'
 import { Toaster } from 'sonner'
 import { createRouter } from './app/router'
 import './i18n'
