@@ -1,0 +1,12 @@
+{
+  "type": "frontend",
+  "agents": [
+    "claude"
+  ],
+  "governance": {
+    "mode": "standard"
+  },
+  "rules": {
+    "impact.source_changed": "error"
+  }
+}

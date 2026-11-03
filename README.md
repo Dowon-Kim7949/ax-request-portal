@@ -166,14 +166,16 @@ src/
   i18n/        UI copy, one dictionary per language
 e2e/           Playwright specs (run on three viewports)
 deploy/        nginx config and its checks
-docs/          openapi.json, README images
+docs/          openapi.json, README images, llm-wiki/ (agent knowledge base)
 ```
+
+[`docs/llm-wiki/`](docs/llm-wiki/index.md) is a code-grounded knowledge base for coding agents (and people): request lifecycle, architecture, every domain with its API calls, accessibility and test conventions. `CLAUDE.md` points agents at it. It is maintained with [llm-wiki-governance](https://www.npmjs.com/package/llm-wiki-governance): `npx llm-wiki validate` checks every evidence reference, and once a person approves a document (`npx llm-wiki review --approve <path>`) CI fails any pull request that changes the code it cites without updating it.
 
 ## Quality gates
 
 - `npm run verify`: oxlint with warnings as errors, Prettier, strict TypeScript (`noUncheckedIndexedAccess`), 156 unit tests (including WCAG contrast in both themes and dictionary parity), production build.
 - E2E: 94 tests on phone, tablet and desktop. Every flow runs on all three. Every main screen of every role is checked at 320 px (in both languages) and on a landscape tablet. Separate runs walk each role's screens in English, failing on any leftover Korean, and in dark mode. Horizontal overflow is checked after data has loaded.
-- CI runs verify, e2e and the nginx check on every push and pull request. Dependabot keeps dependencies and actions current.
+- CI runs verify, e2e, the nginx check and the LLM-WIKI checks on every push and pull request. Dependabot keeps dependencies and actions current.
 
 ## Known limits
 

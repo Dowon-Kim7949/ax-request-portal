@@ -1,0 +1,46 @@
+name: LLM-WIKI
+
+# Keeps docs/llm-wiki honest: frontmatter and evidence locators must resolve,
+# and a pull request that changes a source file a `verified` wiki document cites
+# must update that document too (llm-wiki.config.json makes
+# impact.source_changed an error). Documents only become `verified` when a
+# person runs `npx llm-wiki review --approve <path>`; until then the gate has
+# nothing to guard.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: llm-wiki-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wiki:
+    name: Wiki structure and undocumented changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # `impact --since` compares against the base branch; a shallow clone
+          # lacks that ref and the gate would weaken silently.
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      # No `npm ci`: the CLI has no runtime dependencies. The exact version comes
+      # from the lockfile, so CI runs what `npx llm-wiki` runs locally and
+      # Dependabot bumps reach CI too. Always use the full package name; the
+      # short `llm-wiki` on npm is an unrelated package.
+      - name: Resolve the locked CLI version
+        run: echo "WIKI=llm-wiki-governance@$(node -p "require('./package-lock.json').packages['node_modules/llm-wiki-governance'].version")" >> "$GITHUB_ENV"
+      - run: npx -y "$WIKI" validate-frontmatter
+      - run: npx -y "$WIKI" validate --strict --agent claude
+      - name: Gate on undocumented source changes
+        run: npx -y "$WIKI" impact --since "origin/${{ github.base_ref || 'main' }}" --strict

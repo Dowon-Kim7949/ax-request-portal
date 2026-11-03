@@ -166,14 +166,16 @@ src/
   i18n/        화면 문구, 언어마다 사전 하나
 e2e/           Playwright 테스트 (세 기기에서 실행)
 deploy/        nginx 설정과 검사 스크립트
-docs/          openapi.json, README 이미지
+docs/          openapi.json, README 이미지, llm-wiki/(에이전트용 지식 베이스)
 ```
+
+[`docs/llm-wiki/`](docs/llm-wiki/index.md)는 코딩 에이전트(와 사람)가 읽는, 코드에 근거를 둔 지식 베이스입니다. 요청 lifecycle, 아키텍처, 도메인마다의 API 호출, 접근성·테스트 규약을 담았습니다(영어). `CLAUDE.md`가 에이전트를 이곳으로 안내합니다. [llm-wiki-governance](https://www.npmjs.com/package/llm-wiki-governance)로 관리합니다. `npx llm-wiki validate`가 모든 근거 참조를 검사하고, 사람이 문서를 승인하면(`npx llm-wiki review --approve <경로>`) 그 문서가 인용한 코드를 바꾸면서 문서를 고치지 않은 PR은 CI에서 실패합니다.
 
 ## 품질 검사
 
 - `npm run verify`: 경고도 실패로 보는 oxlint, Prettier, 엄격한 TypeScript(`noUncheckedIndexedAccess`), 단위 테스트 156개(두 테마의 WCAG 대비, 두 사전의 키 일치 포함), 배포용 빌드.
 - E2E: 휴대폰, 태블릿, PC에서 94개. 모든 흐름을 세 기기에서 돌리고, 네 역할의 주요 화면 전부를 320px 휴대폰(두 언어 모두)과 가로 태블릿에서 점검합니다. 따로 영어로 각 역할의 화면을 돌며 한국어가 남아 있으면 실패시키고, 다크 모드로도 돌립니다. 가로 스크롤은 데이터가 다 그려진 뒤에 검사합니다.
-- CI가 push와 PR마다 verify, E2E, nginx 검사를 돌립니다. Dependabot이 의존성과 Actions 버전을 최신으로 유지합니다.
+- CI가 push와 PR마다 verify, E2E, nginx 검사, LLM-WIKI 검사를 돌립니다. Dependabot이 의존성과 Actions 버전을 최신으로 유지합니다.
 
 ## 알려진 한계
 
