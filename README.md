@@ -84,7 +84,7 @@ npm ci
 npm run dev
 ```
 
-Open the printed URL and pick a demo account. Node 22.22.2+ or 24.15+ is required (`.nvmrc` pins 22; React Router 8 and jsdom 30 set that floor). CI checks the floor of each line: 22.22.2 and 24.15.0.
+Open the printed URL and pick a demo account. Node 22.22.2+, 24.15+ or 26+ is required (`.nvmrc` pins 24; React Router 8 and jsdom 30 set that floor). CI checks the floor of each line: 22.22.2, 24.15.0 and 26.0.0.
 
 | Script             | What it does                                                         |
 | ------------------ | -------------------------------------------------------------------- |

@@ -8,7 +8,8 @@ updates:
     # Major versions arrive as their own (ungrouped) PRs so CI judges each one and a
     # person decides; they are never merged automatically. Check a major's "engines"
     # before merging: raising the Node floor is a breaking change for template users.
-    # @types/node follows the Node runtime (22), not the newest Node.
+    # @types/node follows the lowest supported Node (22), so code cannot reach for
+    # APIs that 22 lacks, even though the default runtime (.nvmrc) is newer.
     ignore:
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']

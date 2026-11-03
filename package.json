@@ -71,5 +71,8 @@
     "workerDirectory": [
       "public"
     ]
+  },
+  "allowScripts": {
+    "esbuild": true
   }
 }
