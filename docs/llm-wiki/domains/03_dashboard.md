@@ -42,7 +42,7 @@ A monthly overview at `/dashboard` for whoever holds `dashboard:view` — by def
 
 - **Received** compares like with like: for the current month it is compared with the same number of days of the previous month (up to today's day of month); for a past month, with the whole previous month. The tile shows the signed difference.
 - **In progress** and **delayed** are "now" values and do not depend on the selected month (`isDelayed` decides delay). **Done** counts releases in the month. Average lead time is omitted when nothing was done.
-- **AI cost** is the month's spending as a share of the monthly budget; the tile turns to the warning tone at 80 %.
+- **AI cost** is the month's spending as a share of the monthly budget; the tile and its meter turn to the warning tone at the budget's alert threshold (`aiAlertThresholdPct`, the same `alertThresholdPct` the budget screen uses).
 
 ## Charts
 
@@ -61,7 +61,7 @@ Bars are plain CSS, no chart library: done uses `brand-600`, in progress `ai-500
 
 ## Open Questions
 
-- The 80 % cost warning is hard-coded and independent of the budget's `alertThresholdPct` (see [Admin](01_admin.md)).
+- None.
 
 ## Review Notes
 

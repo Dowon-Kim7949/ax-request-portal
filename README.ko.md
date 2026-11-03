@@ -173,8 +173,8 @@ docs/          openapi.json, README 이미지, llm-wiki/(에이전트용 지식 
 
 ## 품질 검사
 
-- `npm run verify`: 경고도 실패로 보는 oxlint, Prettier, 엄격한 TypeScript(`noUncheckedIndexedAccess`), 단위 테스트 156개(두 테마의 WCAG 대비, 두 사전의 키 일치 포함), 배포용 빌드.
-- E2E: 휴대폰, 태블릿, PC에서 94개. 모든 흐름을 세 기기에서 돌리고, 네 역할의 주요 화면 전부를 320px 휴대폰(두 언어 모두)과 가로 태블릿에서 점검합니다. 따로 영어로 각 역할의 화면을 돌며 한국어가 남아 있으면 실패시키고, 다크 모드로도 돌립니다. 가로 스크롤은 데이터가 다 그려진 뒤에 검사합니다.
+- `npm run verify`: 경고도 실패로 보는 oxlint, Prettier, 엄격한 TypeScript(`noUncheckedIndexedAccess`), 단위 테스트 158개(두 테마의 WCAG 대비, 두 사전의 키 일치 포함), 배포용 빌드.
+- E2E: 휴대폰, 태블릿, PC에서 98개. skip link와 모션 줄이기 설정도 검사합니다. 모든 흐름을 세 기기에서 돌리고, 네 역할의 주요 화면 전부를 320px 휴대폰(두 언어 모두)과 가로 태블릿에서 점검합니다. 따로 영어로 각 역할의 화면을 돌며 한국어가 남아 있으면 실패시키고, 다크 모드로도 돌립니다. 가로 스크롤은 데이터가 다 그려진 뒤에 검사합니다.
 - CI가 push와 PR마다 verify, E2E, nginx 검사, LLM-WIKI 검사를 돌립니다. Dependabot이 의존성과 Actions 버전을 최신으로 유지합니다.
 
 ## 알려진 한계

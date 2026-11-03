@@ -455,6 +455,11 @@ export const DashboardSummary = named(
       .describe('Average days from submission to release, for requests released during `month`'),
     aiCostKrw: z.number().nonnegative(),
     aiBudgetKrw: z.number().nonnegative(),
+    aiAlertThresholdPct: z
+      .int()
+      .min(1)
+      .max(100)
+      .describe("Share of `aiBudgetKrw` at which spending is flagged; the budget's `alertThresholdPct`"),
     byProject: z.array(
       z.object({ projectId: z.string(), done: z.int().nonnegative(), inProgress: z.int().nonnegative() }),
     ),

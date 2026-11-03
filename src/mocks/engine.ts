@@ -205,6 +205,11 @@ export class MockEngine {
     this.state.costs.push(entry)
   }
 
+  /** AI spending booked against one request, all months. */
+  private requestSpentKrw(requestId: number): number {
+    return this.state.costs.reduce((sum, c) => (c.requestId === requestId ? sum + c.krw : sum), 0)
+  }
+
   /* ---------- notifications ---------- */
 
   private notify(
@@ -449,8 +454,13 @@ export class MockEngine {
     }
     if (!isAuthorized(command.event, ctx)) throw new HttpError(403, 'forbidden', 'notYourStep')
     let next = this.apply(req, command, { type: 'user', userId: user.id }, now)
-    if ((command.event === 'runWork' || command.event === 'requestRevision') && !next.assigneeId) {
-      next = { ...next, assigneeId: user.id }
+    if (command.event === 'runWork' || command.event === 'requestRevision') {
+      // Both start an AI run, the cost that repeats per request. 0 means no limit.
+      const limit = this.state.budget.perRequestLimitKrw
+      if (limit > 0 && this.requestSpentKrw(req.id) >= limit) {
+        throw new HttpError(409, 'guard_failed', 'requestBudgetExceeded', { limit })
+      }
+      if (!next.assigneeId) next = { ...next, assigneeId: user.id }
     }
     this.replace(next)
     this.notifyStatus(next, now, user.id)
@@ -734,6 +744,7 @@ export class MockEngine {
         : {}),
       aiCostKrw: this.budget(month).spentKrw,
       aiBudgetKrw: this.state.budget.monthlyLimitKrw,
+      aiAlertThresholdPct: this.state.budget.alertThresholdPct,
       byProject: this.state.projects.map((p) => ({
         projectId: p.id,
         done: doneInMonth.filter((r) => r.projectId === p.id).length,

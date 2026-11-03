@@ -42,6 +42,7 @@ const en: Messages = {
     retry: 'Try again',
   },
   nav: {
+    skipToContent: 'Skip to main content',
     home: 'Home',
     newRequest: 'New request',
     myRequests: 'My requests',

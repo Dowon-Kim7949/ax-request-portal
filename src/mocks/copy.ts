@@ -27,6 +27,8 @@ const ERRORS = {
     invalidTransition: '지금 단계에서는 할 수 없는 작업입니다.',
     needAllPassed: '모든 완료 기준이 통과해야 완료할 수 있습니다.',
     needOneFailed: '안 되는 완료 기준을 하나 이상 표시해 주세요.',
+    requestBudgetExceeded: (p) =>
+      `이 요청의 AI 비용이 요청당 한도(${Number(p.limit).toLocaleString('ko-KR')}원)에 도달해 AI 작업을 더 실행할 수 없습니다. 관리자가 한도를 올리거나 직접 처리해 주세요.`,
     requesterOnlyVerify: '요청자만 결과를 확인할 수 있습니다.',
     notInVerification: '지금은 결과 확인 단계가 아닙니다.',
     developerOnlyRegression: '담당 개발자만 기록할 수 있습니다.',
@@ -55,6 +57,8 @@ const ERRORS = {
     invalidTransition: 'This is not possible at the current step.',
     needAllPassed: 'Every acceptance criterion must pass before you confirm.',
     needOneFailed: 'Mark at least one acceptance criterion as not working.',
+    requestBudgetExceeded: (p) =>
+      `This request has used its per-request AI budget (₩${Number(p.limit).toLocaleString('en-US')}), so AI work cannot run again. Ask an admin to raise the limit, or handle it by hand.`,
     requesterOnlyVerify: 'Only the requester can check the result.',
     notInVerification: 'The request is not waiting for a result check.',
     developerOnlyRegression: 'Only the responsible developer can record this.',

@@ -54,6 +54,7 @@ Every user workflow is tested end to end against the production build with the i
 | `layout.spec.ts` | No horizontal scroll on any route for any role at 320 px and on a landscape tablet, in Korean and English. |
 | `i18n.spec.ts` | With an English browser no Korean text appears on any role's screens (elements with an explicit `lang` excluded); a request can be filed in English; switching language at runtime works; edited demo data keeps its language. |
 | `theme.spec.ts` | System dark mode applies before first paint; no horizontal scroll in dark mode; an explicit light choice persists; the login-screen toggle works. |
+| `a11y.spec.ts` | The skip link is the first tab stop and focuses `main` (desktop only: WebKit does not tab to links by default); nothing animates under `prefers-reduced-motion: reduce`. |
 | `cursor.spec.ts` | Computed cursor of every visible interactive element matches the contract, including inside open dialogs. |
 | `mock-api.spec.ts` | The service-worker mock answers contract calls such as `POST /api/auth/login` in the browser. |
 | `boot.spec.ts` | Reloading during the first load still ends on a usable screen (regression for WebKit refusing the MSW worker registration). |

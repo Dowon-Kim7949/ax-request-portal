@@ -187,6 +187,21 @@
     cursor: progress;
   }
 
+  /*
+   * Reduced motion: the fade/slide animations and transitions finish at once.
+   * Near-zero rather than none, so animationend/transitionend still fire.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
   /* iOS zooms into inputs below 16px; keep form text at 16px on touch devices. */
   @media (pointer: coarse) {
     input,

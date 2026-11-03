@@ -2032,6 +2032,12 @@
             "type": "number",
             "minimum": 0
           },
+          "aiAlertThresholdPct": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "description": "Share of `aiBudgetKrw` at which spending is flagged; the budget's `alertThresholdPct`"
+          },
           "byProject": {
             "type": "array",
             "items": {
@@ -2119,6 +2125,7 @@
           "done",
           "aiCostKrw",
           "aiBudgetKrw",
+          "aiAlertThresholdPct",
           "byProject",
           "upcomingReleases",
           "attention"

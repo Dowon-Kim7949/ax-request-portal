@@ -227,10 +227,10 @@ export default function DashboardPage() {
               label={t('dashboard.aiCost')}
               value={formatKrw(data.aiCostKrw)}
               note={t('dashboard.aiBudget', { pct: Math.round(budgetPct) })}
-              noteTone={budgetPct >= 80 ? 'warning' : 'muted'}
+              noteTone={budgetPct >= data.aiAlertThresholdPct ? 'warning' : 'muted'}
             >
               <div className="mt-1.5">
-                <Meter value={budgetPct} warnAt={80} label={t('dashboard.aiCost')} />
+                <Meter value={budgetPct} warnAt={data.aiAlertThresholdPct} label={t('dashboard.aiCost')} />
               </div>
             </StatTile>
           </div>

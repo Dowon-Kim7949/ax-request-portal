@@ -60,7 +60,7 @@ Everything a developer does: the assigned queue (`/work`, `request:review`), the
 | --- | --- | --- | --- |
 | `useRequests({ scope: 'assigned', projectId? })` | `GET /requests` | → `WorkRequestSummary[]` | Needs `request:review`; 4 s polling while live. |
 | `useRegressionQueue` | `GET /regression-checks` | → `{ requestId, title, projectId, status, checks[] }[]` | Needs `regression:view`. |
-| `useTransition(id)` | `POST /requests/{id}/transitions` | `runWork { instructions? ≤ 2000 }`, `requestInfo { questions 1–5 }`, `reject { reason ≤ 1000 }`, `requestRevision { note }`, `approveMerge`, `markReleased` → `WorkRequest` | 409 for a transition not allowed now. `onRequestChanged`. |
+| `useTransition(id)` | `POST /requests/{id}/transitions` | `runWork { instructions? ≤ 2000 }`, `requestInfo { questions 1–5 }`, `reject { reason ≤ 1000 }`, `requestRevision { note }`, `approveMerge`, `markReleased` → `WorkRequest` | 409 for a transition not allowed now; 409 `guard_failed` for `runWork` / `requestRevision` once the request has used its per-request AI budget (see [Admin](01_admin.md)). Errors show as a toast with the server message. `onRequestChanged`. |
 | `useUpdateRegression(id)` | `PUT /requests/{id}/regression` | `{ checks: [{ id, result }] }` → `WorkRequest` | 403 unless responsible; failure toast only. |
 | `useUpdateRelease(id)` | `PUT /requests/{id}/release` | `{ scheduledDate?, note? ≤ 500 }` → `WorkRequest` | `onRequestChanged`. |
 

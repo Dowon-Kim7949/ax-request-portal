@@ -408,6 +408,27 @@ function BottomNav({ items }: { items: NavItem[] }) {
 /* Shell                                                               */
 /* ------------------------------------------------------------------ */
 
+/**
+ * First tab stop on every signed-in screen (WCAG 2.4.1). It moves focus in
+ * code rather than following `#main`, so the URL hash and the router stay
+ * untouched.
+ */
+function SkipLink() {
+  const { t } = useTranslation()
+  return (
+    <a
+      href="#main"
+      onClick={(e) => {
+        e.preventDefault()
+        document.getElementById('main')?.focus()
+      }}
+      className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:inline-flex focus:min-h-11 focus:items-center focus:rounded-lg focus:bg-surface focus:px-4 focus:text-[15px] focus:font-semibold focus:text-ink-900 focus:shadow-lg"
+    >
+      {t('nav.skipToContent')}
+    </a>
+  )
+}
+
 export function AppShell() {
   const can = useCan()
   const items = visibleNav(can)
@@ -415,6 +436,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-dvh">
+      <SkipLink />
       <Sidebar items={items} />
       <div className="md:pl-[76px] xl:pl-64">
         <header className="sticky top-0 z-20 border-b border-line/70 bg-canvas/90 pt-safe backdrop-blur">
@@ -430,7 +452,11 @@ export function AppShell() {
             </div>
           </div>
         </header>
-        <main className="mx-auto max-w-6xl px-4 pt-4 pb-[calc(6rem+env(safe-area-inset-bottom))] sm:px-6 md:pt-6 md:pb-12">
+        <main
+          id="main"
+          tabIndex={-1}
+          className="mx-auto max-w-6xl px-4 pt-4 pb-[calc(6rem+env(safe-area-inset-bottom))] outline-none sm:px-6 md:pt-6 md:pb-12"
+        >
           <Outlet />
         </main>
       </div>

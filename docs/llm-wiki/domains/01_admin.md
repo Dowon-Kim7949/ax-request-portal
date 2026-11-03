@@ -21,6 +21,9 @@ evidence:
   - src/mocks/engine.ts#symbol:saveProject
   - src/mocks/engine.ts#symbol:updateUser
   - src/mocks/engine.ts#symbol:budget
+  - src/mocks/engine.ts#symbol:requestSpentKrw
+  - src/mocks/copy.ts#symbol:requestBudgetExceeded
+  - src/mocks/api.test.ts#L215-L254
   - src/domain/roles.ts#symbol:DEFAULT_ROLE_PERMISSIONS
 related:
   - docs/llm-wiki/domains/00_overview.md
@@ -46,7 +49,7 @@ Administration of the three things the request workflow depends on: projects (re
 
 - **Projects**: list plus an edit sheet (`editing` is a project, `'new'` or `null`). Fields: name, description, icon, repository (`provider` + URL), wiki path (default `docs/llm-wiki`), owners, targets (name + wiki document) and an active switch. Owner candidates are active developers and admins only. The provider decides whether review links say MR (GitLab) or PR (GitHub).
 - **Users**: one row per user with a role select (`appConfig.enabledRoles`) and an active toggle; invitations open a sheet. An admin cannot change their own role or deactivate themselves: the controls are disabled with a `title`, and the server rejects it too.
-- **Budget**: spending this month, a `Meter` against the monthly limit, spending per model tier (light / heavy) and a limit form. An "over" badge appears once spending reaches `alertThresholdPct`.
+- **Budget**: spending this month, a `Meter` against the monthly limit, spending per model tier (light / heavy) and a limit form. An "over" badge appears once spending reaches `alertThresholdPct`; the dashboard's AI-cost tile uses the same threshold.
 
 ## API Services
 
@@ -64,6 +67,7 @@ All calls carry the bearer token; mutation failures show `toast.error` with the 
 ## Domain rules
 
 - The mock server sums AI costs per month from three sources: a finished feasibility report (heavy model), finished AI work (heavy model) and each precheck (light model). Amounts are KRW, rounded.
+- The per-request limit (`perRequestLimitKrw`) caps AI work: once the costs booked against one request (report, earlier runs, all months) reach it, starting AI work (`runWork`) or a revision run (`requestRevision`) is refused with 409 `guard_failed` and a localized `requestBudgetExceeded` message. Asking, rejecting and the requester's answer (which regenerates the report) are not blocked. `0` means no limit. The limit is checked against what was already spent, not against an estimate of the next run.
 - Permissions are enforced twice: the route guard hides the page and the mock engine rejects the call. A real backend must do the same; hiding UI is not security.
 
 ## Evidence
@@ -71,12 +75,13 @@ All calls carry the bearer token; mutation failures show `toast.error` with the 
 - `src/features/admin/projects-page.tsx#symbol:ProjectsPage`, `src/features/admin/users-page.tsx#symbol:UsersPage`, `src/features/admin/budget-page.tsx#symbol:BudgetPage` — the three screens.
 - `src/api/queries.ts#symbol:useSaveProject`, `src/api/queries.ts#symbol:useUpdateBudget` — create-or-update and budget cache handling.
 - `src/mocks/engine.ts#symbol:saveProject`, `src/mocks/engine.ts#symbol:updateUser`, `src/mocks/engine.ts#symbol:budget` — server-side rules and cost aggregation.
+- `src/mocks/engine.ts#symbol:requestSpentKrw` — per-request spending used by the limit check; `src/mocks/api.test.ts#L215-L254` ("AI budget") covers the refusal and the `0` = no limit case.
+- `src/mocks/copy.ts#symbol:requestBudgetExceeded` — the refusal message in Korean and English.
 - `src/domain/roles.ts#symbol:DEFAULT_ROLE_PERMISSIONS` — who holds the admin permissions.
 
 ## Open Questions
 
-- `perRequestLimitKrw` is stored and shown, but no code was found that enforces it on a single request.
-- The dashboard's AI-cost warning uses a fixed 80 % and ignores `alertThresholdPct`; decide whether they should be the same setting.
+- The developer learns about the per-request limit only when a run is refused; the request page does not show how much of it a request has used.
 
 ## Review Notes
 

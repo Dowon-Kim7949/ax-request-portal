@@ -24,6 +24,27 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-03 - Fix: skip link, reduced motion, per-request AI limit, dashboard alert threshold
+
+- status: needs_review
+- actor: claude-code
+- scope: code, docs
+- changed:
+  - src/app/shell.tsx (SkipLink, focusable main), src/index.css (reduced-motion rule), src/i18n/ko.ts, src/i18n/en.ts (nav.skipToContent)
+  - src/mocks/engine.ts (requestSpentKrw, limit check on runWork / requestRevision, aiAlertThresholdPct in the dashboard), src/mocks/copy.ts (requestBudgetExceeded)
+  - src/domain/model.ts (DashboardSummary.aiAlertThresholdPct), docs/openapi.json (regenerated), src/features/dashboard/dashboard-page.tsx
+  - src/mocks/api.test.ts (AI budget tests), e2e/a11y.spec.ts (new)
+  - docs/llm-wiki/WCAG.md, domains/01_admin.md, domains/03_dashboard.md, domains/12_work.md, E2E_WORKFLOWS.md
+- summary:
+  - Closed four open questions recorded when the wiki was written. The dashboard contract gains `aiAlertThresholdPct`; a backend implementing the contract must return it.
+  - The per-request limit is checked against spending already booked, not an estimate of the next run; 0 means no limit.
+- evidence:
+  - src/app/shell.tsx#symbol:SkipLink, src/index.css#L190-L203, src/mocks/engine.ts#symbol:requestSpentKrw, src/domain/model.ts#symbol:DashboardSummary
+  - Red before the change, green after: src/mocks/api.test.ts "AI budget" (2 tests) and e2e/a11y.spec.ts (2 tests)
+- caveats:
+  - The skip link is tested on the desktop project only; WebKit does not tab to links by default.
+  - The request page does not show how much of the per-request limit a request has used.
+
 ## 2026-11-03 - Wiki written from the code; governance raised to standard
 
 - status: needs_review

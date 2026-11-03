@@ -43,6 +43,7 @@ const ko = {
     retry: '다시 시도',
   },
   nav: {
+    skipToContent: '본문으로 건너뛰기',
     home: '홈',
     newRequest: '새 요청',
     myRequests: '내 요청',

@@ -211,3 +211,44 @@ describe('visibility and permissions', () => {
     await expectApiError(call(api.getBudget), 403)
   })
 })
+
+describe('AI budget', () => {
+  const DEFAULT_BUDGET = { monthlyLimitKrw: 500_000, perRequestLimitKrw: 20_000, alertThresholdPct: 80 }
+  afterAll(async () => {
+    await loginAs('admin@example.com')
+    await call(api.updateBudget, { body: DEFAULT_BUDGET })
+  })
+
+  it('refuses AI work once a request has spent its per-request limit', async () => {
+    await loginAs('admin@example.com')
+    // The feasibility report alone costs more than 1 KRW.
+    await call(api.updateBudget, { body: { ...DEFAULT_BUDGET, perRequestLimitKrw: 1 } })
+
+    await loginAs('planner@example.com')
+    const { id } = await call(api.createRequest, { body: draft })
+    t.advance(6)
+
+    await loginAs('dev1@example.com')
+    await expectApiError(
+      call(api.transitionRequest, { params: { id }, body: { event: 'runWork' } }),
+      409,
+      'guard_failed',
+    )
+    // Asking and rejecting stay possible: they cost nothing.
+    expect((await call(api.getRequest, { params: { id } })).status).toBe('review')
+
+    // 0 means no per-request limit.
+    await loginAs('admin@example.com')
+    await call(api.updateBudget, { body: { ...DEFAULT_BUDGET, perRequestLimitKrw: 0 } })
+    await loginAs('dev1@example.com')
+    const started = await call(api.transitionRequest, { params: { id }, body: { event: 'runWork' } })
+    expect(started.status).toBe('in_progress')
+  })
+
+  it('gives the dashboard the budget alert threshold', async () => {
+    await loginAs('admin@example.com')
+    await call(api.updateBudget, { body: { ...DEFAULT_BUDGET, alertThresholdPct: 65 } })
+    const summary = await call(api.dashboard, { query: {} })
+    expect(summary.aiAlertThresholdPct).toBe(65)
+  })
+})

@@ -19,10 +19,15 @@ source_files:
   - e2e/cursor.spec.ts
   - e2e/layout.spec.ts
   - e2e/theme.spec.ts
+  - e2e/a11y.spec.ts
 evidence:
   - src/theme.test.ts#symbol:PAIRS
   - src/theme.test.ts#L37-L39
-  - src/index.css#L154-L190
+  - src/index.css#L154-L188
+  - src/index.css#L190-L203
+  - src/app/shell.tsx#symbol:SkipLink
+  - src/i18n/en.ts#symbol:skipToContent
+  - src/i18n/ko.ts#symbol:skipToContent
   - index.html#L13-L31
   - src/app/theme.ts#symbol:applyTheme
   - src/components/ui/button.tsx#L66-L67
@@ -40,7 +45,7 @@ contains_sensitive_info: false
 
 ## Summary
 
-The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enforced by a unit test, the cursor contract and 320 px reflow by E2E tests, and the rest (semantics, focus, live regions) by convention in the components. Two gaps are known and listed under Open Questions: there is no skip link and no reduced-motion handling.
+The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enforced by a unit test; the cursor contract, 320 px reflow, the skip link and reduced motion by E2E tests; the rest (semantics, focus, live regions) by convention in the components.
 
 ## Colour and contrast
 
@@ -60,10 +65,12 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 - `Button` sets `aria-busy` while `loading`, so the busy cursor and screen-reader state come from one prop.
 - Focus is shown by one global `:focus-visible` outline (2 px, offset 2 px, brand colour).
 - Form controls use 16 px text on coarse pointers so iOS does not zoom on focus.
+- Reduced motion: under `prefers-reduced-motion: reduce` every animation and transition finishes in 0.01 ms and smooth scrolling is off (`src/index.css`). Near-zero rather than `none`, so `animationend` / `transitionend` handlers still run. `e2e/a11y.spec.ts` counts elements that would move and expects none under reduce.
 - Touch targets are 44 px (`h-11` / `size-11`); the phone tab bar is taller. `Button size="sm"` is the documented exception.
 
 ## Semantics and focus management
 
+- Skip link: `SkipLink` is the first tab stop on every signed-in screen; it is visually hidden until focused and moves focus to `<main id="main" tabIndex={-1}>` in code, so the URL hash and the router are not touched. The login screen has no navigation to skip. `e2e/a11y.spec.ts` checks it on the desktop project only: WebKit (phone and tablet projects) does not tab to links by default.
 - Landmarks come from the shell: `header`, `main`, a labelled `nav` for the sidebar/rail and a separately labelled `nav` for the phone tab bar. Icon-only links carry `aria-label` (the notifications link includes the unread count).
 - `aria-current="step"` marks the current phase in `Stepper` and in the AI work panel; toggle groups use `aria-pressed` or `role="radio"` + `aria-checked`; switches use `role="switch"`.
 - Live regions: `aria-live="polite"` for precheck results in the wizard and the status explainer on the detail page; `role="status"` for spinners and the boot screen; `role="alert"` for `ErrorState`, field errors and login errors.
@@ -77,18 +84,17 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 ## Evidence
 
 - `src/theme.test.ts#symbol:PAIRS` — the 43 checked pairs; `src/theme.test.ts#L37-L39` — the 4.5:1 and 3:1 thresholds.
-- `src/index.css#L154-L190` — focus outline and cursor contract.
+- `src/index.css#L154-L188` — focus outline and cursor contract; `src/index.css#L190-L203` — reduced-motion rule.
+- `src/app/shell.tsx#symbol:SkipLink` — skip link and the focusable `main`; `src/i18n/en.ts#symbol:skipToContent` — its label, with `src/i18n/ko.ts#symbol:skipToContent` for Korean.
 - `index.html#L13-L31` — pre-paint theme script.
 - `src/app/theme.ts#symbol:applyTheme` — runtime theme sync.
 - `src/components/ui/button.tsx#L66-L67` — `disabled` and `aria-busy` while loading.
 - `src/components/request/status.tsx#symbol:Stepper` — `aria-current="step"`.
 - `src/features/wizard/steps.tsx#symbol:StepTitle` — focus target for step changes.
-- `e2e/cursor.spec.ts`, `e2e/layout.spec.ts`, `e2e/theme.spec.ts` — the automated checks.
+- `e2e/cursor.spec.ts`, `e2e/layout.spec.ts`, `e2e/theme.spec.ts`, `e2e/a11y.spec.ts` — the automated checks.
 
 ## Open Questions
 
-- No skip link: keyboard users tab through the navigation on every page before reaching `main` (SC 2.4.1 is met only through landmarks).
-- No `prefers-reduced-motion` handling: the fade/slide animations defined in `@theme` always run (SC 2.3.3 is AAA, but reduced motion is still expected).
 - Whether the desktop sidebar's expanded overlay traps focus has not been checked.
 
 ## Review Notes
