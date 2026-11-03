@@ -71,6 +71,7 @@ const ko = {
     executive: '경영진',
     developer: '담당자',
     admin: '관리자',
+    operator: '운영자',
   },
   auth: {
     title: '로그인',

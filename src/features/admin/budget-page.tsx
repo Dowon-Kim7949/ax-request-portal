@@ -157,10 +157,10 @@ export default function BudgetPage() {
           <dl className="mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
             {b.byModel.map((m) => (
               <div
-                key={m.tier}
+                key={`${m.provider}/${m.model}`}
                 className="flex items-center justify-between rounded-xl bg-muted px-3.5 py-2.5"
               >
-                <dt className="text-ink-600">{t(m.tier === 'light' ? 'budget.light' : 'budget.heavy')}</dt>
+                <dt className="text-ink-600">{m.model}</dt>
                 <dd className="font-semibold tabular-nums">{formatKrw(m.spentKrw)}</dd>
               </div>
             ))}

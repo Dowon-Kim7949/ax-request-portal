@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ChartColumn, ChevronRight, Code, Settings, Send } from 'lucide-react'
+import { Bot, ChartColumn, ChevronRight, Code, Settings, Send } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
@@ -24,6 +24,7 @@ const ROLE_ICON: Record<Role, typeof Send> = {
   executive: ChartColumn,
   developer: Code,
   admin: Settings,
+  operator: Bot,
 }
 
 /** Only allow in-app paths as the post-login destination. */

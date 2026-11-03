@@ -1,4 +1,5 @@
 import * as z from 'zod'
+import { AiProvider, AiRuntime, AiSelection, AiTask, AiUsageEntry, TokenUsage } from './ai'
 import { named } from './registry'
 
 /* ------------------------------------------------------------------ */
@@ -14,8 +15,8 @@ export const CalendarDate = z.iso.date()
 
 export const Role = named(
   'Role',
-  z.enum(['requester', 'executive', 'developer', 'admin']),
-  'requester = planning/sales staff who file requests; executive = requester + company-wide dashboard; developer = reviews reports, runs AI work, approves merges; admin = manages projects, users and AI budget.',
+  z.enum(['requester', 'executive', 'developer', 'admin', 'operator']),
+  'requester = planning/sales staff who file requests; executive = requester + company-wide dashboard; developer = reviews reports, runs AI work, approves merges; admin = manages projects and users; operator = runs the service itself: AI providers and models, prices, AI budget and usage. Operator accounts are provisioned by the service, not by an admin.',
 )
 export type Role = z.infer<typeof Role>
 
@@ -214,6 +215,7 @@ export const FeasibilityReport = named(
     wikiTrust: WikiTrust,
     size: WorkSize,
     risks: z.array(z.string()),
+    generatedBy: AiSelection.optional().describe('Provider and model that wrote this revision'),
   }),
 )
 export type FeasibilityReport = z.infer<typeof FeasibilityReport>
@@ -261,6 +263,10 @@ export const WorkRun = named(
       .describe('Wiki docs edited in the same merge request; always pending human review'),
     summary: z.string().optional(),
     costKrw: z.number().nonnegative().optional(),
+    agent: z
+      .object({ provider: AiProvider, model: z.string(), runtime: AiRuntime })
+      .optional()
+      .describe('Coding agent and model that made this run'),
   }),
 )
 export type WorkRun = z.infer<typeof WorkRun>
@@ -332,6 +338,16 @@ export type TimelineEntry = z.infer<typeof TimelineEntry>
 /* Work request                                                        */
 /* ------------------------------------------------------------------ */
 
+export const RequestAiUsage = named(
+  'RequestAiUsage',
+  z.object({
+    spentKrw: z.number().nonnegative().describe('Estimated AI cost booked against this request so far'),
+    limitKrw: z.number().nonnegative().describe('Per-request limit; 0 = no limit'),
+    entries: z.array(AiUsageEntry),
+  }),
+)
+export type RequestAiUsage = z.infer<typeof RequestAiUsage>
+
 export const WorkRequest = named(
   'WorkRequest',
   z.object({
@@ -364,6 +380,7 @@ export const WorkRequest = named(
     verification: z.array(CriterionCheck),
     release: Release.optional(),
     timeline: z.array(TimelineEntry),
+    aiUsage: RequestAiUsage.optional().describe('Returned only to users with report:read'),
   }),
 )
 export type WorkRequest = z.infer<typeof WorkRequest>
@@ -429,7 +446,9 @@ export const Budget = named(
     perRequestLimitKrw: z.number().nonnegative(),
     alertThresholdPct: z.int().min(1).max(100),
     spentKrw: z.number().nonnegative(),
-    byModel: z.array(z.object({ tier: z.enum(['light', 'heavy']), spentKrw: z.number().nonnegative() })),
+    byModel: z.array(
+      z.object({ provider: AiProvider, model: z.string(), spentKrw: z.number().nonnegative() }),
+    ),
   }),
 )
 export type Budget = z.infer<typeof Budget>
@@ -473,6 +492,38 @@ export const DashboardSummary = named(
   }),
 )
 export type DashboardSummary = z.infer<typeof DashboardSummary>
+
+const Krw = z.number().nonnegative()
+const Calls = z.int().nonnegative()
+
+export const AiUsageReport = named(
+  'AiUsageReport',
+  z.object({
+    month: z.string().regex(/^\d{4}-\d{2}$/),
+    totalKrw: Krw,
+    totalUsd: z.number().nonnegative(),
+    calls: Calls.describe('Model API calls and coding-agent runs booked in `month`'),
+    monthlyLimitKrw: Krw,
+    alertThresholdPct: z.int().min(1).max(100),
+    usdKrw: z
+      .number()
+      .positive()
+      .describe('Exchange rate in the price table now; entries keep the rate they were booked at'),
+    pricingAsOf: CalendarDate,
+    byProvider: z.array(z.object({ provider: AiProvider, calls: Calls, costKrw: Krw, tokens: TokenUsage })),
+    byModel: z.array(
+      z.object({ provider: AiProvider, model: z.string(), calls: Calls, costKrw: Krw, tokens: TokenUsage }),
+    ),
+    byTask: z.array(z.object({ task: AiTask, calls: Calls, costKrw: Krw })),
+    daily: z
+      .array(z.object({ date: CalendarDate, provider: AiProvider, costKrw: Krw }))
+      .describe('One row per day and provider with spending; days without spending are omitted'),
+    topRequests: z
+      .array(z.object({ requestId: z.int().positive(), projectId: z.string(), costKrw: Krw, calls: Calls }))
+      .describe('Most expensive requests in `month`, at most ten'),
+  }),
+)
+export type AiUsageReport = z.infer<typeof AiUsageReport>
 
 export const ReleaseScheduleItem = named(
   'ReleaseScheduleItem',

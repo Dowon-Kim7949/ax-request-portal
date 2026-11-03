@@ -7,6 +7,7 @@
  */
 import type { TransitionCommand } from '../domain/lifecycle'
 import type { NotificationSettings, Project, RequestDraft, User, WorkRequest } from '../domain/model'
+import { DEFAULT_AI_PRICING, DEFAULT_AI_SELECTIONS } from '../config/ai'
 import type { ServerLanguage } from './copy'
 import {
   addDays,
@@ -31,6 +32,7 @@ const USERS: Array<Pick<User, 'id' | 'email' | 'role'>> = [
   { id: 'u-choi', email: 'dev1@example.com', role: 'developer' },
   { id: 'u-jung', email: 'dev2@example.com', role: 'developer' },
   { id: 'u-han', email: 'admin@example.com', role: 'admin' },
+  { id: 'u-yoon', email: 'operator@example.com', role: 'operator' },
 ]
 
 const USER_COPY: Record<ServerLanguage, Record<string, { name: string; team: string }>> = {
@@ -41,6 +43,7 @@ const USER_COPY: Record<ServerLanguage, Record<string, { name: string; team: str
     'u-choi': { name: '최개발', team: '개발팀' },
     'u-jung': { name: '정개발', team: '개발팀' },
     'u-han': { name: '한운영', team: '운영팀' },
+    'u-yoon': { name: '윤시스템', team: '플랫폼팀' },
   },
   en: {
     'u-kim': { name: 'Mina Kim', team: 'Planning' },
@@ -49,11 +52,12 @@ const USER_COPY: Record<ServerLanguage, Record<string, { name: string; team: str
     'u-choi': { name: 'Chris Choi', team: 'Engineering' },
     'u-jung': { name: 'Sam Jung', team: 'Engineering' },
     'u-han': { name: 'Hana Han', team: 'Operations' },
+    'u-yoon': { name: 'Yuna Yoon', team: 'Platform' },
   },
 }
 
 /** One demo account per role, shown on the login screen in mock mode. */
-export const DEMO_ACCOUNT_IDS = ['u-kim', 'u-park', 'u-choi', 'u-han'] as const
+export const DEMO_ACCOUNT_IDS = ['u-kim', 'u-park', 'u-choi', 'u-han', 'u-yoon'] as const
 
 export function seedUsers(lang: ServerLanguage): User[] {
   return USERS.map((u) => ({ ...u, ...USER_COPY[lang][u.id]!, active: true }))
@@ -888,7 +892,22 @@ function emptyState(now: Date, lang: ServerLanguage): MockState {
     notifications: [],
     notificationSettings: settings,
     budget: { monthlyLimitKrw: 500_000, perRequestLimitKrw: 20_000, alertThresholdPct: 80 },
-    costs: [],
+    ai: {
+      selections: DEFAULT_AI_SELECTIONS,
+      // The data team runs on OpenAI, so the demo shows both providers.
+      overrides: [
+        { projectId: 'p-data', task: 'precheck', selection: { provider: 'openai', model: 'gpt-6-luna' } },
+        { projectId: 'p-data', task: 'report', selection: { provider: 'openai', model: 'gpt-6.1-sol' } },
+        { projectId: 'p-data', task: 'work', selection: { provider: 'openai', model: 'gpt-6.1-sol' } },
+      ],
+      // Fictional key hints; the mock never holds a key.
+      providers: {
+        anthropic: { keyHint: 'Xq7d', updatedAt: new Date(now.getTime() - 60 * 86_400_000).toISOString() },
+        openai: { keyHint: 'm2Lp', updatedAt: new Date(now.getTime() - 21 * 86_400_000).toISOString() },
+      },
+      pricing: DEFAULT_AI_PRICING,
+    },
+    aiUsage: [],
     attachments: [],
   }
 }
@@ -970,11 +989,27 @@ export function buildSeedState(now: Date, opts: EngineOptions, lang: ServerLangu
     }
   })
 
-  // Older costs so the budget screen is not empty at the start of a month.
+  // Older usage, so the budget and usage screens have history on any day of the month:
+  // three jobs a day over 45 days, booked against the background requests, about a third
+  // of them on OpenAI. Booked through the engine, so prices come from the table.
   for (let d = 1; d <= 45; d++) {
-    state.costs.push({ at: at(24 * d + 5).toISOString(), tier: 'light', krw: 3 + (d % 5) })
-    if (d % 2)
-      state.costs.push({ at: at(24 * d + 7).toISOString(), tier: 'heavy', krw: 2_400 + (d % 7) * 350 })
+    for (let k = 0; k < 3; k++) {
+      const n = d * 3 + k
+      const requestId = 990 + (n % 14)
+      const openai = n % 3 === 0
+      const shape = { seed: n, criteria: 1 + (n % 3), targets: 1 + (n % 2), attempt: n % 5 === 0 ? 2 : 1 }
+      const pick = (task: 'precheck' | 'report' | 'work') =>
+        openai
+          ? { provider: 'openai' as const, model: task === 'precheck' ? 'gpt-6-luna' : 'gpt-6.1-sol' }
+          : {
+              provider: 'anthropic' as const,
+              model: task === 'precheck' ? 'claude-haiku-5-5' : 'claude-opus-5-5',
+            }
+      const hour = 24 * d + 3 + k * 4
+      engine.bookAi('precheck', pick('precheck'), shape, at(hour + 1).toISOString())
+      engine.bookAi('report', pick('report'), shape, at(hour + 0.5).toISOString(), requestId)
+      if (n % 2) engine.bookAi('work', pick('work'), shape, at(hour).toISOString(), requestId)
+    }
   }
 
   // Seed notifications are history: mark everything older than two days as read.

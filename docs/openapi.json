@@ -38,6 +38,9 @@
     },
     {
       "name": "insights"
+    },
+    {
+      "name": "ai"
     }
   ],
   "paths": {
@@ -1639,7 +1642,7 @@
     "/budget": {
       "get": {
         "operationId": "getBudget",
-        "summary": "AI spend against the monthly limit",
+        "summary": "AI spend against the monthly limit (budget:manage)",
         "tags": [
           "insights"
         ],
@@ -1699,6 +1702,412 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Budget"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/settings": {
+      "get": {
+        "operationId": "getAiSettings",
+        "summary": "Provider connections, model per task and per-project overrides (agent:manage)",
+        "tags": [
+          "ai"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiSettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateAiSettings",
+        "summary": "Choose the model per task and per project (agent:manage). Every selection must be a priced model of a connected provider.",
+        "tags": [
+          "ai"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiSettingsInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/providers/{provider}/key": {
+      "put": {
+        "operationId": "setProviderKey",
+        "summary": "Store or replace a provider API key (agent:manage). The key is write-only.",
+        "tags": [
+          "ai"
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AiProvider"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProviderKeyInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderConnection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "removeProviderKey",
+        "summary": "Disconnect a provider (agent:manage); refused while a task or project still uses it",
+        "tags": [
+          "ai"
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AiProvider"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/pricing": {
+      "get": {
+        "operationId": "getAiPricing",
+        "summary": "Price table and exchange rate used to book AI usage (agent:manage or usage:view)",
+        "tags": [
+          "ai"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiPricing"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateAiPricing",
+        "summary": "Edit prices and the exchange rate (agent:manage). Applies to usage booked from now on.",
+        "tags": [
+          "ai"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AiPricing"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiPricing"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/usage": {
+      "get": {
+        "operationId": "aiUsage",
+        "summary": "AI usage and estimated cost for one month by provider, model, task and request (usage:view)",
+        "tags": [
+          "ai"
+        ],
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "required": false,
+            "description": "YYYY-MM, defaults to the current month",
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiUsageReport"
                 }
               }
             }
@@ -1807,6 +2216,413 @@
           }
         ]
       },
+      "AiPricing": {
+        "type": "object",
+        "properties": {
+          "asOf": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$",
+            "description": "Date the prices were last checked against the providers"
+          },
+          "usdKrw": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "KRW per USD used to book new usage"
+          },
+          "models": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ModelPrice"
+            }
+          }
+        },
+        "required": [
+          "asOf",
+          "usdKrw",
+          "models"
+        ]
+      },
+      "AiProjectOverride": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "task": {
+            "$ref": "#/components/schemas/AiTask"
+          },
+          "selection": {
+            "$ref": "#/components/schemas/AiSelection"
+          }
+        },
+        "required": [
+          "projectId",
+          "task",
+          "selection"
+        ]
+      },
+      "AiProvider": {
+        "description": "anthropic = Claude models through the Claude API, and Claude Code for AI work; openai = GPT models through the OpenAI API, and Codex for AI work.",
+        "type": "string",
+        "enum": [
+          "anthropic",
+          "openai"
+        ]
+      },
+      "AiRuntime": {
+        "description": "api = one model API call; claude_code / codex = a coding-agent run made of many calls.",
+        "type": "string",
+        "enum": [
+          "api",
+          "claude_code",
+          "codex"
+        ]
+      },
+      "AiSelection": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/AiProvider"
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The provider's model id"
+          }
+        },
+        "required": [
+          "provider",
+          "model"
+        ]
+      },
+      "AiSettings": {
+        "type": "object",
+        "properties": {
+          "defaults": {
+            "$ref": "#/components/schemas/AiTaskSelections"
+          },
+          "projectOverrides": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiProjectOverride"
+            }
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProviderConnection"
+            }
+          }
+        },
+        "required": [
+          "defaults",
+          "projectOverrides",
+          "providers"
+        ]
+      },
+      "AiSettingsInput": {
+        "type": "object",
+        "properties": {
+          "defaults": {
+            "$ref": "#/components/schemas/AiTaskSelections"
+          },
+          "projectOverrides": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiProjectOverride"
+            }
+          }
+        },
+        "required": [
+          "defaults",
+          "projectOverrides"
+        ]
+      },
+      "AiTask": {
+        "description": "precheck = advice on a draft before submission; report = feasibility report; work = code change and merge request by a coding agent.",
+        "type": "string",
+        "enum": [
+          "precheck",
+          "report",
+          "work"
+        ]
+      },
+      "AiTaskSelections": {
+        "type": "object",
+        "properties": {
+          "precheck": {
+            "$ref": "#/components/schemas/AiSelection"
+          },
+          "report": {
+            "$ref": "#/components/schemas/AiSelection"
+          },
+          "work": {
+            "$ref": "#/components/schemas/AiSelection"
+          }
+        },
+        "required": [
+          "precheck",
+          "report",
+          "work"
+        ]
+      },
+      "AiUsageEntry": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "task": {
+            "$ref": "#/components/schemas/AiTask"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/AiProvider"
+          },
+          "model": {
+            "type": "string"
+          },
+          "runtime": {
+            "$ref": "#/components/schemas/AiRuntime"
+          },
+          "requestId": {
+            "description": "Absent for a precheck, which runs before the request exists",
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "tokens": {
+            "$ref": "#/components/schemas/TokenUsage"
+          },
+          "costUsd": {
+            "type": "number",
+            "minimum": 0
+          },
+          "costKrw": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "id",
+          "at",
+          "task",
+          "provider",
+          "model",
+          "runtime",
+          "tokens",
+          "costUsd",
+          "costKrw"
+        ]
+      },
+      "AiUsageReport": {
+        "type": "object",
+        "properties": {
+          "month": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}$"
+          },
+          "totalKrw": {
+            "type": "number",
+            "minimum": 0
+          },
+          "totalUsd": {
+            "type": "number",
+            "minimum": 0
+          },
+          "calls": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Model API calls and coding-agent runs booked in `month`"
+          },
+          "monthlyLimitKrw": {
+            "type": "number",
+            "minimum": 0
+          },
+          "alertThresholdPct": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "usdKrw": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Exchange rate in the price table now; entries keep the rate they were booked at"
+          },
+          "pricingAsOf": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "byProvider": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "$ref": "#/components/schemas/AiProvider"
+                },
+                "calls": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "costKrw": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "tokens": {
+                  "$ref": "#/components/schemas/TokenUsage"
+                }
+              },
+              "required": [
+                "provider",
+                "calls",
+                "costKrw",
+                "tokens"
+              ]
+            }
+          },
+          "byModel": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "$ref": "#/components/schemas/AiProvider"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "calls": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "costKrw": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "tokens": {
+                  "$ref": "#/components/schemas/TokenUsage"
+                }
+              },
+              "required": [
+                "provider",
+                "model",
+                "calls",
+                "costKrw",
+                "tokens"
+              ]
+            }
+          },
+          "byTask": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "task": {
+                  "$ref": "#/components/schemas/AiTask"
+                },
+                "calls": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "costKrw": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "task",
+                "calls",
+                "costKrw"
+              ]
+            }
+          },
+          "daily": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date",
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                },
+                "provider": {
+                  "$ref": "#/components/schemas/AiProvider"
+                },
+                "costKrw": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "date",
+                "provider",
+                "costKrw"
+              ]
+            },
+            "description": "One row per day and provider with spending; days without spending are omitted"
+          },
+          "topRequests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "requestId": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "projectId": {
+                  "type": "string"
+                },
+                "costKrw": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "calls": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "requestId",
+                "projectId",
+                "costKrw",
+                "calls"
+              ]
+            },
+            "description": "Most expensive requests in `month`, at most ten"
+          }
+        },
+        "required": [
+          "month",
+          "totalKrw",
+          "totalUsd",
+          "calls",
+          "monthlyLimitKrw",
+          "alertThresholdPct",
+          "usdKrw",
+          "pricingAsOf",
+          "byProvider",
+          "byModel",
+          "byTask",
+          "daily",
+          "topRequests"
+        ]
+      },
       "ApiError": {
         "description": "Error body for every 4xx/5xx response",
         "type": "object",
@@ -1908,12 +2724,11 @@
             "items": {
               "type": "object",
               "properties": {
-                "tier": {
-                  "type": "string",
-                  "enum": [
-                    "light",
-                    "heavy"
-                  ]
+                "provider": {
+                  "$ref": "#/components/schemas/AiProvider"
+                },
+                "model": {
+                  "type": "string"
                 },
                 "spentKrw": {
                   "type": "number",
@@ -1921,7 +2736,8 @@
                 }
               },
               "required": [
-                "tier",
+                "provider",
+                "model",
                 "spentKrw"
               ]
             }
@@ -2254,6 +3070,10 @@
             "items": {
               "type": "string"
             }
+          },
+          "generatedBy": {
+            "description": "Provider and model that wrote this revision",
+            "$ref": "#/components/schemas/AiSelection"
           }
         },
         "required": [
@@ -2287,6 +3107,51 @@
         "required": [
           "email",
           "password"
+        ]
+      },
+      "ModelPrice": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/AiProvider"
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "inputUsd": {
+            "type": "number",
+            "minimum": 0,
+            "description": "USD per 1M input tokens"
+          },
+          "cacheReadUsd": {
+            "type": "number",
+            "minimum": 0,
+            "description": "USD per 1M cached input tokens"
+          },
+          "cacheWriteUsd": {
+            "type": "number",
+            "minimum": 0,
+            "description": "USD per 1M tokens written to the cache at the shortest TTL; 0 when not billed"
+          },
+          "outputUsd": {
+            "type": "number",
+            "minimum": 0,
+            "description": "USD per 1M output tokens"
+          }
+        },
+        "required": [
+          "provider",
+          "model",
+          "label",
+          "inputUsd",
+          "cacheReadUsd",
+          "cacheWriteUsd",
+          "outputUsd"
         ]
       },
       "Notification": {
@@ -2593,6 +3458,44 @@
           "name"
         ]
       },
+      "ProviderConnection": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/AiProvider"
+          },
+          "connected": {
+            "type": "boolean"
+          },
+          "keyHint": {
+            "description": "Last four characters of the stored key; the key itself is never returned",
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "provider",
+          "connected"
+        ]
+      },
+      "ProviderKeyInput": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 500,
+            "description": "Write-only: stored by the server, never returned"
+          }
+        },
+        "required": [
+          "apiKey"
+        ]
+      },
       "RegressionCheck": {
         "type": "object",
         "properties": {
@@ -2778,6 +3681,32 @@
           "undetermined"
         ]
       },
+      "RequestAiUsage": {
+        "type": "object",
+        "properties": {
+          "spentKrw": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Estimated AI cost booked against this request so far"
+          },
+          "limitKrw": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Per-request limit; 0 = no limit"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiUsageEntry"
+            }
+          }
+        },
+        "required": [
+          "spentKrw",
+          "limitKrw",
+          "entries"
+        ]
+      },
       "RequestDraft": {
         "type": "object",
         "properties": {
@@ -2899,13 +3828,14 @@
         ]
       },
       "Role": {
-        "description": "requester = planning/sales staff who file requests; executive = requester + company-wide dashboard; developer = reviews reports, runs AI work, approves merges; admin = manages projects, users and AI budget.",
+        "description": "requester = planning/sales staff who file requests; executive = requester + company-wide dashboard; developer = reviews reports, runs AI work, approves merges; admin = manages projects and users; operator = runs the service itself: AI providers and models, prices, AI budget and usage. Operator accounts are provisioned by the service, not by an admin.",
         "type": "string",
         "enum": [
           "requester",
           "executive",
           "developer",
-          "admin"
+          "admin",
+          "operator"
         ]
       },
       "Session": {
@@ -2957,6 +3887,47 @@
           "at",
           "actor",
           "event"
+        ]
+      },
+      "TokenUsage": {
+        "type": "object",
+        "properties": {
+          "input": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Input tokens billed at the full input rate (cache reads and writes excluded)"
+          },
+          "cacheRead": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Input tokens served from the prompt cache"
+          },
+          "cacheWrite": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Input tokens written to the prompt cache"
+          },
+          "output": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Output tokens, reasoning included"
+          },
+          "reasoning": {
+            "description": "Part of `output` spent on reasoning, when the provider reports it",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "input",
+          "cacheRead",
+          "cacheWrite",
+          "output"
         ]
       },
       "TransitionCommand": {
@@ -3451,6 +4422,10 @@
             "items": {
               "$ref": "#/components/schemas/TimelineEntry"
             }
+          },
+          "aiUsage": {
+            "description": "Returned only to users with report:read",
+            "$ref": "#/components/schemas/RequestAiUsage"
           }
         },
         "required": [
@@ -3671,6 +4646,26 @@
           "costKrw": {
             "type": "number",
             "minimum": 0
+          },
+          "agent": {
+            "description": "Coding agent and model that made this run",
+            "type": "object",
+            "properties": {
+              "provider": {
+                "$ref": "#/components/schemas/AiProvider"
+              },
+              "model": {
+                "type": "string"
+              },
+              "runtime": {
+                "$ref": "#/components/schemas/AiRuntime"
+              }
+            },
+            "required": [
+              "provider",
+              "model",
+              "runtime"
+            ]
           }
         },
         "required": [

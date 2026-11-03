@@ -70,6 +70,7 @@ const en: Messages = {
     executive: 'Executive',
     developer: 'Developer',
     admin: 'Admin',
+    operator: 'Operator',
   },
   auth: {
     title: 'Sign in',

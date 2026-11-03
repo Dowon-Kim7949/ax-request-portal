@@ -7,7 +7,29 @@
  * are stored as keys and rendered when read; AI text is written in the
  * language of the call that makes the AI finish (like a model would).
  */
-import type { ProjectInput, RegressionQueue, RequestScope } from '../api/contract'
+import type { AiSettingsInput, ProjectInput, RegressionQueue, RequestScope } from '../api/contract'
+import {
+  addUsage,
+  AI_PROVIDERS,
+  AI_TASKS,
+  bookUsage,
+  normalizeUsage,
+  priceOf,
+  resolveSelection,
+  runtimeFor,
+  selectionsInUse,
+  ZERO_USAGE,
+  type AiPricing,
+  type AiProjectOverride,
+  type AiProvider,
+  type AiSelection,
+  type AiSettings,
+  type AiTask,
+  type AiTaskSelections,
+  type AiUsageEntry,
+  type ProviderConnection,
+  type TokenUsage,
+} from '../domain/ai'
 import {
   applyTransition,
   isAuthorized,
@@ -18,6 +40,7 @@ import {
 } from '../domain/lifecycle'
 import type {
   Actor,
+  AiUsageReport,
   Attachment,
   Budget,
   DashboardSummary,
@@ -26,6 +49,7 @@ import type {
   PrecheckIssue,
   Project,
   ReleaseScheduleItem,
+  RequestAiUsage,
   RequestDraft,
   RequestStatus,
   User,
@@ -34,7 +58,7 @@ import type {
 } from '../domain/model'
 import { precheckDraft } from '../domain/precheck'
 import { hasPermission, type Permission, type RolePermissions } from '../domain/roles'
-import { finishWork, generateReport, phaseAt, PRECHECK_COST_KRW, reportCost } from './ai'
+import { finishWork, generateReport, phaseAt, simulateUsage, type UsageShape } from './ai'
 import { renderNotification, type ErrorKey, type NotificationKey, type ServerLanguage } from './copy'
 
 /* ------------------------------------------------------------------ */
@@ -42,13 +66,14 @@ import { renderNotification, type ErrorKey, type NotificationKey, type ServerLan
 /* ------------------------------------------------------------------ */
 
 /** Bump when the stored shape changes: older demo data is discarded and reseeded. */
-export const STATE_VERSION = 2
+export const STATE_VERSION = 3
 
-export interface CostEntry {
-  at: string
-  tier: 'light' | 'heavy'
-  krw: number
-  requestId?: number
+/** What the operator configures. Keys are never stored, only their last four characters. */
+export interface AiOperations {
+  selections: AiTaskSelections
+  overrides: AiProjectOverride[]
+  providers: Partial<Record<AiProvider, { keyHint: string; updatedAt: string }>>
+  pricing: AiPricing
 }
 
 export interface StoredNotification {
@@ -76,7 +101,9 @@ export interface MockState {
   notifications: StoredNotification[]
   notificationSettings: Record<string, NotificationSettings>
   budget: Pick<Budget, 'monthlyLimitKrw' | 'perRequestLimitKrw' | 'alertThresholdPct'>
-  costs: CostEntry[]
+  ai: AiOperations
+  /** Usage ledger: one entry per model call or agent run, priced when booked */
+  aiUsage: AiUsageEntry[]
   attachments: Attachment[]
 }
 
@@ -201,13 +228,64 @@ export class MockEngine {
     })
   }
 
-  private recordCost(entry: CostEntry): void {
-    this.state.costs.push(entry)
+  /** The model a task uses for a project right now. */
+  selectionFor(projectId: string, task: AiTask): AiSelection {
+    return resolveSelection(
+      { defaults: this.state.ai.selections, projectOverrides: this.state.ai.overrides },
+      projectId,
+      task,
+    )
+  }
+
+  /**
+   * Books one AI job: the provider's usage report (simulated here, returned by
+   * the call in production), normalized and priced at today's table.
+   */
+  bookAi(
+    task: AiTask,
+    selection: AiSelection,
+    shape: UsageShape,
+    at: string,
+    requestId?: number,
+  ): AiUsageEntry | undefined {
+    const tokens = normalizeUsage(simulateUsage(task, selection.provider, shape))
+    const entry = bookUsage(this.state.ai.pricing, {
+      id: this.newId('ai'),
+      at,
+      task,
+      selection,
+      tokens,
+      ...(requestId !== undefined ? { requestId } : {}),
+    })
+    if (entry) this.state.aiUsage.push(entry)
+    return entry
   }
 
   /** AI spending booked against one request, all months. */
   private requestSpentKrw(requestId: number): number {
-    return this.state.costs.reduce((sum, c) => (c.requestId === requestId ? sum + c.krw : sum), 0)
+    return this.state.aiUsage.reduce((sum, e) => (e.requestId === requestId ? sum + e.costKrw : sum), 0)
+  }
+
+  /** Adds the AI usage of a request for viewers who see engineering detail. */
+  present(user: User, req: WorkRequest): WorkRequest {
+    if (!this.can(user, 'report:read')) return req
+    const entries = this.state.aiUsage.filter((e) => e.requestId === req.id)
+    const aiUsage: RequestAiUsage = {
+      spentKrw: Math.round(entries.reduce((n, e) => n + e.costKrw, 0) * 100) / 100,
+      limitKrw: this.state.budget.perRequestLimitKrw,
+      entries,
+    }
+    return { ...req, aiUsage }
+  }
+
+  private shapeOf(req: WorkRequest, attempt: number): UsageShape {
+    return { seed: req.id, criteria: req.acceptanceCriteria.length, targets: req.targetIds.length, attempt }
+  }
+
+  /** Coding agent and model a new work run starts with. */
+  private agentFor(projectId: string): NonNullable<WorkRequest['work']>['agent'] & object {
+    const sel = this.selectionFor(projectId, 'work')
+    return { ...sel, runtime: runtimeFor('work', sel.provider) }
   }
 
   /* ---------- notifications ---------- */
@@ -339,8 +417,15 @@ export class MockEngine {
       const done = this.enteredAt(req, 'reporting') + this.opts.reportSeconds * 1000
       if (now.getTime() < done) return false
       const at = new Date(done)
-      const report = generateReport(req, project, at, lang)
-      this.recordCost({ at: at.toISOString(), tier: 'heavy', krw: reportCost(req), requestId: req.id })
+      const selection = this.selectionFor(req.projectId, 'report')
+      this.bookAi(
+        'report',
+        selection,
+        this.shapeOf(req, (req.report?.revision ?? 0) + 1),
+        at.toISOString(),
+        req.id,
+      )
+      const report = { ...generateReport(req, project, at, lang), generatedBy: selection }
       req = this.apply({ ...req, report }, { event: 'reportReady' }, { type: 'ai' }, at)
       this.replace(req)
       this.notifyStatus(req, at)
@@ -357,8 +442,17 @@ export class MockEngine {
         return true
       }
       const at = new Date(started + this.opts.workSeconds * 1000)
-      const { work, regression } = finishWork(req, project, at, lang)
-      this.recordCost({ at: at.toISOString(), tier: 'heavy', krw: work.costKrw ?? 0, requestId: req.id })
+      const finished = finishWork(req, project, at, lang)
+      const regression = finished.regression
+      const agent = req.work.agent ?? this.agentFor(req.projectId)
+      const entry = this.bookAi(
+        'work',
+        { provider: agent.provider, model: agent.model },
+        this.shapeOf(req, req.work.attempt),
+        at.toISOString(),
+        req.id,
+      )
+      const work = { ...finished.work, agent, ...(entry ? { costKrw: entry.costKrw } : {}) }
       req = this.apply({ ...req, work, regression }, { event: 'workFinished' }, { type: 'ai' }, at)
       this.replace(req)
       this.notifyStatus(req, at)
@@ -382,7 +476,15 @@ export class MockEngine {
 
   precheck(user: User, draft: RequestDraft, now: Date, lang: ServerLanguage): PrecheckIssue[] {
     this.require(user, 'request:create')
-    this.recordCost({ at: now.toISOString(), tier: 'light', krw: PRECHECK_COST_KRW })
+    if (this.project(draft.projectId)) {
+      const shape = {
+        seed: draft.title.length + draft.desiredBehavior.length,
+        criteria: draft.acceptanceCriteria.length,
+        targets: draft.targetIds.length,
+        attempt: 1,
+      }
+      this.bookAi('precheck', this.selectionFor(draft.projectId, 'precheck'), shape, now.toISOString())
+    }
     return precheckDraft(draft, localDate(now), lang)
   }
 
@@ -461,6 +563,7 @@ export class MockEngine {
         throw new HttpError(409, 'guard_failed', 'requestBudgetExceeded', { limit })
       }
       if (!next.assigneeId) next = { ...next, assigneeId: user.id }
+      if (next.work) next = { ...next, work: { ...next.work, agent: this.agentFor(next.projectId) } }
     }
     this.replace(next)
     this.notifyStatus(next, now, user.id)
@@ -616,6 +719,7 @@ export class MockEngine {
 
   createUser(actor: User, input: { name: string; email: string; role: User['role']; team?: string }): User {
     this.require(actor, 'user:manage')
+    if (input.role === 'operator') throw new HttpError(403, 'forbidden', 'operatorProvisioned')
     if (this.state.users.some((u) => u.email.toLowerCase() === input.email.toLowerCase())) {
       throw new HttpError(400, 'bad_request', 'emailTaken')
     }
@@ -628,6 +732,10 @@ export class MockEngine {
     this.require(actor, 'user:manage')
     const i = this.state.users.findIndex((u) => u.id === id)
     if (i < 0) throw new HttpError(404, 'not_found', 'userNotFound')
+    // Operators run the service; an organization admin can neither make nor change one.
+    if (this.state.users[i]!.role === 'operator' || patch.role === 'operator') {
+      throw new HttpError(403, 'forbidden', 'operatorProvisioned')
+    }
     if (id === actor.id && (patch.active === false || (patch.role && patch.role !== actor.role))) {
       throw new HttpError(400, 'bad_request', 'cannotChangeSelf')
     }
@@ -677,20 +785,172 @@ export class MockEngine {
     return found ? this.render(found, lang) : undefined
   }
 
+  /* ---------- AI operations (service operator) ---------- */
+
+  aiSettings(user: User): AiSettings {
+    this.require(user, 'agent:manage')
+    const providers: ProviderConnection[] = AI_PROVIDERS.map((provider) => {
+      const p = this.state.ai.providers[provider]
+      return p
+        ? { provider, connected: true, keyHint: p.keyHint, updatedAt: p.updatedAt }
+        : { provider, connected: false }
+    })
+    return { defaults: this.state.ai.selections, projectOverrides: this.state.ai.overrides, providers }
+  }
+
+  /** A selection must name a priced model of a connected provider. */
+  private checkSelection(sel: AiSelection, pricing: AiPricing = this.state.ai.pricing): void {
+    if (!this.state.ai.providers[sel.provider]) {
+      throw new HttpError(400, 'bad_request', 'providerNotConnected', { provider: sel.provider })
+    }
+    if (!priceOf(pricing, sel))
+      throw new HttpError(400, 'bad_request', 'modelNotPriced', { model: sel.model })
+  }
+
+  updateAiSettings(user: User, input: AiSettingsInput): AiSettings {
+    this.require(user, 'agent:manage')
+    const seen = new Set<string>()
+    for (const o of input.projectOverrides) {
+      if (!this.project(o.projectId)) throw new HttpError(400, 'bad_request', 'projectNotFound')
+      const key = `${o.projectId}/${o.task}`
+      if (seen.has(key)) throw new HttpError(400, 'bad_request', 'checkInput')
+      seen.add(key)
+    }
+    for (const sel of selectionsInUse(input)) this.checkSelection(sel)
+    this.state.ai.selections = input.defaults
+    this.state.ai.overrides = input.projectOverrides
+    return this.aiSettings(user)
+  }
+
+  setProviderKey(user: User, provider: AiProvider, apiKey: string, now: Date): ProviderConnection {
+    this.require(user, 'agent:manage')
+    // The mock keeps only the hint. A real backend stores the key encrypted and never returns it.
+    const p = { keyHint: apiKey.slice(-4), updatedAt: now.toISOString() }
+    this.state.ai.providers[provider] = p
+    return { provider, connected: true, ...p }
+  }
+
+  removeProviderKey(user: User, provider: AiProvider): void {
+    this.require(user, 'agent:manage')
+    const inUse = selectionsInUse({
+      defaults: this.state.ai.selections,
+      projectOverrides: this.state.ai.overrides,
+    })
+    if (inUse.some((s) => s.provider === provider)) {
+      throw new HttpError(409, 'guard_failed', 'providerInUse', { provider })
+    }
+    delete this.state.ai.providers[provider]
+  }
+
+  aiPricing(user: User): AiPricing {
+    if (!this.can(user, 'agent:manage') && !this.can(user, 'usage:view')) {
+      throw new HttpError(403, 'forbidden', 'forbidden')
+    }
+    return this.state.ai.pricing
+  }
+
+  /** New prices apply to usage booked from now on; booked entries keep their price. */
+  updateAiPricing(user: User, pricing: AiPricing): AiPricing {
+    this.require(user, 'agent:manage')
+    const inUse = selectionsInUse({
+      defaults: this.state.ai.selections,
+      projectOverrides: this.state.ai.overrides,
+    })
+    const dropped = inUse.find((s) => !priceOf(pricing, s))
+    if (dropped) throw new HttpError(409, 'guard_failed', 'modelInUse', { model: dropped.model })
+    this.state.ai.pricing = pricing
+    return pricing
+  }
+
+  aiUsageReport(user: User, month: string): AiUsageReport {
+    this.require(user, 'usage:view')
+    const entries = this.usageIn(month)
+    const money = (n: number) => Math.round(n)
+    type Acc = { calls: number; costKrw: number; tokens: TokenUsage }
+    const group = <K>(keyOf: (e: AiUsageEntry) => K) => {
+      const m = new Map<K, Acc>()
+      for (const e of entries) {
+        const k = keyOf(e)
+        const a = m.get(k) ?? { calls: 0, costKrw: 0, tokens: ZERO_USAGE }
+        m.set(k, { calls: a.calls + 1, costKrw: a.costKrw + e.costKrw, tokens: addUsage(a.tokens, e.tokens) })
+      }
+      return m
+    }
+    const byProvider = group((e) => e.provider)
+    const byModel = group((e) => `${e.provider}/${e.model}`)
+    const byTask = group((e) => e.task)
+    const daily = group((e) => `${localDate(new Date(e.at))}/${e.provider}`)
+    const byRequest = group((e) => e.requestId ?? 0)
+    byRequest.delete(0)
+    return {
+      month,
+      totalKrw: money(entries.reduce((n, e) => n + e.costKrw, 0)),
+      totalUsd: Math.round(entries.reduce((n, e) => n + e.costUsd, 0) * 100) / 100,
+      calls: entries.length,
+      monthlyLimitKrw: this.state.budget.monthlyLimitKrw,
+      alertThresholdPct: this.state.budget.alertThresholdPct,
+      usdKrw: this.state.ai.pricing.usdKrw,
+      pricingAsOf: this.state.ai.pricing.asOf,
+      byProvider: AI_PROVIDERS.filter((p) => byProvider.has(p)).map((provider) => {
+        const a = byProvider.get(provider)!
+        return { provider, calls: a.calls, costKrw: money(a.costKrw), tokens: a.tokens }
+      }),
+      byModel: [...byModel.entries()]
+        .map(([key, a]) => {
+          const [provider, ...rest] = key.split('/')
+          return {
+            provider: provider as AiProvider,
+            model: rest.join('/'),
+            calls: a.calls,
+            costKrw: money(a.costKrw),
+            tokens: a.tokens,
+          }
+        })
+        .sort((x, y) => y.costKrw - x.costKrw),
+      byTask: AI_TASKS.filter((t) => byTask.has(t)).map((task) => {
+        const a = byTask.get(task)!
+        return { task, calls: a.calls, costKrw: money(a.costKrw) }
+      }),
+      daily: [...daily.entries()]
+        .map(([key, a]) => {
+          const [date, provider] = key.split('/') as [string, AiProvider]
+          return { date, provider, costKrw: money(a.costKrw) }
+        })
+        .sort((x, y) => x.date.localeCompare(y.date) || x.provider.localeCompare(y.provider)),
+      topRequests: [...byRequest.entries()]
+        .sort((x, y) => y[1].costKrw - x[1].costKrw)
+        .slice(0, 10)
+        .flatMap(([requestId, a]) => {
+          const req = this.state.requests.find((r) => r.id === requestId)
+          return req
+            ? [{ requestId, projectId: req.projectId, costKrw: money(a.costKrw), calls: a.calls }]
+            : []
+        }),
+    }
+  }
+
   /* ---------- insights ---------- */
 
+  private usageIn(month: string): AiUsageEntry[] {
+    return this.state.aiUsage.filter((e) => localDate(new Date(e.at)).startsWith(month))
+  }
+
   budget(month: string): Budget {
-    const inMonth = this.state.costs.filter((c) => c.at.startsWith(month))
-    const sum = (tier?: CostEntry['tier']) =>
-      Math.round(inMonth.filter((c) => !tier || c.tier === tier).reduce((n, c) => n + c.krw, 0))
+    const inMonth = this.usageIn(month)
+    const byModel = new Map<string, { provider: AiProvider; model: string; spentKrw: number }>()
+    for (const e of inMonth) {
+      const key = `${e.provider}/${e.model}`
+      const row = byModel.get(key) ?? { provider: e.provider, model: e.model, spentKrw: 0 }
+      row.spentKrw += e.costKrw
+      byModel.set(key, row)
+    }
     return {
       month,
       ...this.state.budget,
-      spentKrw: sum(),
-      byModel: [
-        { tier: 'light', spentKrw: sum('light') },
-        { tier: 'heavy', spentKrw: sum('heavy') },
-      ],
+      spentKrw: Math.round(inMonth.reduce((n, e) => n + e.costKrw, 0)),
+      byModel: [...byModel.values()]
+        .map((r) => ({ ...r, spentKrw: Math.round(r.spentKrw) }))
+        .sort((a, b) => b.spentKrw - a.spentKrw),
     }
   }
 

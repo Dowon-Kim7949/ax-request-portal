@@ -47,6 +47,15 @@ export const AppConfigSchema = z
         message: 'at least one enabled role needs user:manage',
       })
     }
+    for (const permission of ['agent:manage', 'budget:manage'] as const) {
+      if (!cfg.enabledRoles.some((r) => cfg.rolePermissions[r].includes(permission))) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['rolePermissions'],
+          message: `at least one enabled role needs ${permission}`,
+        })
+      }
+    }
     if (!cfg.locales.includes(cfg.defaultLocale)) {
       ctx.addIssue({
         code: 'custom',

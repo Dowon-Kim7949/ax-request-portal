@@ -183,28 +183,35 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
     route(api.listRequests, ({ store, me, query }) => store.engine.listRequests(me, query)),
     route(
       api.createRequest,
-      ({ store, me, body, now, lang }) => store.engine.createRequest(me, body, now, lang),
+      ({ store, me, body, now, lang }) =>
+        store.engine.present(me, store.engine.createRequest(me, body, now, lang)),
       edit,
     ),
-    route(api.getRequest, ({ store, me, params }) => store.engine.getRequest(me, params.id)),
+    route(api.getRequest, ({ store, me, params }) =>
+      store.engine.present(me, store.engine.getRequest(me, params.id)),
+    ),
     route(
       api.transitionRequest,
-      ({ store, me, params, body, now, lang }) => store.engine.transition(me, params.id, body, now, lang),
+      ({ store, me, params, body, now, lang }) =>
+        store.engine.present(me, store.engine.transition(me, params.id, body, now, lang)),
       edit,
     ),
     route(
       api.saveVerification,
-      ({ store, me, params, body, now }) => store.engine.saveVerification(me, params.id, body.checks, now),
+      ({ store, me, params, body, now }) =>
+        store.engine.present(me, store.engine.saveVerification(me, params.id, body.checks, now)),
       edit,
     ),
     route(
       api.updateRegression,
-      ({ store, me, params, body, now }) => store.engine.updateRegression(me, params.id, body.checks, now),
+      ({ store, me, params, body, now }) =>
+        store.engine.present(me, store.engine.updateRegression(me, params.id, body.checks, now)),
       edit,
     ),
     route(
       api.updateRelease,
-      ({ store, me, params, body, now }) => store.engine.updateRelease(me, params.id, body, now),
+      ({ store, me, params, body, now }) =>
+        store.engine.present(me, store.engine.updateRelease(me, params.id, body, now)),
       edit,
     ),
     route(
@@ -264,6 +271,26 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
         return store.engine.budget(localDate(now).slice(0, 7))
       },
       edit,
+    ),
+
+    /* AI operations */
+    route(api.getAiSettings, ({ store, me }) => store.engine.aiSettings(me)),
+    route(api.updateAiSettings, ({ store, me, body }) => store.engine.updateAiSettings(me, body), edit),
+    route(
+      api.setProviderKey,
+      ({ store, me, params, body, now }) =>
+        store.engine.setProviderKey(me, params.provider, body.apiKey, now),
+      edit,
+    ),
+    route(
+      api.removeProviderKey,
+      ({ store, me, params }) => store.engine.removeProviderKey(me, params.provider),
+      edit,
+    ),
+    route(api.getAiPricing, ({ store, me }) => store.engine.aiPricing(me)),
+    route(api.updateAiPricing, ({ store, me, body }) => store.engine.updateAiPricing(me, body), edit),
+    route(api.aiUsage, ({ store, me, query, now }) =>
+      store.engine.aiUsageReport(me, query.month ?? localDate(now).slice(0, 7)),
     ),
   ]
 }

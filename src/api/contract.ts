@@ -6,8 +6,10 @@
  * building with VITE_API_MOCK=false and VITE_API_BASE_URL=<backend>.
  */
 import * as z from 'zod'
+import { AiPricing, AiProvider, AiSettings, ProviderConnection } from '../domain/ai'
 import { TransitionCommand } from '../domain/lifecycle'
 import {
+  AiUsageReport,
   Attachment,
   Budget,
   CalendarDate,
@@ -183,6 +185,21 @@ export const BudgetInput = named(
   'BudgetInput',
   Budget.pick({ monthlyLimitKrw: true, perRequestLimitKrw: true, alertThresholdPct: true }),
 )
+
+export const AiSettingsInput = named(
+  'AiSettingsInput',
+  AiSettings.pick({ defaults: true, projectOverrides: true }),
+)
+export type AiSettingsInput = z.infer<typeof AiSettingsInput>
+
+export const ProviderKeyInput = named(
+  'ProviderKeyInput',
+  z.object({
+    apiKey: z.string().trim().min(8).max(500).describe('Write-only: stored by the server, never returned'),
+  }),
+)
+
+const ProviderParam = z.object({ provider: AiProvider })
 
 const MonthQuery = z.object({
   month: z
@@ -424,7 +441,7 @@ export const api = {
     method: 'GET',
     path: '/budget',
     tag: 'insights',
-    summary: 'AI spend against the monthly limit',
+    summary: 'AI spend against the monthly limit (budget:manage)',
     response: Budget,
   }),
   updateBudget: endpoint({
@@ -434,6 +451,64 @@ export const api = {
     summary: 'Change AI cost limits (budget:manage)',
     body: BudgetInput,
     response: Budget,
+  }),
+
+  /* AI operations (service operator) */
+  getAiSettings: endpoint({
+    method: 'GET',
+    path: '/ai/settings',
+    tag: 'ai',
+    summary: 'Provider connections, model per task and per-project overrides (agent:manage)',
+    response: AiSettings,
+  }),
+  updateAiSettings: endpoint({
+    method: 'PUT',
+    path: '/ai/settings',
+    tag: 'ai',
+    summary:
+      'Choose the model per task and per project (agent:manage). Every selection must be a priced model of a connected provider.',
+    body: AiSettingsInput,
+    response: AiSettings,
+  }),
+  setProviderKey: endpoint({
+    method: 'PUT',
+    path: '/ai/providers/{provider}/key',
+    tag: 'ai',
+    summary: 'Store or replace a provider API key (agent:manage). The key is write-only.',
+    params: ProviderParam,
+    body: ProviderKeyInput,
+    response: ProviderConnection,
+  }),
+  removeProviderKey: endpoint({
+    method: 'DELETE',
+    path: '/ai/providers/{provider}/key',
+    tag: 'ai',
+    summary: 'Disconnect a provider (agent:manage); refused while a task or project still uses it',
+    params: ProviderParam,
+    response: null,
+  }),
+  getAiPricing: endpoint({
+    method: 'GET',
+    path: '/ai/pricing',
+    tag: 'ai',
+    summary: 'Price table and exchange rate used to book AI usage (agent:manage or usage:view)',
+    response: AiPricing,
+  }),
+  updateAiPricing: endpoint({
+    method: 'PUT',
+    path: '/ai/pricing',
+    tag: 'ai',
+    summary: 'Edit prices and the exchange rate (agent:manage). Applies to usage booked from now on.',
+    body: AiPricing,
+    response: AiPricing,
+  }),
+  aiUsage: endpoint({
+    method: 'GET',
+    path: '/ai/usage',
+    tag: 'ai',
+    summary: 'AI usage and estimated cost for one month by provider, model, task and request (usage:view)',
+    query: MonthQuery,
+    response: AiUsageReport,
   }),
 } as const satisfies Record<string, EndpointSpec>
 
