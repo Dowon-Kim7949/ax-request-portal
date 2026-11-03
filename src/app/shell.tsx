@@ -9,7 +9,7 @@ import {
   RotateCcw,
   Settings,
 } from 'lucide-react'
-import { useEffect, useId, useRef, useState } from 'react'
+import { Fragment, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, NavLink, Outlet, ScrollRestoration, useMatches } from 'react-router'
 import { toast } from 'sonner'
@@ -221,7 +221,9 @@ function Sidebar({ items }: { items: NavItem[] }) {
   const [open, setOpen] = useState(false)
 
   const main = items.filter((i) => i.group === 'main')
-  const admin = items.filter((i) => i.group === 'admin')
+  const sections = (['admin', 'ops'] as const)
+    .map((group) => ({ group, items: items.filter((i) => i.group === group) }))
+    .filter((s) => s.items.length)
 
   const body = (expanded: boolean, onNavigate?: () => void) => (
     <>
@@ -232,16 +234,16 @@ function Sidebar({ items }: { items: NavItem[] }) {
         {main.map((i) => (
           <SideLink key={i.key} item={i} expanded={expanded} onNavigate={onNavigate} />
         ))}
-        {admin.length ? (
-          <>
+        {sections.map((section) => (
+          <Fragment key={section.group}>
             <p className={cn('mt-5 mb-1 px-3 text-xs font-semibold text-ink-400', !expanded && 'sr-only')}>
-              {t('nav.admin')}
+              {t(`nav.${section.group}`)}
             </p>
-            {admin.map((i) => (
+            {section.items.map((i) => (
               <SideLink key={i.key} item={i} expanded={expanded} onNavigate={onNavigate} />
             ))}
-          </>
-        ) : null}
+          </Fragment>
+        ))}
       </nav>
     </>
   )

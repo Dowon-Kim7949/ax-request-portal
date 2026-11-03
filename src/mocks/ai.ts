@@ -1,8 +1,11 @@
 /**
- * Deterministic stand-ins for the two AI jobs. A real backend replaces these
+ * Deterministic stand-ins for the AI jobs. A real backend replaces these
  * with model calls; the shapes they return are the contract. The text is
  * written in the request's language (Accept-Language), like a model would.
+ * Token usage is simulated in each provider's own report format, so the
+ * normalization in src/domain/ai.ts runs on the same shapes as in production.
  */
+import type { AiProvider, AiTask, RawUsage } from '../domain/ai'
 import type {
   FeasibilityReport,
   Project,
@@ -209,7 +212,6 @@ export function finishWork(
     },
     wikiChanges: { docs: wikiDocs.slice(0, 1), pendingReview: true },
     summary: summaryParts.join(' '),
-    costKrw: 1800 + 900 * criteria + 300 * prev.attempt,
   }
 
   const sources = req.report?.evidence.wikiDocs ?? []
@@ -222,10 +224,83 @@ export function finishWork(
   return { work, regression }
 }
 
-/** Approximate cost in KRW of writing one report (heavy model). */
-export function reportCost(req: WorkRequest): number {
-  return 400 + 150 * req.acceptanceCriteria.length + 100 * req.targetIds.length
+/* ------------------------------------------------------------------ */
+/* Token usage                                                         */
+/* ------------------------------------------------------------------ */
+
+export interface UsageShape {
+  /** Varies the numbers between requests; the request id is enough */
+  seed: number
+  criteria: number
+  targets: number
+  /** 1 for the first run or report revision */
+  attempt: number
 }
 
-/** Approximate cost in KRW of one submission check (light model). */
-export const PRECHECK_COST_KRW = 1
+/** Small deterministic jitter in [0.9, 1.1]. */
+function jitter(seed: number, salt: number): number {
+  const x = Math.sin(seed * 12.9898 + salt * 78.233) * 43758.5453
+  return 0.9 + (x - Math.floor(x)) * 0.2
+}
+
+/**
+ * Token counts for one AI job, as the provider reports them. precheck and
+ * report are single model API calls; work is a whole coding-agent run
+ * (Claude Code reports Anthropic usage; Codex reports per-turn usage that is
+ * summed here). Cache reads dominate agent runs, as in practice.
+ */
+export function simulateUsage(task: AiTask, provider: AiProvider, s: UsageShape): RawUsage {
+  const j = (salt: number, n: number) => Math.round(n * jitter(s.seed + s.attempt, salt))
+  const sizes = {
+    precheck: { fresh: 700 + 60 * s.criteria, cached: 1_800, written: 0, output: 160 + 40 * s.criteria },
+    report: {
+      fresh: 5_000 + 1_500 * s.targets + 800 * s.criteria,
+      cached: s.attempt > 1 ? 26_000 : 2_000,
+      written: s.attempt > 1 ? 1_500 : 24_000,
+      output: 2_000 + 350 * s.criteria,
+    },
+    work: {
+      fresh: 30_000 + 12_000 * s.criteria,
+      cached: 800_000 + 250_000 * s.criteria + 150_000 * (s.attempt - 1),
+      written: 50_000 + 10_000 * s.criteria,
+      output: 16_000 + 6_000 * s.criteria,
+    },
+  }[task]
+  const fresh = j(1, sizes.fresh)
+  const cached = j(2, sizes.cached)
+  const written = j(3, sizes.written)
+  const output = j(4, sizes.output)
+  if (provider === 'anthropic') {
+    return {
+      provider,
+      usage: {
+        input_tokens: fresh,
+        cache_read_input_tokens: cached,
+        cache_creation_input_tokens: written,
+        output_tokens: output,
+      },
+    }
+  }
+  const reasoning = Math.round(output * (task === 'precheck' ? 0.25 : 0.4))
+  if (task === 'work') {
+    return {
+      provider: 'codex',
+      usage: {
+        input_tokens: fresh + cached + written,
+        cached_input_tokens: cached,
+        cache_write_input_tokens: written,
+        output_tokens: output,
+        reasoning_output_tokens: reasoning,
+      },
+    }
+  }
+  return {
+    provider,
+    usage: {
+      input_tokens: fresh + cached + written,
+      input_tokens_details: { cached_tokens: cached, cache_write_tokens: written },
+      output_tokens: output,
+      output_tokens_details: { reasoning_tokens: reasoning },
+    },
+  }
+}

@@ -18,4 +18,19 @@ describe('appConfig', () => {
     }
     expect(AppConfigSchema.safeParse(nobodyManagesUsers).success).toBe(false)
   })
+
+  it('refuses a configuration where nobody runs AI operations', () => {
+    const noOperator = { ...appConfig, enabledRoles: ['requester', 'executive', 'developer', 'admin'] }
+    expect(AppConfigSchema.safeParse(noOperator).success).toBe(false)
+
+    // Without the operator role, an admin can take the operator's permissions.
+    const adminRunsAi = {
+      ...noOperator,
+      rolePermissions: {
+        ...DEFAULT_ROLE_PERMISSIONS,
+        admin: [...DEFAULT_ROLE_PERMISSIONS.admin, ...DEFAULT_ROLE_PERMISSIONS.operator],
+      },
+    }
+    expect(AppConfigSchema.safeParse(adminRunsAi).success).toBe(true)
+  })
 })

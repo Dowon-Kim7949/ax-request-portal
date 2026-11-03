@@ -39,7 +39,8 @@ The landing page at `/` (authentication only, no extra permission). It shows wha
 | Dashboard call-to-action | `dashboard:view` | Link to `/dashboard`. |
 | `DeveloperSection` | `request:review` | Up to six requests whose turn is the developer's (`turnOf(status) === 'developer'`), with requester names; "see all" goes to `/work`. |
 | `RequesterSection` | `request:create` and not `request:review` | Count of open requests (link to `/requests`), "your turn" cards (`turnOf === 'requester'`), active projects that start a request at `/requests/new?project=<id>`, and a new-request button. |
-| `AdminSection` | any of `project:manage`, `user:manage`, `budget:manage` | Links to the admin pages the user may open. |
+| `AdminSection` | `project:manage` or `user:manage` | Links to the admin pages the user may open. |
+| `OpsSection` | any of `usage:view`, `agent:manage`, `budget:manage` | This month's AI cost against the monthly limit (with `usage:view`, from `GET /ai/usage`) and links to the AI operations pages ([AI Operations](13_ops.md)). |
 
 Developers and admins therefore never see the requester section.
 

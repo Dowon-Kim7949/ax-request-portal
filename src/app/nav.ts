@@ -1,12 +1,15 @@
 import {
+  Bot,
   CalendarDays,
   ChartColumn,
+  ChartPie,
   ClipboardList,
   FolderGit2,
   House,
   ListChecks,
   ShieldCheck,
   SquarePen,
+  Tags,
   Users,
   Wallet,
   type LucideIcon,
@@ -23,14 +26,20 @@ export type NavKey =
   | 'dashboard'
   | 'projects'
   | 'users'
+  | 'aiUsage'
+  | 'aiAgents'
+  | 'aiPricing'
   | 'budget'
+
+export type NavGroup = 'main' | 'admin' | 'ops'
 
 export interface NavItem {
   key: NavKey
   to: string
   icon: LucideIcon
   permission?: Permission
-  group: 'main' | 'admin'
+  /** Sidebar section: the organization's admin and the service's AI operations are separate jobs */
+  group: NavGroup
   /** Match the path exactly (for "/") */
   end?: boolean
 }
@@ -66,14 +75,27 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'dashboard', to: '/dashboard', icon: ChartColumn, permission: 'dashboard:view', group: 'main' },
   { key: 'projects', to: '/admin/projects', icon: FolderGit2, permission: 'project:manage', group: 'admin' },
   { key: 'users', to: '/admin/users', icon: Users, permission: 'user:manage', group: 'admin' },
-  { key: 'budget', to: '/admin/budget', icon: Wallet, permission: 'budget:manage', group: 'admin' },
+  { key: 'aiUsage', to: '/ops/usage', icon: ChartPie, permission: 'usage:view', group: 'ops' },
+  { key: 'aiAgents', to: '/ops/agents', icon: Bot, permission: 'agent:manage', group: 'ops' },
+  { key: 'aiPricing', to: '/ops/pricing', icon: Tags, permission: 'agent:manage', group: 'ops' },
+  { key: 'budget', to: '/ops/budget', icon: Wallet, permission: 'budget:manage', group: 'ops' },
 ]
 
 /**
  * Phone tab bar: the four most useful items for this user, in this order.
  * Everything else lives in the "more" sheet.
  */
-const PHONE_PRIORITY: NavKey[] = ['home', 'assigned', 'dashboard', 'newRequest', 'myRequests', 'schedule']
+const PHONE_PRIORITY: NavKey[] = [
+  'home',
+  'assigned',
+  'dashboard',
+  'newRequest',
+  'myRequests',
+  'schedule',
+  'aiUsage',
+  'aiAgents',
+  'budget',
+]
 
 export function visibleNav(can: (p: Permission) => boolean): NavItem[] {
   return NAV_ITEMS.filter((i) => !i.permission || can(i.permission))

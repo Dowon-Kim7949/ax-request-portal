@@ -17,6 +17,11 @@ export function serverLanguage(header: string | null | undefined): ServerLanguag
 type Params = Record<string, string | number>
 type Text = string | ((p: Params) => string)
 
+/** Brand names are not translated. */
+function providerName(provider: string | number | undefined): string {
+  return provider === 'anthropic' ? 'Anthropic(Claude)' : provider === 'openai' ? 'OpenAI' : String(provider)
+}
+
 const ERRORS = {
   ko: {
     forbidden: '이 작업을 할 권한이 없습니다.',
@@ -28,7 +33,14 @@ const ERRORS = {
     needAllPassed: '모든 완료 기준이 통과해야 완료할 수 있습니다.',
     needOneFailed: '안 되는 완료 기준을 하나 이상 표시해 주세요.',
     requestBudgetExceeded: (p) =>
-      `이 요청의 AI 비용이 요청당 한도(${Number(p.limit).toLocaleString('ko-KR')}원)에 도달해 AI 작업을 더 실행할 수 없습니다. 관리자가 한도를 올리거나 직접 처리해 주세요.`,
+      `이 요청의 AI 비용이 요청당 한도(${Number(p.limit).toLocaleString('ko-KR')}원)에 도달해 AI 작업을 더 실행할 수 없습니다. 운영자가 한도를 올리거나 직접 처리해 주세요.`,
+    operatorProvisioned: '운영자 계정은 서비스가 관리합니다. 여기서 만들거나 바꿀 수 없습니다.',
+    providerNotConnected: (p) =>
+      `${providerName(p.provider)}가 연결되어 있지 않습니다. 먼저 API 키를 등록해 주세요.`,
+    modelNotPriced: (p) => `단가표에 없는 모델입니다: ${p.model}`,
+    providerInUse: (p) =>
+      `${providerName(p.provider)}를 쓰는 작업이나 프로젝트가 있어 연결을 끊을 수 없습니다. 먼저 다른 모델로 바꿔 주세요.`,
+    modelInUse: (p) => `지금 쓰고 있는 모델(${p.model})은 단가표에서 뺄 수 없습니다.`,
     requesterOnlyVerify: '요청자만 결과를 확인할 수 있습니다.',
     notInVerification: '지금은 결과 확인 단계가 아닙니다.',
     developerOnlyRegression: '담당 개발자만 기록할 수 있습니다.',
@@ -58,7 +70,14 @@ const ERRORS = {
     needAllPassed: 'Every acceptance criterion must pass before you confirm.',
     needOneFailed: 'Mark at least one acceptance criterion as not working.',
     requestBudgetExceeded: (p) =>
-      `This request has used its per-request AI budget (₩${Number(p.limit).toLocaleString('en-US')}), so AI work cannot run again. Ask an admin to raise the limit, or handle it by hand.`,
+      `This request has used its per-request AI budget (₩${Number(p.limit).toLocaleString('en-US')}), so AI work cannot run again. Ask an operator to raise the limit, or handle it by hand.`,
+    operatorProvisioned:
+      'Operator accounts are managed by the service and cannot be created or changed here.',
+    providerNotConnected: (p) => `${providerName(p.provider)} is not connected. Add its API key first.`,
+    modelNotPriced: (p) => `This model is not in the price table: ${p.model}`,
+    providerInUse: (p) =>
+      `A task or project still uses ${providerName(p.provider)}, so it cannot be disconnected. Switch them to another model first.`,
+    modelInUse: (p) => `A model in use (${p.model}) cannot be removed from the price table.`,
     requesterOnlyVerify: 'Only the requester can check the result.',
     notInVerification: 'The request is not waiting for a result check.',
     developerOnlyRegression: 'Only the responsible developer can record this.',

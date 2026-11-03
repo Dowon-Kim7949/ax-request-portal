@@ -38,7 +38,7 @@ The `/login` screen: e-mail and password sign-in plus, in mock mode, one-click d
 1. If a token already exists the page navigates away immediately.
 2. The form (react-hook-form + zod) validates the e-mail inline; a server error is shown in a `role="alert"` paragraph with the localized server message.
 3. On success it navigates to `next` with `replace`. `safeNext` accepts only paths that start with `/` and not `//`, so `?next=` cannot redirect to another site.
-4. Demo accounts (mock mode only) are one button per role — requester, executive, developer, admin — labelled with the role, name and team. The hint shows the shared demo password. Buttons are disabled while a login is in flight.
+4. Demo accounts (mock mode only) are one button per role — requester, executive, developer, admin, operator (`operator@example.com`) — labelled with the role, name and team. The hint shows the shared demo password. Buttons are disabled while a login is in flight.
 
 ## Demo data and language
 

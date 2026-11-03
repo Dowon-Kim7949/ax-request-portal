@@ -13,7 +13,7 @@ import type { TransitionCommand } from '../domain/lifecycle'
 import type { RequestStatus, WorkRequest } from '../domain/model'
 import { useSession } from '../stores/session'
 import { call } from './client'
-import { api, type BodyOf, type QueryOf } from './contract'
+import { api, type BodyOf, type ParamsOf, type QueryOf } from './contract'
 
 export const keys = {
   all: ['api'] as const,
@@ -29,6 +29,9 @@ export const keys = {
   dashboard: (month?: string) => [...keys.all, 'dashboard', month ?? 'current'] as const,
   releases: (from?: string, to?: string) => [...keys.all, 'releases', from, to] as const,
   budget: () => [...keys.all, 'budget'] as const,
+  aiSettings: () => [...keys.all, 'ai', 'settings'] as const,
+  aiPricing: () => [...keys.all, 'ai', 'pricing'] as const,
+  aiUsage: (month?: string) => [...keys.all, 'ai', 'usage', month ?? 'current'] as const,
 }
 
 /** Statuses in which the AI is working, so the screen should refresh by itself. */
@@ -126,6 +129,31 @@ export function useReleases(from?: string, to?: string) {
 
 export function useBudget() {
   return useQuery({ queryKey: keys.budget(), queryFn: ({ signal }) => call(api.getBudget, { signal }) })
+}
+
+export function useAiSettings() {
+  return useQuery({
+    queryKey: keys.aiSettings(),
+    queryFn: ({ signal }) => call(api.getAiSettings, { signal }),
+  })
+}
+
+/** The price table; `enabled: false` for people who may not read it (they fall back to the defaults). */
+export function useAiPricing(options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: keys.aiPricing(),
+    queryFn: ({ signal }) => call(api.getAiPricing, { signal }),
+    enabled: options.enabled ?? true,
+    staleTime: 60_000,
+  })
+}
+
+export function useAiUsage(month?: string) {
+  return useQuery({
+    queryKey: keys.aiUsage(month),
+    queryFn: ({ signal }) => call(api.aiUsage, { query: { month }, signal }),
+    placeholderData: keepPreviousData,
+  })
 }
 
 /* ------------------------------------------------------------------ */
@@ -271,6 +299,48 @@ export function useUpdateBudget() {
     onSuccess: (budget) => {
       qc.setQueryData(keys.budget(), budget)
       void qc.invalidateQueries({ queryKey: [...keys.all, 'dashboard'] })
+      void qc.invalidateQueries({ queryKey: [...keys.all, 'ai', 'usage'] })
+    },
+  })
+}
+
+export function useUpdateAiSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: BodyOf<typeof api.updateAiSettings>) => call(api.updateAiSettings, { body }),
+    onSuccess: (settings) => qc.setQueryData(keys.aiSettings(), settings),
+  })
+}
+
+export function useSetProviderKey() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      provider,
+      apiKey,
+    }: ParamsOf<typeof api.setProviderKey> & BodyOf<typeof api.setProviderKey>) =>
+      call(api.setProviderKey, { params: { provider }, body: { apiKey } }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.aiSettings() }),
+  })
+}
+
+export function useRemoveProviderKey() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (provider: ParamsOf<typeof api.removeProviderKey>['provider']) =>
+      call(api.removeProviderKey, { params: { provider } }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.aiSettings() }),
+  })
+}
+
+export function useUpdateAiPricing() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: BodyOf<typeof api.updateAiPricing>) => call(api.updateAiPricing, { body }),
+    onSuccess: (pricing) => {
+      qc.setQueryData(keys.aiPricing(), pricing)
+      // The usage report shows the current rate and price date.
+      void qc.invalidateQueries({ queryKey: [...keys.all, 'ai', 'usage'] })
     },
   })
 }

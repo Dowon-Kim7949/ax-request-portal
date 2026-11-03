@@ -58,6 +58,7 @@ The page computes two things and lets them decide everything:
 | `technical` and regression checks exist | `RegressionChecks` (editable when responsible and not terminal) |
 | `technical` and type is not `non_code` | `ReportPanel` |
 | responsible developer and status is release-editable | `ReleasePanel`, otherwise the read-only release card |
+| `technical` and the response carries `aiUsage` | `AiUsageCard` — spent vs. the per-request limit and every AI call with model, runtime, tokens and estimated cost |
 | always | request content and `Timeline` |
 
 "Responsible" (`isResponsibleDeveloper`) means holding `request:review` and being an admin, the assignee or a project owner. Back navigation goes to `/requests` for the requester, `/work` for reviewers and `/` otherwise. A non-numeric id or a 404 renders the not-found page.
@@ -75,6 +76,7 @@ Requester commands: `provideInfo { answer }`, `reportIssue { checks, note? }` (n
 ## Evidence
 
 - `src/features/detail/request-detail-page.tsx#symbol:RequestDetailPage` — the placement table above.
+- `src/features/detail/ai-usage-card.tsx#symbol:AiUsageCard` — AI usage of the request; the server attaches `aiUsage` only for `report:read` (`src/mocks/engine.ts#symbol:present`).
 - `src/features/detail/requester-panels.tsx#symbol:InfoAnswerCard`, `src/features/detail/requester-panels.tsx#symbol:VerificationCard`, `src/features/detail/requester-panels.tsx#symbol:StatusExplainer` — requester panels.
 - `src/domain/lifecycle.ts#symbol:availableEvents`, `src/domain/lifecycle.ts#symbol:isResponsibleDeveloper`, `src/domain/lifecycle.ts#symbol:TransitionCommand` — rules the page relies on.
 - `src/api/queries.ts#symbol:useRequest`, `src/api/queries.ts#symbol:useTransition`, `src/api/queries.ts#symbol:useSaveVerification` — API calls.

@@ -20,7 +20,7 @@ export const appConfig: AppConfig = AppConfigSchema.parse({
   },
   locales: ['ko', 'en'],
   defaultLocale: 'ko',
-  enabledRoles: ['requester', 'executive', 'developer', 'admin'],
+  enabledRoles: ['requester', 'executive', 'developer', 'admin', 'operator'],
   rolePermissions: DEFAULT_ROLE_PERMISSIONS,
   requestTypes: ['new_feature', 'change', 'bug', 'copy_design', 'non_code'],
   mock: {

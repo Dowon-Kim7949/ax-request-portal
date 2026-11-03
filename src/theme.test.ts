@@ -76,6 +76,8 @@ const PAIRS: Array<[string, string, number]> = [
   ['ai-600', 'surface', UI],
   ['warning-600', 'surface', UI],
   ['brand-500', 'surface', UI],
+  ['provider-anthropic', 'surface', UI],
+  ['provider-openai', 'surface', UI],
 ]
 
 describe.each(Object.entries(THEMES))('%s theme contrast', (_name, t) => {

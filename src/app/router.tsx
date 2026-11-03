@@ -62,7 +62,12 @@ export const routes: RouteObject[] = [
       { path: 'dashboard', ...page(() => import('@/features/dashboard/dashboard-page'), 'dashboard:view') },
       { path: 'admin/projects', ...page(() => import('@/features/admin/projects-page'), 'project:manage') },
       { path: 'admin/users', ...page(() => import('@/features/admin/users-page'), 'user:manage') },
-      { path: 'admin/budget', ...page(() => import('@/features/admin/budget-page'), 'budget:manage') },
+      // The AI budget moved to the operator's screens; keep old bookmarks working.
+      { path: 'admin/budget', element: <Navigate to="/ops/budget" replace /> },
+      { path: 'ops/usage', ...page(() => import('@/features/ops/usage-page'), 'usage:view') },
+      { path: 'ops/agents', ...page(() => import('@/features/ops/agents-page'), 'agent:manage') },
+      { path: 'ops/pricing', ...page(() => import('@/features/ops/pricing-page'), 'agent:manage') },
+      { path: 'ops/budget', ...page(() => import('@/features/ops/budget-page'), 'budget:manage') },
       { path: 'notifications', ...page(() => import('@/features/notifications/notifications-page')) },
       { path: 'settings', ...page(() => import('@/features/settings/settings-page')) },
       { path: 'settings/notifications', element: <Navigate to="/settings" replace /> },

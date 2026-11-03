@@ -198,8 +198,8 @@ describe('visibility and permissions', () => {
     await expectApiError(call(api.updateUser, { params: { id: 'u-han' }, body: { role: 'requester' } }), 400)
   })
 
-  it('keeps the budget screen to budget managers', async () => {
-    await loginAs('admin@example.com')
+  it('keeps the budget screen to the operator', async () => {
+    await loginAs('operator@example.com')
     const budget = await call(api.getBudget)
     expect(budget.monthlyLimitKrw).toBe(500_000)
     const updated = await call(api.updateBudget, {
@@ -209,18 +209,21 @@ describe('visibility and permissions', () => {
 
     await loginAs('dev1@example.com')
     await expectApiError(call(api.getBudget), 403)
+    // An organization admin manages people and projects, not the AI budget.
+    await loginAs('admin@example.com')
+    await expectApiError(call(api.getBudget), 403)
   })
 })
 
 describe('AI budget', () => {
   const DEFAULT_BUDGET = { monthlyLimitKrw: 500_000, perRequestLimitKrw: 20_000, alertThresholdPct: 80 }
   afterAll(async () => {
-    await loginAs('admin@example.com')
+    await loginAs('operator@example.com')
     await call(api.updateBudget, { body: DEFAULT_BUDGET })
   })
 
   it('refuses AI work once a request has spent its per-request limit', async () => {
-    await loginAs('admin@example.com')
+    await loginAs('operator@example.com')
     // The feasibility report alone costs more than 1 KRW.
     await call(api.updateBudget, { body: { ...DEFAULT_BUDGET, perRequestLimitKrw: 1 } })
 
@@ -238,7 +241,7 @@ describe('AI budget', () => {
     expect((await call(api.getRequest, { params: { id } })).status).toBe('review')
 
     // 0 means no per-request limit.
-    await loginAs('admin@example.com')
+    await loginAs('operator@example.com')
     await call(api.updateBudget, { body: { ...DEFAULT_BUDGET, perRequestLimitKrw: 0 } })
     await loginAs('dev1@example.com')
     const started = await call(api.transitionRequest, { params: { id }, body: { event: 'runWork' } })
@@ -246,9 +249,124 @@ describe('AI budget', () => {
   })
 
   it('gives the dashboard the budget alert threshold', async () => {
-    await loginAs('admin@example.com')
+    await loginAs('operator@example.com')
     await call(api.updateBudget, { body: { ...DEFAULT_BUDGET, alertThresholdPct: 65 } })
+    await loginAs('ceo@example.com')
     const summary = await call(api.dashboard, { query: {} })
     expect(summary.aiAlertThresholdPct).toBe(65)
+  })
+})
+
+describe('AI operations', () => {
+  it('books each AI job with the provider, model and agent the project uses', async () => {
+    await loginAs('planner@example.com')
+    const onClaude = await call(api.createRequest, { body: draft })
+    const onOpenAi = await call(api.createRequest, {
+      body: { ...draft, projectId: 'p-data', targetIds: ['t-report-api'] },
+    })
+    t.advance(6)
+
+    await loginAs('dev1@example.com')
+    const claude = await call(api.getRequest, { params: { id: onClaude.id } })
+    expect(claude.report?.generatedBy).toEqual({ provider: 'anthropic', model: 'claude-opus-5-5' })
+    const report = claude.aiUsage?.entries.find((e) => e.task === 'report')
+    expect(report).toMatchObject({ provider: 'anthropic', runtime: 'api', requestId: onClaude.id })
+    expect(report!.costKrw).toBeGreaterThan(0)
+    expect(claude.aiUsage?.spentKrw).toBeCloseTo(report!.costKrw, 2)
+
+    await loginAs('dev2@example.com')
+    await call(api.transitionRequest, { params: { id: onOpenAi.id }, body: { event: 'runWork' } })
+    t.advance(20)
+    const openai = await call(api.getRequest, { params: { id: onOpenAi.id } })
+    expect(openai.work?.agent).toEqual({ provider: 'openai', model: 'gpt-6.1-sol', runtime: 'codex' })
+    const work = openai.aiUsage?.entries.find((e) => e.task === 'work')
+    expect(work).toMatchObject({ provider: 'openai', runtime: 'codex' })
+    expect(work!.tokens.cacheRead).toBeGreaterThan(work!.tokens.input)
+    expect(openai.work?.costKrw).toBe(work!.costKrw)
+  })
+
+  it('shows request cost to engineering viewers only', async () => {
+    await loginAs('planner@example.com')
+    const mine = await call(api.listRequests, { query: { scope: 'mine' } })
+    const req = await call(api.getRequest, { params: { id: mine[0]!.id } })
+    expect(req.aiUsage).toBeUndefined()
+  })
+
+  it('lets the operator choose models and connect providers, keeping keys write-only', async () => {
+    await loginAs('operator@example.com')
+    const settings = await call(api.getAiSettings)
+    expect(settings.providers.every((p) => p.connected)).toBe(true)
+
+    const key = 'sk-test-0123456789abcd'
+    const saved = await call(api.setProviderKey, { params: { provider: 'openai' }, body: { apiKey: key } })
+    expect(saved).toMatchObject({ provider: 'openai', connected: true, keyHint: 'abcd' })
+    expect(JSON.stringify(saved)).not.toContain(key)
+    expect(JSON.stringify(await call(api.getAiSettings))).not.toContain(key)
+
+    // A provider still in use cannot be disconnected.
+    await expectApiError(call(api.removeProviderKey, { params: { provider: 'openai' } }), 409, 'guard_failed')
+
+    // Move everything to Claude, then OpenAI can go; selecting it again is refused.
+    const updated = await call(api.updateAiSettings, {
+      body: { defaults: settings.defaults, projectOverrides: [] },
+    })
+    expect(updated.projectOverrides).toEqual([])
+    await call(api.removeProviderKey, { params: { provider: 'openai' } })
+    await expectApiError(
+      call(api.updateAiSettings, {
+        body: {
+          defaults: { ...settings.defaults, report: { provider: 'openai', model: 'gpt-6.1-sol' } },
+          projectOverrides: [],
+        },
+      }),
+      400,
+      'bad_request',
+    )
+
+    // Restore the seed configuration for later tests.
+    await call(api.setProviderKey, { params: { provider: 'openai' }, body: { apiKey: key } })
+    await call(api.updateAiSettings, {
+      body: { defaults: settings.defaults, projectOverrides: settings.projectOverrides },
+    })
+  })
+
+  it('keeps models in use in the price table and prices new usage only', async () => {
+    await loginAs('operator@example.com')
+    const pricing = await call(api.getAiPricing)
+    const withoutOpus = { ...pricing, models: pricing.models.filter((m) => m.model !== 'claude-opus-5-5') }
+    await expectApiError(call(api.updateAiPricing, { body: withoutOpus }), 409, 'guard_failed')
+
+    const before = await call(api.aiUsage, { query: {} })
+    const doubled = await call(api.updateAiPricing, { body: { ...pricing, usdKrw: pricing.usdKrw * 2 } })
+    expect(doubled.usdKrw).toBe(pricing.usdKrw * 2)
+    // Booked entries keep the rate they were booked at.
+    expect((await call(api.aiUsage, { query: {} })).totalKrw).toBe(before.totalKrw)
+    await call(api.updateAiPricing, { body: pricing })
+  })
+
+  it('reports usage by provider, model, task and request for the month', async () => {
+    await loginAs('operator@example.com')
+    const report = await call(api.aiUsage, { query: {} })
+    expect(report.calls).toBeGreaterThan(0)
+    expect(report.byProvider.map((p) => p.provider).sort()).toEqual(['anthropic', 'openai'])
+    const sum = (rows: Array<{ costKrw: number }>) => rows.reduce((n, r) => n + r.costKrw, 0)
+    // Groups are rounded separately, so allow one won per group.
+    expect(Math.abs(sum(report.byProvider) - report.totalKrw)).toBeLessThanOrEqual(report.byProvider.length)
+    expect(Math.abs(sum(report.byTask) - report.totalKrw)).toBeLessThanOrEqual(report.byTask.length)
+    expect(report.topRequests.length).toBeLessThanOrEqual(10)
+  })
+
+  it('keeps AI operations to the operator, and the operator out of requests', async () => {
+    await loginAs('admin@example.com')
+    await expectApiError(call(api.getAiSettings), 403)
+    await expectApiError(call(api.aiUsage, { query: {} }), 403)
+    await expectApiError(
+      call(api.createUser, { body: { name: 'Op', email: 'op2@example.com', role: 'operator' } }),
+      403,
+    )
+    await expectApiError(call(api.updateUser, { params: { id: 'u-yoon' }, body: { active: false } }), 403)
+
+    await loginAs('operator@example.com')
+    await expectApiError(call(api.listRequests, { query: { scope: 'all' } }), 403)
   })
 })

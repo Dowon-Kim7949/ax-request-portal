@@ -23,7 +23,8 @@ const ROUTES = {
   ],
   담당자: ['/work', '/work/regression', '/requests/1024', '/requests/1026'],
   경영진: ['/dashboard'],
-  관리자: ['/admin/projects', '/admin/users', '/admin/budget'],
+  관리자: ['/admin/projects', '/admin/users'],
+  운영자: ['/', '/ops/usage', '/ops/agents', '/ops/pricing', '/ops/budget'],
 } as const
 
 async function settle(page: Page) {
@@ -71,7 +72,8 @@ test.describe('small phone in English', () => {
     ],
     Developer: ['/work', '/requests/1024', '/requests/1026'],
     Executive: ['/dashboard'],
-    Admin: ['/admin/projects', '/admin/users', '/admin/budget'],
+    Admin: ['/admin/projects', '/admin/users'],
+    Operator: ['/', '/ops/usage', '/ops/agents', '/ops/pricing', '/ops/budget'],
   } as const
 
   for (const [role, routes] of Object.entries(EN_ROUTES)) {

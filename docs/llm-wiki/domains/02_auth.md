@@ -54,16 +54,17 @@ Who the user is and what they may do: the session, the auth and permission guard
 
 ## Roles and permissions
 
-`DEFAULT_ROLE_PERMISSIONS` maps four roles to eleven permissions; `appConfig.rolePermissions` may override it, and `useCan` reads the effective table.
+`DEFAULT_ROLE_PERMISSIONS` maps five roles to thirteen permissions; `appConfig.rolePermissions` may override it, and `useCan` reads the effective table.
 
 | Role | Permissions |
 | --- | --- |
 | `requester` | `request:create`, `request:read:own`, `schedule:view` |
 | `executive` | requester's + `request:read:all`, `dashboard:view` |
 | `developer` | `request:create`, `request:read:own`, `request:read:all`, `request:review`, `report:read`, `regression:view`, `schedule:view` |
-| `admin` | all, including `project:manage`, `user:manage`, `budget:manage` |
+| `admin` | all except `OPERATOR_PERMISSIONS`, including `project:manage`, `user:manage` |
+| `operator` | `OPERATOR_PERMISSIONS`: `budget:manage`, `agent:manage`, `usage:view` — the service's AI operations, no request permissions ([AI Operations](13_ops.md)) |
 
-The config schema refuses a configuration without `admin` or without any active role holding `user:manage`.
+The config schema refuses a configuration without `admin`, or without an enabled role holding `user:manage`, `agent:manage` or `budget:manage`. Operator accounts are provisioned by the service; an admin cannot create or change one (403 `operatorProvisioned`).
 
 ## API Services
 

@@ -15,19 +15,15 @@ source_files:
 evidence:
   - src/features/admin/projects-page.tsx#symbol:ProjectsPage
   - src/features/admin/users-page.tsx#symbol:UsersPage
-  - src/features/admin/budget-page.tsx#symbol:BudgetPage
   - src/api/queries.ts#symbol:useSaveProject
-  - src/api/queries.ts#symbol:useUpdateBudget
   - src/mocks/engine.ts#symbol:saveProject
+  - src/mocks/engine.ts#symbol:createUser
   - src/mocks/engine.ts#symbol:updateUser
-  - src/mocks/engine.ts#symbol:budget
-  - src/mocks/engine.ts#symbol:requestSpentKrw
-  - src/mocks/copy.ts#symbol:requestBudgetExceeded
-  - src/mocks/api.test.ts#L215-L254
   - src/domain/roles.ts#symbol:DEFAULT_ROLE_PERMISSIONS
 related:
   - docs/llm-wiki/domains/00_overview.md
   - docs/llm-wiki/domains/03_dashboard.md
+  - docs/llm-wiki/domains/13_ops.md
   - docs/llm-wiki/DOMAIN_FEATURES.md
 visibility: public
 contains_sensitive_info: false
@@ -37,19 +33,17 @@ contains_sensitive_info: false
 
 ## Responsibility
 
-Administration of the three things the request workflow depends on: projects (repositories, owners, change targets), users (role and active flag) and the monthly AI budget. Each screen has its own permission, and by default only the `admin` role holds all three.
+Administration of the organization's side of the workflow: projects (repositories, owners, change targets) and users (role and active flag). Each screen has its own permission; by default the `admin` role holds both. The AI side of the service (providers, models, prices, budget, usage) belongs to the `operator` role and is documented in [AI Operations](13_ops.md); `/admin/budget` now redirects to `/ops/budget`.
 
 | Route | Page | Permission |
 | --- | --- | --- |
 | `/admin/projects` | `ProjectsPage` | `project:manage` |
 | `/admin/users` | `UsersPage` | `user:manage` |
-| `/admin/budget` | `BudgetPage` | `budget:manage` |
 
 ## Workflows
 
 - **Projects**: list plus an edit sheet (`editing` is a project, `'new'` or `null`). Fields: name, description, icon, repository (`provider` + URL), wiki path (default `docs/llm-wiki`), owners, targets (name + wiki document) and an active switch. Owner candidates are active developers and admins only. The provider decides whether review links say MR (GitLab) or PR (GitHub).
-- **Users**: one row per user with a role select (`appConfig.enabledRoles`) and an active toggle; invitations open a sheet. An admin cannot change their own role or deactivate themselves: the controls are disabled with a `title`, and the server rejects it too.
-- **Budget**: spending this month, a `Meter` against the monthly limit, spending per model tier (light / heavy) and a limit form. An "over" badge appears once spending reaches `alertThresholdPct`; the dashboard's AI-cost tile uses the same threshold.
+- **Users**: one row per user with a role select and an active toggle; invitations open a sheet. The select offers `appConfig.enabledRoles` minus `operator`. An admin cannot change their own role or deactivate themselves, and cannot change an operator's row: the controls are disabled with a `title`, an operator row also says so in visible text, and the server rejects both.
 
 ## API Services
 
@@ -59,29 +53,26 @@ Administration of the three things the request workflow depends on: projects (re
 | `useSaveProject` | `POST /projects` or `PUT /projects/{id}` (chosen by presence of `id`) | `ProjectInput` (name 1–60, description ≤ 300, repository, ≥ 1 owner, targets with optional id) → `Project` | Server: owners must be developers/admins (`ownersMustBeDevelopers`, 400), unknown id 404, missing target ids are generated. Invalidates projects. |
 | `useCreateUser` | `POST /users` | `UserCreate { name, email, role, team? }` → `User` | Duplicate e-mail → 400 `emailTaken`. Invalidates users. |
 | `useUpdateUser` | `PATCH /users/{id}` | `UserPatch { role?, team?, active? }` → `User` | Self-change → 400 `cannotChangeSelf`. Invalidates users. |
-| `useBudget` | `GET /budget` | → `Budget { month, monthlyLimitKrw, perRequestLimitKrw, alertThresholdPct, spentKrw, byModel[] }` | Inline `ErrorState` with retry. |
-| `useUpdateBudget` | `PUT /budget` | `BudgetInput { monthlyLimitKrw, perRequestLimitKrw, alertThresholdPct 1–100 }` → `Budget` | Writes the budget into the cache and invalidates the dashboard. |
+
+Creating a user with the `operator` role, or changing an operator, is refused with 403 `operatorProvisioned` (`createUser`, `updateUser`).
 
 All calls carry the bearer token; mutation failures show `toast.error` with the localized server message.
 
 ## Domain rules
 
-- The mock server sums AI costs per month from three sources: a finished feasibility report (heavy model), finished AI work (heavy model) and each precheck (light model). Amounts are KRW, rounded.
-- The per-request limit (`perRequestLimitKrw`) caps AI work: once the costs booked against one request (report, earlier runs, all months) reach it, starting AI work (`runWork`) or a revision run (`requestRevision`) is refused with 409 `guard_failed` and a localized `requestBudgetExceeded` message. Asking, rejecting and the requester's answer (which regenerates the report) are not blocked. `0` means no limit. The limit is checked against what was already spent, not against an estimate of the next run.
+- Operator accounts are provisioned by the service (database, seed or an identity-provider group mapped to `operator`), never by an organization admin, so an admin cannot hand themselves the AI keys or the budget.
 - Permissions are enforced twice: the route guard hides the page and the mock engine rejects the call. A real backend must do the same; hiding UI is not security.
 
 ## Evidence
 
-- `src/features/admin/projects-page.tsx#symbol:ProjectsPage`, `src/features/admin/users-page.tsx#symbol:UsersPage`, `src/features/admin/budget-page.tsx#symbol:BudgetPage` — the three screens.
-- `src/api/queries.ts#symbol:useSaveProject`, `src/api/queries.ts#symbol:useUpdateBudget` — create-or-update and budget cache handling.
-- `src/mocks/engine.ts#symbol:saveProject`, `src/mocks/engine.ts#symbol:updateUser`, `src/mocks/engine.ts#symbol:budget` — server-side rules and cost aggregation.
-- `src/mocks/engine.ts#symbol:requestSpentKrw` — per-request spending used by the limit check; `src/mocks/api.test.ts#L215-L254` ("AI budget") covers the refusal and the `0` = no limit case.
-- `src/mocks/copy.ts#symbol:requestBudgetExceeded` — the refusal message in Korean and English.
-- `src/domain/roles.ts#symbol:DEFAULT_ROLE_PERMISSIONS` — who holds the admin permissions.
+- `src/features/admin/projects-page.tsx#symbol:ProjectsPage`, `src/features/admin/users-page.tsx#symbol:UsersPage` — the two screens; `ASSIGNABLE_ROLES` in the users page leaves out `operator`.
+- `src/api/queries.ts#symbol:useSaveProject` — create-or-update.
+- `src/mocks/engine.ts#symbol:saveProject`, `src/mocks/engine.ts#symbol:createUser`, `src/mocks/engine.ts#symbol:updateUser` — server-side rules, including the `operatorProvisioned` refusal.
+- `src/domain/roles.ts#symbol:DEFAULT_ROLE_PERMISSIONS` — `admin` holds every permission except `OPERATOR_PERMISSIONS`.
 
 ## Open Questions
 
-- The developer learns about the per-request limit only when a run is refused; the request page does not show how much of it a request has used.
+- None at the moment.
 
 ## Review Notes
 

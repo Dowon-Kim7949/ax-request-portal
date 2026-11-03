@@ -1,15 +1,17 @@
-import { ChartColumn, ChevronRight, FolderGit2, Users, Wallet } from 'lucide-react'
+import { Bot, ChartColumn, ChartPie, ChevronRight, FolderGit2, Tags, Users, Wallet } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
-import { useRequests } from '@/api/queries'
+import { useAiUsage, useRequests } from '@/api/queries'
 import { useCan, useCurrentUser, useDirectory } from '@/app/hooks'
 import { usePageTitle } from '@/app/title'
 import { ProjectIcon } from '@/components/request/project-icon'
 import { RequestCard } from '@/components/request/request-card'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { Meter } from '@/components/ui/controls'
 import { EmptyState, ListSkeleton, Skeleton } from '@/components/ui/feedback'
 import { isTerminal, turnOf } from '@/domain/lifecycle'
+import { formatKrw, formatMonth } from '@/lib/format'
 
 function RequesterSection() {
   const { t } = useTranslation()
@@ -118,33 +120,105 @@ function DeveloperSection() {
   )
 }
 
+interface HomeLink {
+  to: string
+  label: string
+  icon: typeof Users
+}
+
+function LinkGrid({ links }: { links: HomeLink[] }) {
+  return (
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {links.map((l) => (
+        <Link
+          key={l.to}
+          to={l.to}
+          className="flex items-center gap-3 rounded-2xl bg-surface p-4 font-bold ring-1 ring-line hover:ring-field"
+        >
+          <span className="grid size-10 place-items-center rounded-xl bg-muted text-ink-600">
+            <l.icon className="size-5" aria-hidden />
+          </span>
+          {l.label}
+        </Link>
+      ))}
+    </div>
+  )
+}
+
 function AdminSection() {
   const { t } = useTranslation()
   const can = useCan()
   const links = [
     { to: '/admin/projects', label: t('nav.projects'), icon: FolderGit2, ok: can('project:manage') },
     { to: '/admin/users', label: t('nav.users'), icon: Users, ok: can('user:manage') },
-    { to: '/admin/budget', label: t('nav.budget'), icon: Wallet, ok: can('budget:manage') },
   ].filter((l) => l.ok)
   return (
     <section aria-labelledby="admin-links" className="flex flex-col gap-3">
       <h2 id="admin-links" className="font-bold text-ink-900">
         {t('home.adminTitle')}
       </h2>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {links.map((l) => (
-          <Link
-            key={l.to}
-            to={l.to}
-            className="flex items-center gap-3 rounded-2xl bg-surface p-4 font-bold ring-1 ring-line hover:ring-field"
-          >
-            <span className="grid size-10 place-items-center rounded-xl bg-muted text-ink-600">
-              <l.icon className="size-5" aria-hidden />
-            </span>
-            {l.label}
-          </Link>
-        ))}
-      </div>
+      <LinkGrid links={links} />
+    </section>
+  )
+}
+
+/** This month's AI spending against the monthly limit, linking to the usage dashboard. */
+function AiSpendSummary() {
+  const { t } = useTranslation()
+  const usage = useAiUsage()
+  const u = usage.data
+  const pct = u && u.monthlyLimitKrw ? (u.totalKrw / u.monthlyLimitKrw) * 100 : 0
+  return (
+    <Link
+      to="/ops/usage"
+      className="flex flex-col gap-2 rounded-2xl bg-surface px-4 py-4 ring-1 ring-line hover:ring-field"
+    >
+      <span className="flex items-center justify-between gap-3">
+        <span className="text-sm font-semibold text-ink-500">
+          {u ? t('home.opsSpend', { month: formatMonth(u.month) }) : t('nav.aiUsage')}
+        </span>
+        <span className="flex items-center text-sm font-semibold text-accent">
+          {t('home.view')}
+          <ChevronRight className="size-4" aria-hidden />
+        </span>
+      </span>
+      {u ? (
+        <>
+          <span className="text-[28px] leading-tight font-bold tracking-tight text-ink-900">
+            {formatKrw(u.totalKrw)}
+          </span>
+          {u.monthlyLimitKrw ? (
+            <>
+              <span className="text-sm text-ink-500">
+                {t('budget.of', { limit: formatKrw(u.monthlyLimitKrw) })} · {Math.round(pct)}%
+              </span>
+              <Meter value={pct} warnAt={u.alertThresholdPct} label={t('nav.aiUsage')} />
+            </>
+          ) : null}
+        </>
+      ) : (
+        <Skeleton className="h-16" />
+      )}
+    </Link>
+  )
+}
+
+function OpsSection() {
+  const { t } = useTranslation()
+  const can = useCan()
+  const links = [
+    { to: '/ops/usage', label: t('nav.aiUsage'), icon: ChartPie, ok: can('usage:view') },
+    { to: '/ops/agents', label: t('nav.aiAgents'), icon: Bot, ok: can('agent:manage') },
+    { to: '/ops/pricing', label: t('nav.aiPricing'), icon: Tags, ok: can('agent:manage') },
+    { to: '/ops/budget', label: t('nav.budget'), icon: Wallet, ok: can('budget:manage') },
+  ].filter((l) => l.ok)
+  return (
+    <section aria-labelledby="ops-links" className="flex flex-col gap-3">
+      <h2 id="ops-links" className="font-bold text-ink-900">
+        {t('home.opsTitle')}
+      </h2>
+      {can('usage:view') ? <AiSpendSummary /> : null}
+      <LinkGrid links={links} />
     </section>
   )
 }
@@ -155,7 +229,8 @@ export default function HomePage() {
   const user = useCurrentUser()
   const can = useCan()
   const reviewer = can('request:review')
-  const admin = can('project:manage') || can('user:manage') || can('budget:manage')
+  const admin = can('project:manage') || can('user:manage')
+  const ops = can('usage:view') || can('agent:manage') || can('budget:manage')
 
   return (
     <div className="flex flex-col gap-8">
@@ -180,6 +255,7 @@ export default function HomePage() {
       {reviewer ? <DeveloperSection /> : null}
       {can('request:create') && !reviewer ? <RequesterSection /> : null}
       {admin ? <AdminSection /> : null}
+      {ops ? <OpsSection /> : null}
     </div>
   )
 }

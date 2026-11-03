@@ -15,6 +15,7 @@ import { ErrorState, Skeleton } from '@/components/ui/feedback'
 import { appConfig } from '@/config/app.config'
 import { availableEvents, isResponsibleDeveloper, isTerminal } from '@/domain/lifecycle'
 import { formatDate } from '@/lib/format'
+import { AiUsageCard } from './ai-usage-card'
 import { DecisionCard, RegressionChecks, ReleasePanel, ReportPanel, WorkPanel } from './developer-panels'
 import { ReleaseCard, RequestContent } from './request-content'
 import { CancelRequest, InfoAnswerCard, StatusExplainer, VerificationCard } from './requester-panels'
@@ -188,6 +189,7 @@ export default function RequestDetailPage() {
           ) : (
             <ReleaseCard request={request} />
           )}
+          {technical && request.aiUsage ? <AiUsageCard usage={request.aiUsage} /> : null}
           <Card>
             <CardHeader>
               <CardTitle>{t('detail.timeline')}</CardTitle>

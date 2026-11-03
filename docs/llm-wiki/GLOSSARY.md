@@ -54,8 +54,12 @@ Terms as the code uses them. Identifiers are kept in English in both UI language
 | Requester status (`RequesterStatus`) | Plain-language status shown to people without `report:read`. | `src/domain/lifecycle.ts` |
 | Responsible developer | Holds `request:review` and is an admin, the assignee or a project owner (`isResponsibleDeveloper`). | `src/domain/lifecycle.ts` |
 | Role | `requester`, `executive`, `developer`, `admin`. | `src/domain/model.ts` |
-| Permission | One of eleven capability strings such as `request:create` or `dashboard:view`; roles map to sets of them. | `src/domain/roles.ts` |
+| Permission | One of thirteen capability strings such as `request:create` or `dashboard:view`; roles map to sets of them. | `src/domain/roles.ts` |
 | Executive | A requester who may also read all requests and the dashboard. | `src/domain/roles.ts` |
+| Operator | The person running the service's AI side: providers and keys, model per task, prices, AI budget and usage. Provisioned by the service, not by an admin. | `src/domain/roles.ts` |
+| Provider | `anthropic` (Claude) or `openai` (GPT). | `src/domain/ai.ts` |
+| Runtime | How a task drives the model: `api` for precheck and report, `claude_code` or `codex` for AI work. | `src/domain/ai.ts` |
+| Usage entry | One booked AI call or agent run: provider, model, runtime, normalized tokens and estimated cost, priced once and never re-priced. | `src/domain/ai.ts` |
 | Precheck (`PrecheckIssue`) | Advice on a draft before submission; never blocks. | `src/domain/precheck.ts` |
 | Feasibility report (`FeasibilityReport`) | The AI's assessment before any work: verdict, evidence, impact, plan, verification, size, risks, open questions. | `src/domain/model.ts` |
 | Verdict (`ReportVerdict`) | `feasible`, `conditional`, `out_of_scope`, `undetermined`. | `src/domain/model.ts` |

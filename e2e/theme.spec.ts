@@ -37,7 +37,8 @@ test.describe('system dark mode', () => {
       요청자: ['/', '/requests/new?project=p-portal&step=1', '/requests/1021', '/schedule', '/settings'],
       담당자: ['/work', '/requests/1024', '/requests/1026'],
       경영진: ['/dashboard'],
-      관리자: ['/admin/users', '/admin/budget'],
+      관리자: ['/admin/users'],
+      운영자: ['/ops/usage', '/ops/agents', '/ops/pricing', '/ops/budget'],
     } as const
     for (const [role, routes] of Object.entries(plan)) {
       await loginAs(page, role as keyof typeof plan)

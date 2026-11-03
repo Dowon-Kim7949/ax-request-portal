@@ -48,9 +48,9 @@ Everything a developer does: the assigned queue (`/work`, `request:review`), the
 
 ## Panels on the request page
 
-- `ReportPanel` — the AI feasibility report (`FeasibilityReport`): verdict (`feasible`, `conditional`, `out_of_scope`, `undetermined`), summary, wiki trust, evidence (wiki documents with their verified flag, code files; expandable), impact (changed screens, features to re-check — the regression candidates), plan, verification method per acceptance criterion, size (`S`/`M`/`L`), risks and open questions. Shown only to users with `report:read` and not for `non_code` requests.
-- `DecisionCard` — shown while `runWork` is available: run AI work (optional instructions), ask the requester (1–5 questions, prefilled from the report's open questions) or reject (reason required). On a rework after `changes_requested` it lists the failed criteria and prefills the instructions with them.
-- `WorkPanel` — the AI run: phases `queued → editing → testing → opening_mr → finished` with `aria-current="step"`, attempts, cost, result, change summary (merge request number, files, lines, wiki documents touched). In `code_review` the developer approves the merge (`approveMerge`), opens the MR, or asks for a revision (`requestRevision { note }`). The project's provider decides the wording: PR for GitHub, MR otherwise.
+- `ReportPanel` — the AI feasibility report (`FeasibilityReport`), with the model that wrote it (`generatedBy`): verdict (`feasible`, `conditional`, `out_of_scope`, `undetermined`), summary, wiki trust, evidence (wiki documents with their verified flag, code files; expandable), impact (changed screens, features to re-check — the regression candidates), plan, verification method per acceptance criterion, size (`S`/`M`/`L`), risks and open questions. Shown only to users with `report:read` and not for `non_code` requests.
+- `DecisionCard` — shown while `runWork` is available: run AI work (optional instructions; disabled with the reason beside it once the request reaches its per-request AI limit, `useAiRunLimit` → `overRequestLimit`, the same rule the server enforces), ask the requester (1–5 questions, prefilled from the report's open questions) or reject (reason required). On a rework after `changes_requested` it lists the failed criteria and prefills the instructions with them.
+- `WorkPanel` — the AI run: phases `queued → editing → testing → opening_mr → finished` with `aria-current="step"`, attempts, cost, the coding agent and model (`work.agent`, e.g. Claude Agent · Claude Opus 5.5), result, change summary (merge request number, files, lines, wiki documents touched). In `code_review` the developer approves the merge (`approveMerge`), opens the MR, or asks for a revision (`requestRevision { note }`; disabled at the per-request limit like the run button). The project's provider decides the wording: PR for GitHub, MR otherwise.
 - `RegressionChecks` — pass/fail per check, saved one at a time.
 - `ReleasePanel` — release date (not in the past) and note; setting a date notifies the requester. "Released" (`markReleased`) needs a confirmation sheet.
 
@@ -75,6 +75,7 @@ Everything a developer does: the assigned queue (`/work`, `request:review`), the
 - `src/mocks/engine.ts#symbol:listRequests`, `src/mocks/engine.ts#symbol:regressionQueue` — server-side scoping.
 - `src/mocks/ai.ts#symbol:generateReport`, `src/domain/report.ts#symbol:deriveWikiTrust` — mock AI and trust rule.
 - `src/domain/model.ts#symbol:FeasibilityReport` — report fields.
+- `src/features/detail/ai-limit.ts#symbol:useAiRunLimit` — the per-request limit check shared by both buttons; the model per task is chosen in [AI Operations](13_ops.md).
 
 ## Open Questions
 
