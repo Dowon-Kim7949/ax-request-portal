@@ -61,6 +61,8 @@ test('requester screens', async ({ page }) => {
     '/requests/new?project=p-portal&step=1',
     '/requests',
     '/requests/1021',
+    '/requests/1028',
+    '/requests/1029',
     '/schedule',
     '/notifications',
     '/settings',

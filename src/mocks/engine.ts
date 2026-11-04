@@ -7,7 +7,13 @@
  * are stored as keys and rendered when read; AI text is written in the
  * language of the call that makes the AI finish (like a model would).
  */
-import type { AiSettingsInput, ProjectInput, RegressionQueue, RequestScope } from '../api/contract'
+import type {
+  AiSettingsInput,
+  PreviewFeedbackInput,
+  ProjectInput,
+  RegressionQueue,
+  RequestScope,
+} from '../api/contract'
 import {
   addUsage,
   AI_PROVIDERS,
@@ -37,6 +43,7 @@ import {
   isTerminal,
   LifecycleError,
   type AnyCommand,
+  type GuardName,
   type TransitionCommand,
 } from '../domain/lifecycle'
 import type {
@@ -59,7 +66,7 @@ import type {
 } from '../domain/model'
 import { precheckDraft } from '../domain/precheck'
 import { hasPermission, type Permission, type RolePermissions } from '../domain/roles'
-import { finishWork, generateReport, phaseAt, simulateUsage, type UsageShape } from './ai'
+import { finishWork, generateReport, generateScope, phaseAt, simulateUsage, type UsageShape } from './ai'
 import { renderNotification, type ErrorKey, type NotificationKey, type ServerLanguage } from './copy'
 
 /* ------------------------------------------------------------------ */
@@ -67,7 +74,7 @@ import { renderNotification, type ErrorKey, type NotificationKey, type ServerLan
 /* ------------------------------------------------------------------ */
 
 /** Bump when the stored shape changes: older demo data is discarded and reseeded. */
-export const STATE_VERSION = 3
+export const STATE_VERSION = 4
 
 /** What the operator configures. Keys are never stored, only their last four characters. */
 export interface AiOperations {
@@ -112,6 +119,8 @@ export interface EngineOptions {
   reportSeconds: number
   workSeconds: number
   rolePermissions: RolePermissions
+  /** Ask the requester to confirm the AI's reading before a developer reviews it (default on) */
+  scopeCheck?: boolean
 }
 
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
@@ -143,6 +152,14 @@ export class HttpError extends Error {
 }
 
 const DAY = 86_400_000
+
+const GUARD_ERRORS: Record<GuardName, ErrorKey> = {
+  criteriaAllPassed: 'needAllPassed',
+  criteriaOneFailed: 'needOneFailed',
+  assumptionsUnchecked: 'assumptionsUnchecked',
+  scopeUnanswered: 'scopeUnanswered',
+  scopeRevisionsUsed: 'scopeRevisionsUsed',
+}
 
 export function toDate(iso: string): string {
   return iso.slice(0, 10)
@@ -325,9 +342,13 @@ export class MockEngine {
       action: boolean,
     ) => this.notify(to, key, params, req.id, action, now, actorId)
 
+    const last = req.timeline.at(-1)?.event
     switch (req.status) {
+      case 'scope_check':
+        send(requester, 'scopeCheck', { title: req.title }, true)
+        break
       case 'review':
-        send(devs, 'reportReady', { title: req.title }, true)
+        send(devs, last === 'approveScope' ? 'scopeApproved' : 'reportReady', { title: req.title }, true)
         break
       case 'info_needed':
         send(
@@ -338,7 +359,8 @@ export class MockEngine {
         )
         break
       case 'reporting':
-        if (req.infoRequest?.answer) send(devs, 'requesterAnswered', {}, false)
+        // A new reading after "not quite" stays between the requester and the AI.
+        if (last === 'provideInfo') send(devs, 'requesterAnswered', {}, false)
         break
       case 'rejected':
         send(requester, 'rejected', { reason: req.rejectionReason ?? req.title }, false)
@@ -348,6 +370,8 @@ export class MockEngine {
         break
       case 'code_review':
         send(devs, 'workFinished', {}, true)
+        // Optional for the requester, so not "your turn".
+        if (req.work?.preview) send(requester, 'previewReady', { title: req.title }, false)
         break
       case 'verification':
         send(requester, 'pleaseCheck', { count: req.acceptanceCriteria.length }, true)
@@ -388,10 +412,7 @@ export class MockEngine {
       return applyTransition(req, command, { actor, now, newId: () => this.newId('tl') })
     } catch (err) {
       if (err instanceof LifecycleError) {
-        if (err.code === 'guard_failed') {
-          const key = command.event === 'reportIssue' ? 'needOneFailed' : 'needAllPassed'
-          throw new HttpError(409, 'guard_failed', key)
-        }
+        if (err.code === 'guard_failed') throw new HttpError(409, 'guard_failed', GUARD_ERRORS[err.guard!])
         if (err.code === 'forbidden') throw new HttpError(403, 'forbidden', 'notYourStep')
         throw new HttpError(409, 'invalid_transition', 'invalidTransition')
       }
@@ -427,7 +448,16 @@ export class MockEngine {
         req.id,
       )
       const report = { ...generateReport(req, project, at, lang), generatedBy: selection }
-      req = this.apply({ ...req, report }, { event: 'reportReady' }, { type: 'ai' }, at)
+      // Nothing to confirm when the AI cannot or need not do the work: a developer takes over.
+      const confirm =
+        this.opts.scopeCheck !== false && (report.verdict === 'feasible' || report.verdict === 'conditional')
+      const scope = confirm ? { proposal: generateScope(req, project, report, lang) } : undefined
+      req = this.apply(
+        { ...req, report, scope },
+        { event: confirm ? 'scopeReady' : 'reportReady' },
+        { type: 'ai' },
+        at,
+      )
       this.replace(req)
       this.notifyStatus(req, at)
       return true
@@ -502,6 +532,25 @@ export class MockEngine {
       .map((aid) => this.state.attachments.find((a) => a.id === aid))
       .filter((a): a is Attachment => Boolean(a))
 
+    // A checklist request is checked item by item: every finding becomes an acceptance criterion.
+    const checklist =
+      draft.type === 'checklist'
+        ? (draft.checklist ?? []).map((item, i) => ({
+            id: `k${i + 1}`,
+            criterionId: `c${i + 1}`,
+            ref: item.ref,
+            ...(item.clause ? { clause: item.clause } : {}),
+            finding: item.finding,
+            ...(item.expected ? { expected: item.expected } : {}),
+          }))
+        : undefined
+    const criteria = checklist
+      ? checklist.map((k) => ({
+          id: k.criterionId,
+          text: `[${k.ref}] ${k.expected ?? k.finding}`.slice(0, 300),
+        }))
+      : draft.acceptanceCriteria.map((c, i) => ({ id: `c${i + 1}`, text: c.text }))
+
     let req: WorkRequest = {
       id,
       title: draft.title,
@@ -511,7 +560,9 @@ export class MockEngine {
       ...(draft.targetOther ? { targetOther: draft.targetOther } : {}),
       currentBehavior: draft.currentBehavior,
       desiredBehavior: draft.desiredBehavior,
-      acceptanceCriteria: draft.acceptanceCriteria.map((c, i) => ({ id: `c${i + 1}`, text: c.text })),
+      acceptanceCriteria: criteria,
+      ...(checklist ? { checklist } : {}),
+      ...(checklist && draft.checklistSource ? { checklistSource: draft.checklistSource } : {}),
       ...(draft.outOfScope ? { outOfScope: draft.outOfScope } : {}),
       attachments,
       ...(draft.desiredDate ? { desiredDate: draft.desiredDate } : {}),
@@ -557,12 +608,20 @@ export class MockEngine {
     }
     if (!isAuthorized(command.event, ctx)) throw new HttpError(403, 'forbidden', 'notYourStep')
     let next = this.apply(req, command, { type: 'user', userId: user.id }, now)
-    if (command.event === 'runWork' || command.event === 'requestRevision') {
-      // Both start an AI run, the cost that repeats per request. 0 means no limit.
+    if (
+      command.event === 'runWork' ||
+      command.event === 'requestRevision' ||
+      command.event === 'reviseScope'
+    ) {
+      // Each starts an AI job someone chose to repeat. 0 means no limit. Answering a
+      // developer's question (provideInfo) also rewrites the report but is never refused,
+      // or the requester would be stuck.
       const limit = this.state.budget.perRequestLimitKrw
       if (overRequestLimit(this.requestSpentKrw(req.id), limit)) {
         throw new HttpError(409, 'guard_failed', 'requestBudgetExceeded', { limit })
       }
+    }
+    if (command.event === 'runWork' || command.event === 'requestRevision') {
       if (!next.assigneeId) next = { ...next, assigneeId: user.id }
       if (next.work) next = { ...next, work: { ...next.work, agent: this.agentFor(next.projectId) } }
     }
@@ -630,6 +689,45 @@ export class MockEngine {
         (c) => byId.get(c.id) ?? { criterionId: c.id, result: 'pending' },
       ),
     })
+  }
+
+  /** Advisory: recorded on the run and sent to the developers; the status does not change. */
+  previewFeedback(user: User, id: number, input: PreviewFeedbackInput, now: Date): WorkRequest {
+    const req = this.getRequest(user, id)
+    if (req.requesterId !== user.id) throw new HttpError(403, 'forbidden', 'requesterOnlyPreview')
+    if (req.status !== 'code_review' || !req.work?.preview) {
+      throw new HttpError(409, 'invalid_transition', 'noPreviewNow')
+    }
+    const at = now.toISOString()
+    const note = input.note?.trim()
+    const next = this.replace({
+      ...req,
+      updatedAt: at,
+      work: {
+        ...req.work,
+        previewFeedback: { at, by: user.id, verdict: input.verdict, ...(note ? { note } : {}) },
+      },
+      timeline: [
+        ...req.timeline,
+        {
+          id: this.newId('tl'),
+          at,
+          actor: { type: 'user', userId: user.id },
+          event: `preview_${input.verdict}`,
+          ...(note ? { note } : {}),
+        },
+      ],
+    })
+    this.notify(
+      this.responsibleDevelopers(req),
+      input.verdict === 'needs_change' ? 'previewChange' : 'previewGood',
+      { title: req.title, note: note ?? '' },
+      req.id,
+      input.verdict === 'needs_change',
+      now,
+      user.id,
+    )
+    return next
   }
 
   updateRegression(
@@ -757,6 +855,11 @@ export class MockEngine {
       id: existing?.id ?? this.newId('p'),
       ...input,
       targets: input.targets.map((t) => ({ ...t, id: t.id ?? this.newId('t') })),
+      constraints: input.constraints.map(({ id, text, reference }) => ({
+        id: id ?? this.newId('pc'),
+        text,
+        ...(reference ? { reference } : {}),
+      })),
       wikiStats: existing?.wikiStats ?? { verifiedDocs: 0, totalDocs: 0 },
     }
     if (existing) this.state.projects[this.state.projects.indexOf(existing)] = project

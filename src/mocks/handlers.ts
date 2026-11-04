@@ -203,6 +203,12 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
       edit,
     ),
     route(
+      api.sendPreviewFeedback,
+      ({ store, me, params, body, now }) =>
+        store.engine.present(me, store.engine.previewFeedback(me, params.id, body, now)),
+      edit,
+    ),
+    route(
       api.updateRegression,
       ({ store, me, params, body, now }) =>
         store.engine.present(me, store.engine.updateRegression(me, params.id, body.checks, now)),

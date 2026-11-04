@@ -11,6 +11,8 @@ import type {
   Project,
   RegressionCheck,
   ReportVerdict,
+  ScopeProposal,
+  ScopeQuestion,
   WorkPhase,
   WorkRequest,
   WorkRun,
@@ -39,6 +41,14 @@ const COPY = {
     done: (n: number) => `완료 기준 ${n}개를 반영했습니다.`,
     followedMemo: (memo: string) => `담당자 메모(“${memo}”)를 따랐습니다.`,
     testFailed: '기존 테스트 1개가 실패해 확인이 필요합니다.',
+    previewAlt: (title: string) => `바뀐 화면 미리보기(가상 이미지): ${title}`,
+    previewCaption: '미리보기 배포에서 찍은 화면',
+    previewBadge: '미리보기',
+    noWikiAssumption: (name: string) =>
+      `‘${name}’은 위키 문서가 없어, 화면 이름으로 관련 코드를 찾았다고 가정했습니다.`,
+    unverifiedAssumption: (titles: string) =>
+      `사람이 검토하지 않은 위키(${titles})의 설명이 지금 코드와 같다고 보고 계획했습니다.`,
+    constraintKept: '작업 계획과 AI 작업 지시에 이 제약을 넣었습니다.',
   },
   en: {
     summary: {
@@ -61,6 +71,14 @@ const COPY = {
     done: (n: number) => `Implemented the ${n} acceptance criteria.`,
     followedMemo: (memo: string) => `Followed the developer's note (“${memo}”).`,
     testFailed: 'One existing test fails and needs a look.',
+    previewAlt: (title: string) => `Preview of the changed screen (illustration): ${title}`,
+    previewCaption: 'Captured on the preview deployment',
+    previewBadge: 'Preview',
+    noWikiAssumption: (name: string) =>
+      `“${name}” has no wiki doc, so the related code was found by the screen name alone.`,
+    unverifiedAssumption: (titles: string) =>
+      `The plan takes the wiki docs no person has reviewed (${titles}) to match the current code.`,
+    constraintKept: 'Added to the plan and to the AI work instructions.',
   },
 } satisfies Record<ServerLanguage, { summary: Record<ReportVerdict, string> } & Record<string, unknown>>
 
@@ -116,10 +134,26 @@ export function generateReport(
     }
   }
 
+  const assumptionTexts: string[] = []
+  for (const t of targets) if (!t.wikiDoc) assumptionTexts.push(c.noWikiAssumption(t.name))
+  const unreviewed = wikiDocs.filter((d) => !d.verified).map((d) => d.title)
+  if (unreviewed.length) assumptionTexts.push(c.unverifiedAssumption(unreviewed.join(', ')))
+  const assumptions = assumptionTexts.map((text, i) => ({ id: `a${i + 1}`, text }))
+
+  // The simulated AI never finds a conflict; a real model compares the plan with each rule.
+  const constraintChecks = project.constraints.map((k) => ({
+    constraintId: k.id,
+    text: k.text,
+    ...(k.reference ? { reference: k.reference } : {}),
+    conflict: false,
+    note: c.constraintKept,
+  }))
+  const conflict = constraintChecks.some((k) => k.conflict)
+
   let verdict: ReportVerdict
   if (req.type === 'non_code') verdict = 'out_of_scope'
   else if (wikiDocs.length === 0) verdict = 'undetermined'
-  else if (openQuestions.length > 0 || wikiTrust === 'low') verdict = 'conditional'
+  else if (openQuestions.length > 0 || wikiTrust === 'low' || conflict) verdict = 'conditional'
   else verdict = 'feasible'
 
   const criteria = req.acceptanceCriteria
@@ -146,9 +180,119 @@ export function generateReport(
       method: automatable ? c.autoMethod : c.manualMethod,
     })),
     openQuestions,
+    assumptions: verdict === 'out_of_scope' ? [] : assumptions,
+    constraintChecks: verdict === 'out_of_scope' ? [] : constraintChecks,
     wikiTrust,
     size: score <= 3 ? 'S' : score <= 5 ? 'M' : 'L',
     risks,
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Scope proposal (the requester's view of the report)                 */
+/* ------------------------------------------------------------------ */
+
+const SCOPE_COPY = {
+  ko: {
+    thisService: '이 서비스',
+    summary: (where: string, desired: string) => `${where}에서 ‘${desired}’ 되도록 바꿉니다.`,
+    criteria: (n: number) => `아래 ${n}가지가 되면 끝난 것으로 봅니다.`,
+    more: (n: number) => `그 밖에 ${n}건 (요청서의 항목 그대로)`,
+    revised: (note: string) => `말씀하신 ‘${note}’를 반영해 다시 정리했어요.`,
+    keep: (name: string) =>
+      `‘${name}’ 화면은 바꾸지 않아요. 같은 코드를 써서, 영향이 없는지만 다시 확인해요.`,
+    whichScreen: (other: string) => `‘${other}’은 어느 화면을 말씀하신 건가요?`,
+    newScreen: '목록에 없는 새 화면이에요',
+    notSure: '잘 모르겠어요',
+    alsoChange: (name: string) => `‘${name}’ 화면도 같이 바뀌어야 하나요?`,
+    onlyRequested: '아니요, 요청한 화면만 바꿔 주세요',
+    both: (name: string) => `네, ‘${name}’도 같이 바꿔 주세요`,
+  },
+  en: {
+    thisService: 'this service',
+    summary: (where: string, desired: string) => `On ${where}, change it so that “${desired}”.`,
+    criteria: (n: number) => `It is done when the ${n} item(s) below work.`,
+    more: (n: number) => `${n} more, as listed in the request`,
+    revised: (note: string) => `Summed up again with your note: “${note}”.`,
+    keep: (name: string) =>
+      `“${name}” stays as it is. It shares code, so it is only re-checked for side effects.`,
+    whichScreen: (other: string) => `Which screen do you mean by “${other}”?`,
+    newScreen: 'A new screen that is not listed',
+    notSure: 'Not sure',
+    alsoChange: (name: string) => `Should “${name}” change as well?`,
+    onlyRequested: 'No, only the screens I asked for',
+    both: (name: string) => `Yes, change “${name}” too`,
+  },
+} satisfies Record<ServerLanguage, Record<string, unknown>>
+
+/** The note of the last "not quite" since the scope was last written, if any. */
+function lastRevisionNote(req: WorkRequest): string | undefined {
+  for (let i = req.timeline.length - 1; i >= 0; i--) {
+    const e = req.timeline[i]!
+    if (e.event === 'scopeReady') return undefined
+    if (e.event === 'reviseScope') return e.note
+  }
+  return undefined
+}
+
+/**
+ * What the requester confirms: the report in plain words, plus a choice
+ * wherever the request can be read two ways. Written in the same model call
+ * as the report, so it costs nothing extra.
+ */
+export function generateScope(
+  req: WorkRequest,
+  project: Project,
+  report: FeasibilityReport,
+  lang: ServerLanguage = 'ko',
+): ScopeProposal {
+  const c = SCOPE_COPY[lang]
+  const names = selectedTargets(req, project).map((t) => t.name)
+  const where = names.length ? names.join(', ') : req.targetOther?.trim() || c.thisService
+  const note = lastRevisionNote(req)
+  const criteria = req.acceptanceCriteria.map((cr) => cr.text)
+
+  const questions: ScopeQuestion[] = []
+  const other = req.targetOther?.trim()
+  if (other && !req.infoRequest?.answer) {
+    const candidates = project.targets.filter((t) => !req.targetIds.includes(t.id)).slice(0, 2)
+    questions.push({
+      id: 'q-screen',
+      text: c.whichScreen(other),
+      options: [
+        ...candidates.map((t) => ({ id: t.id, label: t.name })),
+        { id: 'new', label: c.newScreen },
+        ...(candidates.length ? [] : [{ id: 'unsure', label: c.notSure }]),
+      ],
+    })
+  }
+  const neighbour = report.impact.recheck[0]
+  if (neighbour) {
+    // The AI tends to widen a change to code it shares; ask instead of assuming.
+    questions.push({
+      id: 'q-extent',
+      text: c.alsoChange(neighbour),
+      options: [
+        { id: 'only', label: c.onlyRequested },
+        { id: 'both', label: c.both(neighbour) },
+      ],
+      recommended: 'only',
+    })
+  }
+
+  return {
+    revision: report.revision,
+    summary: [
+      c.summary(where, req.desiredBehavior.trim().replace(/[.。]$/, '')),
+      c.criteria(criteria.length),
+      ...(note ? [c.revised(note)] : []),
+    ].join(' '),
+    changes: criteria.length > 5 ? [...criteria.slice(0, 4), c.more(criteria.length - 4)] : criteria,
+    unchanged: [
+      ...(req.outOfScope?.trim() ? [req.outOfScope.trim()] : []),
+      ...report.impact.recheck.map(c.keep),
+    ].slice(0, 5),
+    questions: questions.slice(0, 3),
   }
 }
 
@@ -166,6 +310,34 @@ const PHASES: Array<[number, WorkPhase]> = [
 export function phaseAt(progress: number): WorkPhase {
   for (const [until, phase] of PHASES) if (progress < until) return phase
   return 'finished'
+}
+
+const xml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+/** A fictional screen with the request's title and criteria, so the demo has something to look at. */
+function previewImage(title: string, criteria: string[], badge: string): string {
+  const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
+  const rows = criteria
+    .slice(0, 4)
+    .map(
+      (c, i) =>
+        `<rect x="24" y="${96 + i * 40}" width="312" height="30" rx="8" fill="#eef2f7"/>` +
+        `<circle cx="42" cy="${111 + i * 40}" r="6" fill="#2f6fde"/>` +
+        `<text x="56" y="${116 + i * 40}" font-size="13" fill="#1f2937">${xml(clip(c, 30))}</text>`,
+    )
+    .join('')
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="360" height="270" viewBox="0 0 360 270" font-family="sans-serif">` +
+    `<rect width="360" height="270" rx="16" fill="#ffffff"/>` +
+    `<rect width="360" height="48" rx="16" fill="#1f3b70"/><rect y="32" width="360" height="16" fill="#1f3b70"/>` +
+    `<text x="24" y="31" font-size="15" font-weight="700" fill="#ffffff">${xml(clip(title, 26))}</text>` +
+    `<rect x="276" y="14" width="64" height="20" rx="10" fill="#ffd166"/>` +
+    `<text x="308" y="28" font-size="11" text-anchor="middle" fill="#1f2937">${xml(badge)}</text>` +
+    `<rect x="24" y="64" width="160" height="12" rx="6" fill="#d7dee8"/>` +
+    rows +
+    `</svg>`
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
 export function finishWork(
@@ -212,6 +384,27 @@ export function finishWork(
     },
     wikiChanges: { docs: wikiDocs.slice(0, 1), pendingReview: true },
     summary: summaryParts.join(' '),
+    // A real pipeline deploys the branch and captures the changed screens; no AI involved.
+    ...(failed
+      ? {}
+      : {
+          preview: {
+            url: `https://preview.example.com/ax-request-${req.id}/`,
+            screenshots: [
+              {
+                id: `shot-${req.id}-${prev.attempt}`,
+                url: previewImage(
+                  req.title,
+                  req.acceptanceCriteria.map((a) => a.text),
+                  c.previewBadge,
+                ),
+                alt: c.previewAlt(req.title),
+                caption: c.previewCaption,
+              },
+            ],
+            expiresAt: new Date(now.getTime() + 7 * 86_400_000).toISOString(),
+          },
+        }),
   }
 
   const sources = req.report?.evidence.wikiDocs ?? []

@@ -28,6 +28,15 @@ export const AppConfigSchema = z
     rolePermissions: z.record(Role, z.array(z.enum(PERMISSIONS))),
     /** Request types offered in the wizard, in display order */
     requestTypes: z.array(RequestType).min(1),
+    workflow: z.object({
+      /**
+       * After the feasibility report, ask the requester to confirm the AI's reading
+       * (what changes, what does not, choices where the request is ambiguous) before
+       * a developer reviews it. The mock API follows this; a real backend should
+       * read the same setting.
+       */
+      scopeCheck: z.boolean(),
+    }),
     mock: z.object({
       /** Seconds the simulated AI takes to write a feasibility report */
       reportSeconds: z.number().positive(),

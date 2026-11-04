@@ -2,10 +2,13 @@
  * Request Lifecycle — the single source of truth for which status a request
  * can move to, who may move it, and what the move records.
  *
- *   submitted → reporting(AI) → review → in_progress(AI) → code_review
- *             → verification → release_scheduled → done
+ *   submitted → reporting(AI) → scope_check → review → in_progress(AI)
+ *             → code_review → verification → release_scheduled → done
  *
- *   exceptions: review → info_needed → reporting (report is rewritten)
+ *   exceptions: reporting → review directly when there is nothing to confirm
+ *                 (out of scope, undetermined, or the scope check is off)
+ *               scope_check → reporting (requester asks for another reading)
+ *               review → info_needed → reporting (report is rewritten)
  *               review | info_needed → rejected
  *               code_review → in_progress (developer asks the AI to revise)
  *               verification → changes_requested → in_progress
@@ -15,7 +18,15 @@
  * (it is pure TypeScript with no browser dependencies).
  */
 import * as z from 'zod'
-import type { Actor, CriterionCheck, Project, RequestStatus, User, WorkRequest } from './model'
+import {
+  SCOPE_REVISIONS_MAX,
+  type Actor,
+  type CriterionCheck,
+  type Project,
+  type RequestStatus,
+  type User,
+  type WorkRequest,
+} from './model'
 import { named } from './registry'
 import { DEFAULT_ROLE_PERMISSIONS, hasPermission, type RolePermissions } from './roles'
 
@@ -34,6 +45,9 @@ interface TransitionRule {
 export const TRANSITIONS = {
   startReport: { from: ['submitted'], to: 'reporting', by: 'system' },
   reportReady: { from: ['reporting'], to: 'review', by: 'ai' },
+  scopeReady: { from: ['reporting'], to: 'scope_check', by: 'ai' },
+  approveScope: { from: ['scope_check'], to: 'review', by: 'requester' },
+  reviseScope: { from: ['scope_check'], to: 'reporting', by: 'requester' },
   requestInfo: { from: ['review'], to: 'info_needed', by: 'developer' },
   provideInfo: { from: ['info_needed'], to: 'reporting', by: 'requester' },
   reject: { from: ['review', 'info_needed'], to: 'rejected', by: 'developer' },
@@ -44,7 +58,11 @@ export const TRANSITIONS = {
   reportIssue: { from: ['verification'], to: 'changes_requested', by: 'requester' },
   confirmResult: { from: ['verification'], to: 'release_scheduled', by: 'requester' },
   markReleased: { from: ['release_scheduled'], to: 'done', by: 'developer' },
-  cancel: { from: ['submitted', 'reporting', 'review', 'info_needed'], to: 'cancelled', by: 'requester' },
+  cancel: {
+    from: ['submitted', 'reporting', 'scope_check', 'review', 'info_needed'],
+    to: 'cancelled',
+    by: 'requester',
+  },
 } as const satisfies Record<string, TransitionRule>
 
 export type LifecycleEvent = keyof typeof TRANSITIONS
@@ -66,8 +84,22 @@ export const TransitionCommand = named(
   z.discriminatedUnion('event', [
     z.object({ event: z.literal('requestInfo'), questions: z.array(z.string().trim().min(1)).min(1).max(5) }),
     z.object({ event: z.literal('provideInfo'), answer: z.string().trim().min(1).max(2000) }),
+    z.object({
+      event: z.literal('approveScope'),
+      choices: z.array(z.object({ questionId: z.string(), optionId: z.string() })).max(3),
+      note: z.string().trim().max(1000).optional(),
+    }),
+    z.object({ event: z.literal('reviseScope'), note: z.string().trim().min(1).max(1000) }),
     z.object({ event: z.literal('reject'), reason: z.string().trim().min(1).max(1000) }),
-    z.object({ event: z.literal('runWork'), instructions: z.string().trim().max(2000).optional() }),
+    z.object({
+      event: z.literal('runWork'),
+      instructions: z.string().trim().max(2000).optional(),
+      checkedAssumptions: z
+        .array(z.string())
+        .max(50)
+        .optional()
+        .describe("Ids of the report's assumptions the developer confirmed; all of them on the first run"),
+    }),
     z.object({ event: z.literal('requestRevision'), note: z.string().trim().min(1).max(2000) }),
     z.object({ event: z.literal('approveMerge') }),
     z.object({ event: z.literal('reportIssue'), checks, note: z.string().trim().max(2000).optional() }),
@@ -88,12 +120,22 @@ export const USER_EVENTS = TransitionCommand.options.map((o) => o.shape.event.va
 
 export type LifecycleErrorCode = 'invalid_transition' | 'forbidden' | 'guard_failed'
 
+/** Which rule a `guard_failed` broke, so the caller can explain it. */
+export type GuardName =
+  | 'criteriaAllPassed'
+  | 'criteriaOneFailed'
+  | 'assumptionsUnchecked'
+  | 'scopeUnanswered'
+  | 'scopeRevisionsUsed'
+
 export class LifecycleError extends Error {
   readonly code: LifecycleErrorCode
-  constructor(code: LifecycleErrorCode, message: string) {
+  readonly guard?: GuardName
+  constructor(code: LifecycleErrorCode, message: string, guard?: GuardName) {
     super(message)
     this.name = 'LifecycleError'
     this.code = code
+    if (guard) this.guard = guard
   }
 }
 
@@ -117,6 +159,7 @@ export type Turn = 'requester' | 'developer' | 'ai' | 'none'
 const TURN: Record<RequestStatus, Turn> = {
   submitted: 'ai',
   reporting: 'ai',
+  scope_check: 'requester',
   review: 'developer',
   info_needed: 'requester',
   rejected: 'none',
@@ -140,6 +183,7 @@ export type Stage = (typeof STAGES)[number]
 const STAGE: Record<RequestStatus, Stage | null> = {
   submitted: 'submitted',
   reporting: 'report',
+  scope_check: 'review',
   review: 'review',
   info_needed: 'review',
   rejected: 'review',
@@ -162,6 +206,7 @@ export function stageOf(status: RequestStatus): Stage | null {
  */
 export type RequesterStatus =
   | 'reviewing'
+  | 'confirm_scope'
   | 'info_needed'
   | 'working'
   | 'please_check'
@@ -174,6 +219,7 @@ export type RequesterStatus =
 const REQUESTER_STATUS: Record<RequestStatus, RequesterStatus> = {
   submitted: 'reviewing',
   reporting: 'reviewing',
+  scope_check: 'confirm_scope',
   review: 'reviewing',
   info_needed: 'info_needed',
   rejected: 'rejected',
@@ -242,16 +288,68 @@ export interface ApplyOptions {
   newId: () => string
 }
 
+/**
+ * Assumptions the developer still has to confirm before the first AI run.
+ * A re-run after a failed check reuses what was confirmed then.
+ */
+export function uncheckedAssumptions(request: WorkRequest, checked: readonly string[] = []): string[] {
+  if (request.status !== 'review') return []
+  const done = new Set(checked)
+  return (request.report?.assumptions ?? []).map((a) => a.id).filter((id) => !done.has(id))
+}
+
+/** Times the requester may still send the scope back to be rewritten. */
+export function scopeRevisionsLeft(request: Pick<WorkRequest, 'timeline'>): number {
+  const used = request.timeline.filter((e) => e.event === 'reviseScope').length
+  return Math.max(0, SCOPE_REVISIONS_MAX - used)
+}
+
+/** Scope questions without a valid choice. */
+export function unansweredScopeQuestions(
+  request: Pick<WorkRequest, 'scope'>,
+  choices: ReadonlyArray<{ questionId: string; optionId: string }>,
+): string[] {
+  const picked = new Map(choices.map((c) => [c.questionId, c.optionId]))
+  return (request.scope?.proposal.questions ?? [])
+    .filter((q) => !q.options.some((o) => o.id === picked.get(q.id)))
+    .map((q) => q.id)
+}
+
 function assertGuards(request: WorkRequest, command: AnyCommand): void {
   if (command.event === 'confirmResult' || command.event === 'reportIssue') {
     const byId = new Map(command.checks.map((c) => [c.criterionId, c.result]))
     const results = request.acceptanceCriteria.map((c) => byId.get(c.id) ?? 'pending')
     if (command.event === 'confirmResult' && results.some((r) => r !== 'passed')) {
-      throw new LifecycleError('guard_failed', 'Every acceptance criterion must pass before confirming.')
+      throw new LifecycleError(
+        'guard_failed',
+        'Every acceptance criterion must pass before confirming.',
+        'criteriaAllPassed',
+      )
     }
     if (command.event === 'reportIssue' && !results.includes('failed')) {
-      throw new LifecycleError('guard_failed', 'Mark at least one acceptance criterion as failed.')
+      throw new LifecycleError(
+        'guard_failed',
+        'Mark at least one acceptance criterion as failed.',
+        'criteriaOneFailed',
+      )
     }
+  }
+  if (command.event === 'approveScope' && unansweredScopeQuestions(request, command.choices).length) {
+    throw new LifecycleError('guard_failed', 'Answer every scope question first.', 'scopeUnanswered')
+  }
+  if (command.event === 'reviseScope' && scopeRevisionsLeft(request) === 0) {
+    throw new LifecycleError(
+      'guard_failed',
+      'The scope has been rewritten as often as allowed; approve it with a note or cancel.',
+      'scopeRevisionsUsed',
+    )
+  }
+  if (command.event === 'runWork' && uncheckedAssumptions(request, command.checkedAssumptions).length) {
+    throw new LifecycleError(
+      'guard_failed',
+      'Confirm every assumption in the report before the AI starts work.',
+      'assumptionsUnchecked',
+    )
   }
 }
 
@@ -286,6 +384,29 @@ export function applyTransition(request: WorkRequest, command: AnyCommand, opts:
       if (next.infoRequest) next.infoRequest = { ...next.infoRequest, answer: command.answer }
       note = command.answer
       break
+    case 'approveScope':
+      if (request.scope) {
+        // Keep only answers to questions that were asked, in the order they were asked.
+        const picked = new Map(command.choices.map((c) => [c.questionId, c.optionId]))
+        const choices = request.scope.proposal.questions.map((q) => ({
+          questionId: q.id,
+          optionId: picked.get(q.id)!,
+        }))
+        next.scope = {
+          proposal: request.scope.proposal,
+          decision: {
+            at,
+            by: opts.actor.type === 'user' ? opts.actor.userId : opts.actor.type,
+            choices,
+            ...(command.note ? { note: command.note } : {}),
+          },
+        }
+      }
+      note = command.note
+      break
+    case 'reviseScope':
+      note = command.note
+      break
     case 'reject':
       next.rejectionReason = command.reason
       note = command.reason
@@ -293,12 +414,18 @@ export function applyTransition(request: WorkRequest, command: AnyCommand, opts:
     case 'runWork':
     case 'requestRevision': {
       const instructions = command.event === 'runWork' ? command.instructions : command.note
+      // Confirmed on the first run; later runs keep the record.
+      const checked =
+        command.event === 'runWork' && request.status === 'review'
+          ? (request.report?.assumptions ?? []).map((a) => a.id)
+          : request.work?.checkedAssumptions
       next.work = {
         attempt: (request.work?.attempt ?? 0) + 1,
         startedAt: at,
         phase: 'queued',
         branch: slug(request.id),
         ...(instructions ? { instructions } : {}),
+        ...(checked?.length ? { checkedAssumptions: checked } : {}),
       }
       note = instructions
       break
@@ -322,6 +449,7 @@ export function applyTransition(request: WorkRequest, command: AnyCommand, opts:
       break
     case 'startReport':
     case 'reportReady':
+    case 'scopeReady':
     case 'workFinished':
       break
   }

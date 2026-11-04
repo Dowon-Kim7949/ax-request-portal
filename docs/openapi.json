@@ -980,6 +980,89 @@
         }
       }
     },
+    "/requests/{id}/preview-feedback": {
+      "put": {
+        "operationId": "sendPreviewFeedback",
+        "summary": "The requester's reaction to the preview while the change is in code review (advisory; status unchanged)",
+        "tags": [
+          "requests"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewFeedbackInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/requests/{id}/regression": {
       "put": {
         "operationId": "updateRegression",
@@ -2775,6 +2858,105 @@
           "alertThresholdPct"
         ]
       },
+      "ChecklistItem": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "description": "The finding's own number, e.g. \"Finding 24\""
+          },
+          "clause": {
+            "description": "Clause of the standard, e.g. \"2.3.1\"",
+            "type": "string",
+            "maxLength": 60
+          },
+          "finding": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "What the reviewer found, in their words"
+          },
+          "expected": {
+            "description": "What counts as fixed",
+            "type": "string",
+            "maxLength": 300
+          },
+          "id": {
+            "type": "string"
+          },
+          "criterionId": {
+            "type": "string",
+            "description": "The acceptance criterion made from this item"
+          }
+        },
+        "required": [
+          "ref",
+          "finding",
+          "id",
+          "criterionId"
+        ]
+      },
+      "ChecklistItemInput": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "description": "The finding's own number, e.g. \"Finding 24\""
+          },
+          "clause": {
+            "description": "Clause of the standard, e.g. \"2.3.1\"",
+            "type": "string",
+            "maxLength": 60
+          },
+          "finding": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "What the reviewer found, in their words"
+          },
+          "expected": {
+            "description": "What counts as fixed",
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "ref",
+          "finding"
+        ]
+      },
+      "ConstraintCheck": {
+        "type": "object",
+        "properties": {
+          "constraintId": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "description": "Copy of the project constraint when the report was written"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "conflict": {
+            "type": "boolean",
+            "description": "The plan, or the code it touches, breaks this constraint"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "constraintId",
+          "text",
+          "conflict",
+          "note"
+        ]
+      },
       "CriterionCheck": {
         "type": "object",
         "properties": {
@@ -3059,6 +3241,19 @@
               "type": "string"
             }
           },
+          "assumptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportAssumption"
+            }
+          },
+          "constraintChecks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConstraintCheck"
+            },
+            "description": "Every project constraint and how the plan keeps it; a conflict makes the verdict conditional"
+          },
           "wikiTrust": {
             "$ref": "#/components/schemas/WikiTrust"
           },
@@ -3086,6 +3281,8 @@
           "plan",
           "verification",
           "openQuestions",
+          "assumptions",
+          "constraintChecks",
           "wikiTrust",
           "size",
           "risks"
@@ -3258,6 +3455,77 @@
           "issues"
         ]
       },
+      "PreviewFeedback": {
+        "description": "The requester's reaction to the preview. Advisory: the developer still decides on the merge.",
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "by": {
+            "type": "string"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/PreviewVerdict"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "by",
+          "verdict"
+        ]
+      },
+      "PreviewFeedbackInput": {
+        "description": "A change request needs a note so the developer knows what to change.",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "verdict": {
+                "type": "string",
+                "const": "looks_good"
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 1000
+              }
+            },
+            "required": [
+              "verdict"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "verdict": {
+                "type": "string",
+                "const": "needs_change"
+              },
+              "note": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            },
+            "required": [
+              "verdict",
+              "note"
+            ]
+          }
+        ]
+      },
+      "PreviewVerdict": {
+        "type": "string",
+        "enum": [
+          "looks_good",
+          "needs_change"
+        ]
+      },
       "Project": {
         "type": "object",
         "properties": {
@@ -3329,6 +3597,13 @@
               "$ref": "#/components/schemas/ProjectTarget"
             }
           },
+          "constraints": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectConstraint"
+            }
+          },
           "active": {
             "type": "boolean"
           }
@@ -3343,7 +3618,32 @@
           "wikiStats",
           "ownerIds",
           "targets",
+          "constraints",
           "active"
+        ]
+      },
+      "ProjectConstraint": {
+        "description": "A project rule the AI must respect when it plans and makes a change (security, data, operations). Kept by the project, so requesters never have to repeat it.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "description": "A rule every change must keep, in plain words"
+          },
+          "reference": {
+            "description": "Where the rule comes from, e.g. \"Security policy 3.2\"",
+            "type": "string",
+            "maxLength": 60
+          }
+        },
+        "required": [
+          "id",
+          "text"
         ]
       },
       "ProjectIcon": {
@@ -3418,6 +3718,32 @@
               ]
             }
           },
+          "constraints": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300,
+                  "description": "A rule every change must keep, in plain words"
+                },
+                "reference": {
+                  "description": "Where the rule comes from, e.g. \"Security policy 3.2\"",
+                  "type": "string",
+                  "maxLength": 60
+                }
+              },
+              "required": [
+                "text"
+              ]
+            }
+          },
           "active": {
             "type": "boolean"
           }
@@ -3430,6 +3756,7 @@
           "wikiPath",
           "ownerIds",
           "targets",
+          "constraints",
           "active"
         ]
       },
@@ -3672,6 +3999,22 @@
           "$ref": "#/components/schemas/ReleaseScheduleItem"
         }
       },
+      "ReportAssumption": {
+        "description": "A fact the plan relies on that neither the code nor a reviewed wiki confirmed. The developer checks each one before the AI starts work.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ]
+      },
       "ReportVerdict": {
         "type": "string",
         "enum": [
@@ -3742,7 +4085,6 @@
             "maxLength": 2000
           },
           "acceptanceCriteria": {
-            "minItems": 1,
             "maxItems": 5,
             "type": "array",
             "items": {
@@ -3757,6 +4099,20 @@
               "required": [
                 "text"
               ]
+            },
+            "description": "1–5; ignored for checklist requests"
+          },
+          "checklistSource": {
+            "description": "Who raised the findings, e.g. \"Security audit, on-site review\"",
+            "type": "string",
+            "maxLength": 100
+          },
+          "checklist": {
+            "description": "Checklist requests only: each item becomes an acceptance criterion",
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChecklistItemInput"
             }
           },
           "outOfScope": {
@@ -3805,6 +4161,7 @@
         "enum": [
           "submitted",
           "reporting",
+          "scope_check",
           "review",
           "info_needed",
           "rejected",
@@ -3818,13 +4175,15 @@
         ]
       },
       "RequestType": {
+        "description": "checklist = findings from an outside review (audit, inspection, certification) handled item by item",
         "type": "string",
         "enum": [
           "new_feature",
           "change",
           "bug",
           "copy_design",
-          "non_code"
+          "non_code",
+          "checklist"
         ]
       },
       "Role": {
@@ -3836,6 +4195,133 @@
           "developer",
           "admin",
           "operator"
+        ]
+      },
+      "ScopeDecision": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "by": {
+            "type": "string",
+            "description": "User id of the requester"
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "questionId": {
+                  "type": "string"
+                },
+                "optionId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "questionId",
+                "optionId"
+              ]
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "by",
+          "choices"
+        ]
+      },
+      "ScopeProposal": {
+        "description": "The AI's reading of the request in the requester's words, written with the feasibility report.",
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Report revision this was written with"
+          },
+          "summary": {
+            "type": "string",
+            "description": "Two or three plain sentences, no technical terms"
+          },
+          "changes": {
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What will change"
+          },
+          "unchanged": {
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What this request will not change"
+          },
+          "questions": {
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScopeQuestion"
+            }
+          }
+        },
+        "required": [
+          "revision",
+          "summary",
+          "changes",
+          "unchanged",
+          "questions"
+        ]
+      },
+      "ScopeQuestion": {
+        "description": "A choice the requester makes where the request can be read more than one way.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "options": {
+            "minItems": 2,
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "label"
+              ]
+            }
+          },
+          "recommended": {
+            "description": "Option id the AI would pick; never preselected",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "options"
         ]
       },
       "Session": {
@@ -3978,6 +4464,60 @@
             "properties": {
               "event": {
                 "type": "string",
+                "const": "approveScope"
+              },
+              "choices": {
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "questionId": {
+                      "type": "string"
+                    },
+                    "optionId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "questionId",
+                    "optionId"
+                  ]
+                }
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 1000
+              }
+            },
+            "required": [
+              "event",
+              "choices"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string",
+                "const": "reviseScope"
+              },
+              "note": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            },
+            "required": [
+              "event",
+              "note"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string",
                 "const": "reject"
               },
               "reason": {
@@ -4001,6 +4541,14 @@
               "instructions": {
                 "type": "string",
                 "maxLength": 2000
+              },
+              "checkedAssumptions": {
+                "description": "Ids of the report's assumptions the developer confirmed; all of them on the first run",
+                "maxItems": 50,
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             },
             "required": [
@@ -4290,6 +4838,52 @@
           "finished"
         ]
       },
+      "WorkPreview": {
+        "description": "What the requester can look at before the merge. Filled by CI or the coding agent; costs no AI.",
+        "type": "object",
+        "properties": {
+          "url": {
+            "description": "A running build of the change, e.g. a preview deployment",
+            "type": "string",
+            "format": "uri"
+          },
+          "screenshots": {
+            "maxItems": 6,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Image URL (data: URLs allowed)"
+                },
+                "alt": {
+                  "type": "string"
+                },
+                "caption": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "url",
+                "alt"
+              ]
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "screenshots"
+        ]
+      },
       "WorkRequest": {
         "type": "object",
         "properties": {
@@ -4326,6 +4920,15 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AcceptanceCriterion"
+            }
+          },
+          "checklistSource": {
+            "type": "string"
+          },
+          "checklist": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChecklistItem"
             }
           },
           "outOfScope": {
@@ -4398,6 +5001,21 @@
           },
           "report": {
             "$ref": "#/components/schemas/FeasibilityReport"
+          },
+          "scope": {
+            "description": "Scope the requester confirmed (or is asked to); the developer and the AI work from it",
+            "type": "object",
+            "properties": {
+              "proposal": {
+                "$ref": "#/components/schemas/ScopeProposal"
+              },
+              "decision": {
+                "$ref": "#/components/schemas/ScopeDecision"
+              }
+            },
+            "required": [
+              "proposal"
+            ]
           },
           "work": {
             "$ref": "#/components/schemas/WorkRun"
@@ -4551,6 +5169,13 @@
             "description": "Developer memo or revision note passed to the AI",
             "type": "string"
           },
+          "checkedAssumptions": {
+            "description": "Report assumption ids the developer confirmed before this run started",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "branch": {
             "type": "string"
           },
@@ -4642,6 +5267,13 @@
           },
           "summary": {
             "type": "string"
+          },
+          "preview": {
+            "$ref": "#/components/schemas/WorkPreview"
+          },
+          "previewFeedback": {
+            "description": "Reset with every new run",
+            "$ref": "#/components/schemas/PreviewFeedback"
           },
           "costKrw": {
             "type": "number",

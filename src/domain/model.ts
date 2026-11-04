@@ -58,6 +58,24 @@ export const ProjectIcon = named(
 )
 export type ProjectIcon = z.infer<typeof ProjectIcon>
 
+export const PROJECT_CONSTRAINTS_MAX = 20
+
+export const ProjectConstraint = named(
+  'ProjectConstraint',
+  z.object({
+    id: z.string(),
+    text: z.string().trim().min(1).max(300).describe('A rule every change must keep, in plain words'),
+    reference: z
+      .string()
+      .trim()
+      .max(60)
+      .optional()
+      .describe('Where the rule comes from, e.g. "Security policy 3.2"'),
+  }),
+  'A project rule the AI must respect when it plans and makes a change (security, data, operations). Kept by the project, so requesters never have to repeat it.',
+)
+export type ProjectConstraint = z.infer<typeof ProjectConstraint>
+
 export const Project = named(
   'Project',
   z.object({
@@ -75,6 +93,7 @@ export const Project = named(
     }),
     ownerIds: z.array(z.string()).describe('Developers responsible for this project'),
     targets: z.array(ProjectTarget),
+    constraints: z.array(ProjectConstraint).max(PROJECT_CONSTRAINTS_MAX),
     active: z.boolean(),
   }),
 )
@@ -86,7 +105,8 @@ export type Project = z.infer<typeof Project>
 
 export const RequestType = named(
   'RequestType',
-  z.enum(['new_feature', 'change', 'bug', 'copy_design', 'non_code']),
+  z.enum(['new_feature', 'change', 'bug', 'copy_design', 'non_code', 'checklist']),
+  'checklist = findings from an outside review (audit, inspection, certification) handled item by item',
 )
 export type RequestType = z.infer<typeof RequestType>
 
@@ -113,27 +133,74 @@ export type Attachment = z.infer<typeof Attachment>
 
 export const ACCEPTANCE_CRITERIA_MIN = 1
 export const ACCEPTANCE_CRITERIA_MAX = 5
+export const CHECKLIST_ITEMS_MAX = 30
+
+export const ChecklistItemInput = named(
+  'ChecklistItemInput',
+  z.object({
+    ref: z.string().trim().min(1).max(60).describe('The finding\'s own number, e.g. "Finding 24"'),
+    clause: z.string().trim().max(60).optional().describe('Clause of the standard, e.g. "2.3.1"'),
+    finding: z.string().trim().min(1).max(500).describe('What the reviewer found, in their words'),
+    expected: z.string().trim().max(300).optional().describe('What counts as fixed'),
+  }),
+)
+export type ChecklistItemInput = z.infer<typeof ChecklistItemInput>
+
+export const ChecklistItem = named(
+  'ChecklistItem',
+  ChecklistItemInput.extend({
+    id: z.string(),
+    criterionId: z.string().describe('The acceptance criterion made from this item'),
+  }),
+)
+export type ChecklistItem = z.infer<typeof ChecklistItem>
 
 /** Fields the requester fills in. Field names are fixed so they reach the AI verbatim. */
 export const RequestDraft = named(
   'RequestDraft',
-  z.object({
-    projectId: z.string().min(1),
-    type: RequestType,
-    title: z.string().trim().min(2).max(120),
-    targetIds: z.array(z.string()),
-    targetOther: z.string().max(200).optional(),
-    currentBehavior: z.string().trim().max(2000),
-    desiredBehavior: z.string().trim().min(1).max(2000),
-    acceptanceCriteria: z
-      .array(z.object({ text: z.string().trim().min(1).max(300) }))
-      .min(ACCEPTANCE_CRITERIA_MIN)
-      .max(ACCEPTANCE_CRITERIA_MAX),
-    outOfScope: z.string().max(1000).optional(),
-    attachmentIds: z.array(z.string()),
-    desiredDate: CalendarDate.optional(),
-    desiredDateReason: z.string().max(300).optional(),
-  }),
+  z
+    .object({
+      projectId: z.string().min(1),
+      type: RequestType,
+      title: z.string().trim().min(2).max(120),
+      targetIds: z.array(z.string()),
+      targetOther: z.string().max(200).optional(),
+      currentBehavior: z.string().trim().max(2000),
+      desiredBehavior: z.string().trim().min(1).max(2000),
+      acceptanceCriteria: z
+        .array(z.object({ text: z.string().trim().min(1).max(300) }))
+        .max(ACCEPTANCE_CRITERIA_MAX)
+        .describe(`${ACCEPTANCE_CRITERIA_MIN}–${ACCEPTANCE_CRITERIA_MAX}; ignored for checklist requests`),
+      checklistSource: z
+        .string()
+        .trim()
+        .max(100)
+        .optional()
+        .describe('Who raised the findings, e.g. "Security audit, on-site review"'),
+      checklist: z
+        .array(ChecklistItemInput)
+        .max(CHECKLIST_ITEMS_MAX)
+        .optional()
+        .describe('Checklist requests only: each item becomes an acceptance criterion'),
+      outOfScope: z.string().max(1000).optional(),
+      attachmentIds: z.array(z.string()),
+      desiredDate: CalendarDate.optional(),
+      desiredDateReason: z.string().max(300).optional(),
+    })
+    .superRefine((d, ctx) => {
+      if (d.type === 'checklist') {
+        if (!d.checklist?.length) {
+          ctx.addIssue({ code: 'custom', path: ['checklist'], message: 'At least one checklist item' })
+        }
+      } else {
+        if (d.acceptanceCriteria.length < ACCEPTANCE_CRITERIA_MIN) {
+          ctx.addIssue({ code: 'custom', path: ['acceptanceCriteria'], message: 'At least one criterion' })
+        }
+        if (d.checklist?.length) {
+          ctx.addIssue({ code: 'custom', path: ['checklist'], message: 'Only for checklist requests' })
+        }
+      }
+    }),
 )
 export type RequestDraft = z.infer<typeof RequestDraft>
 
@@ -157,6 +224,7 @@ export const RequestStatus = named(
   z.enum([
     'submitted',
     'reporting',
+    'scope_check',
     'review',
     'info_needed',
     'rejected',
@@ -192,6 +260,24 @@ export type WikiTrust = z.infer<typeof WikiTrust>
 export const WorkSize = named('WorkSize', z.enum(['S', 'M', 'L']))
 export type WorkSize = z.infer<typeof WorkSize>
 
+export const ReportAssumption = named(
+  'ReportAssumption',
+  z.object({ id: z.string(), text: z.string() }),
+  'A fact the plan relies on that neither the code nor a reviewed wiki confirmed. The developer checks each one before the AI starts work.',
+)
+export type ReportAssumption = z.infer<typeof ReportAssumption>
+
+export const ConstraintCheck = named(
+  'ConstraintCheck',
+  z.object({
+    constraintId: z.string(),
+    text: z.string().describe('Copy of the project constraint when the report was written'),
+    reference: z.string().optional(),
+    conflict: z.boolean().describe('The plan, or the code it touches, breaks this constraint'),
+    note: z.string(),
+  }),
+)
+export type ConstraintCheck = z.infer<typeof ConstraintCheck>
 export const FeasibilityReport = named(
   'FeasibilityReport',
   z.object({
@@ -212,6 +298,12 @@ export const FeasibilityReport = named(
       z.object({ criterionId: z.string(), automatable: z.boolean(), method: z.string() }),
     ),
     openQuestions: z.array(z.string()),
+    assumptions: z.array(ReportAssumption),
+    constraintChecks: z
+      .array(ConstraintCheck)
+      .describe(
+        'Every project constraint and how the plan keeps it; a conflict makes the verdict conditional',
+      ),
     wikiTrust: WikiTrust,
     size: WorkSize,
     risks: z.array(z.string()),
@@ -219,6 +311,52 @@ export const FeasibilityReport = named(
   }),
 )
 export type FeasibilityReport = z.infer<typeof FeasibilityReport>
+
+/* ------------------------------------------------------------------ */
+/* Scope check: the requester confirms the AI's reading of the request */
+/* ------------------------------------------------------------------ */
+
+/** How many times a requester may send the scope back to be rewritten. */
+export const SCOPE_REVISIONS_MAX = 2
+
+export const ScopeQuestion = named(
+  'ScopeQuestion',
+  z.object({
+    id: z.string(),
+    text: z.string(),
+    options: z
+      .array(z.object({ id: z.string(), label: z.string() }))
+      .min(2)
+      .max(4),
+    recommended: z.string().optional().describe('Option id the AI would pick; never preselected'),
+  }),
+  'A choice the requester makes where the request can be read more than one way.',
+)
+export type ScopeQuestion = z.infer<typeof ScopeQuestion>
+
+export const ScopeProposal = named(
+  'ScopeProposal',
+  z.object({
+    revision: z.int().positive().describe('Report revision this was written with'),
+    summary: z.string().describe('Two or three plain sentences, no technical terms'),
+    changes: z.array(z.string()).max(5).describe('What will change'),
+    unchanged: z.array(z.string()).max(5).describe('What this request will not change'),
+    questions: z.array(ScopeQuestion).max(3),
+  }),
+  "The AI's reading of the request in the requester's words, written with the feasibility report.",
+)
+export type ScopeProposal = z.infer<typeof ScopeProposal>
+
+export const ScopeDecision = named(
+  'ScopeDecision',
+  z.object({
+    at: Timestamp,
+    by: z.string().describe('User id of the requester'),
+    choices: z.array(z.object({ questionId: z.string(), optionId: z.string() })),
+    note: z.string().optional(),
+  }),
+)
+export type ScopeDecision = z.infer<typeof ScopeDecision>
 
 /* ------------------------------------------------------------------ */
 /* AI work run (branch -> tests -> merge request)                      */
@@ -230,6 +368,41 @@ export const WorkPhase = named(
 )
 export type WorkPhase = z.infer<typeof WorkPhase>
 
+export const WorkPreview = named(
+  'WorkPreview',
+  z.object({
+    url: z.url().optional().describe('A running build of the change, e.g. a preview deployment'),
+    screenshots: z
+      .array(
+        z.object({
+          id: z.string(),
+          url: z.string().describe('Image URL (data: URLs allowed)'),
+          alt: z.string(),
+          caption: z.string().optional(),
+        }),
+      )
+      .max(6),
+    expiresAt: Timestamp.optional(),
+  }),
+  'What the requester can look at before the merge. Filled by CI or the coding agent; costs no AI.',
+)
+export type WorkPreview = z.infer<typeof WorkPreview>
+
+export const PreviewVerdict = named('PreviewVerdict', z.enum(['looks_good', 'needs_change']))
+export type PreviewVerdict = z.infer<typeof PreviewVerdict>
+
+export const PreviewFeedback = named(
+  'PreviewFeedback',
+  z.object({
+    at: Timestamp,
+    by: z.string(),
+    verdict: PreviewVerdict,
+    note: z.string().optional(),
+  }),
+  "The requester's reaction to the preview. Advisory: the developer still decides on the merge.",
+)
+export type PreviewFeedback = z.infer<typeof PreviewFeedback>
+
 export const WorkRun = named(
   'WorkRun',
   z.object({
@@ -239,6 +412,10 @@ export const WorkRun = named(
     phase: WorkPhase,
     outcome: z.enum(['success', 'tests_failed', 'error']).optional(),
     instructions: z.string().optional().describe('Developer memo or revision note passed to the AI'),
+    checkedAssumptions: z
+      .array(z.string())
+      .optional()
+      .describe('Report assumption ids the developer confirmed before this run started'),
     branch: z.string(),
     mergeRequest: z
       .object({
@@ -262,6 +439,8 @@ export const WorkRun = named(
       .optional()
       .describe('Wiki docs edited in the same merge request; always pending human review'),
     summary: z.string().optional(),
+    preview: WorkPreview.optional(),
+    previewFeedback: PreviewFeedback.optional().describe('Reset with every new run'),
     costKrw: z.number().nonnegative().optional(),
     agent: z
       .object({ provider: AiProvider, model: z.string(), runtime: AiRuntime })
@@ -360,6 +539,8 @@ export const WorkRequest = named(
     currentBehavior: z.string(),
     desiredBehavior: z.string(),
     acceptanceCriteria: z.array(AcceptanceCriterion),
+    checklistSource: z.string().optional(),
+    checklist: z.array(ChecklistItem).optional(),
     outOfScope: z.string().optional(),
     attachments: z.array(Attachment),
     desiredDate: CalendarDate.optional(),
@@ -375,6 +556,10 @@ export const WorkRequest = named(
       .optional(),
     rejectionReason: z.string().optional(),
     report: FeasibilityReport.optional(),
+    scope: z
+      .object({ proposal: ScopeProposal, decision: ScopeDecision.optional() })
+      .optional()
+      .describe('Scope the requester confirmed (or is asked to); the developer and the AI work from it'),
     work: WorkRun.optional(),
     regression: z.array(RegressionCheck),
     verification: z.array(CriterionCheck),

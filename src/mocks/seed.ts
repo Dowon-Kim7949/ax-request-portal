@@ -67,13 +67,16 @@ export function seedUsers(lang: ServerLanguage): User[] {
 /* Projects                                                            */
 /* ------------------------------------------------------------------ */
 
-type ProjectBase = Omit<Project, 'name' | 'description' | 'targets'> & {
+type ProjectBase = Omit<Project, 'name' | 'description' | 'targets' | 'constraints'> & {
   targets: Array<{ id: string; wikiDoc?: string }>
+  /** Ids of the project rules; the words are in CONSTRAINT_COPY */
+  constraints: string[]
 }
 
 const PROJECTS: ProjectBase[] = [
   {
     id: 'p-portal',
+    constraints: ['pc-storage', 'pc-masking'],
     icon: 'globe',
     repository: { provider: 'gitlab', url: 'https://gitlab.example.com/acme/customer-portal' },
     wikiPath: 'docs/llm-wiki',
@@ -92,6 +95,7 @@ const PROJECTS: ProjectBase[] = [
   },
   {
     id: 'p-field',
+    constraints: ['pc-offline'],
     icon: 'smartphone',
     repository: { provider: 'github', url: 'https://github.com/acme/field-worker-app' },
     wikiPath: 'docs/llm-wiki',
@@ -108,6 +112,7 @@ const PROJECTS: ProjectBase[] = [
   },
   {
     id: 'p-admin',
+    constraints: ['pc-audit'],
     icon: 'layout-dashboard',
     repository: { provider: 'gitlab', url: 'https://gitlab.example.com/acme/admin-console' },
     wikiPath: 'docs/llm-wiki',
@@ -123,6 +128,7 @@ const PROJECTS: ProjectBase[] = [
   },
   {
     id: 'p-data',
+    constraints: [],
     icon: 'server',
     repository: { provider: 'github', url: 'https://github.com/acme/analytics-server' },
     wikiPath: 'docs/llm-wiki',
@@ -225,6 +231,45 @@ const PROJECT_COPY: Record<
   },
 }
 
+const CONSTRAINT_COPY: Record<ServerLanguage, Record<string, { text: string; reference: string }>> = {
+  ko: {
+    'pc-storage': {
+      text: '인증 정보와 개인정보는 브라우저 저장소(localStorage·sessionStorage)에 두지 않는다',
+      reference: '보안 정책 3.2',
+    },
+    'pc-masking': {
+      text: '고객 이름과 연락처는 화면에 가려서(마스킹) 보여 준다',
+      reference: '개인정보 처리 지침 5조',
+    },
+    'pc-offline': {
+      text: '통신이 끊겨도 작업 완료를 기록할 수 있어야 한다',
+      reference: '현장 운영 요건',
+    },
+    'pc-audit': {
+      text: '사용자나 권한을 바꾸는 동작은 모두 감사 로그를 남긴다',
+      reference: '내부 통제 기준 2.1',
+    },
+  },
+  en: {
+    'pc-storage': {
+      text: 'Never keep credentials or personal data in browser storage (localStorage, sessionStorage)',
+      reference: 'Security policy 3.2',
+    },
+    'pc-masking': {
+      text: 'Show customer names and phone numbers masked on screen',
+      reference: 'Privacy guideline art. 5',
+    },
+    'pc-offline': {
+      text: 'Workers must be able to record a finished job without a connection',
+      reference: 'Field operations requirement',
+    },
+    'pc-audit': {
+      text: 'Every change to users or permissions writes an audit log entry',
+      reference: 'Internal control 2.1',
+    },
+  },
+}
+
 function seedProjects(lang: ServerLanguage): Project[] {
   return PROJECTS.map((p) => {
     const c = PROJECT_COPY[lang][p.id]!
@@ -233,6 +278,7 @@ function seedProjects(lang: ServerLanguage): Project[] {
       name: c.name,
       description: c.description,
       targets: p.targets.map((t) => ({ ...t, name: c.targets[t.id]! })),
+      constraints: p.constraints.map((id) => ({ id, ...CONSTRAINT_COPY[lang][id]! })),
     }
   })
 }
@@ -255,6 +301,8 @@ interface ScenarioCopy {
   targetOther?: string
   outOfScope?: string
   dateReason?: string
+  checklistSource?: string
+  checklist?: RequestDraft['checklist']
   questions?: string[]
   answer?: string
   reason?: string
@@ -279,7 +327,14 @@ interface Scenario {
 const passAll = (n: number) =>
   Array.from({ length: n }, (_, i) => ({ criterionId: `c${i + 1}`, result: 'passed' as const }))
 
-/** report → run work → AI done → approve → requester confirms → released */
+/** The requester confirms the AI's reading (choices left out are filled in by `withDefaults`). */
+const approve = (requester: string, h: number): Step => ({
+  h,
+  by: requester,
+  command: { event: 'approveScope', choices: [] },
+})
+
+/** report → scope confirmed → run work → AI done → approve → requester confirms → released */
 function shipped(
   dev: string,
   requester: string,
@@ -290,6 +345,7 @@ function shipped(
   const t = (offset: number) => start - offset
   return [
     { h: t(1), ai: true },
+    approve(requester, t(4)),
     { h: t(16), by: dev, command: { event: 'runWork' } },
     { h: t(17), ai: true },
     { h: t(20), by: dev, command: { event: 'approveMerge' } },
@@ -354,6 +410,7 @@ const SCENARIOS: Scenario[] = [
     desiredInDays: -3,
     steps: () => [
       { h: 24 * 10 - 1, ai: true },
+      approve('u-kim', 24 * 10 - 3),
       { h: 24 * 9, by: 'u-choi', command: { event: 'runWork' } },
       { h: 24 * 9 - 1, ai: true },
       { h: 24 * 8, by: 'u-choi', command: { event: 'approveMerge' } },
@@ -378,6 +435,7 @@ const SCENARIOS: Scenario[] = [
     targetIds: ['t-payments'],
     steps: () => [
       { h: 24 * 8 - 1, ai: true },
+      approve('u-kim', 24 * 8 - 3),
       { h: 24 * 7, by: 'u-choi', command: { event: 'runWork' } },
       { h: 24 * 7 - 1, ai: true },
       { h: 24 * 6, by: 'u-choi', command: { event: 'approveMerge' } },
@@ -393,6 +451,7 @@ const SCENARIOS: Scenario[] = [
     targetIds: ['t-offline'],
     steps: () => [
       { h: 24 * 7 - 1, ai: true },
+      approve('u-lee', 24 * 7 - 3),
       { h: 24 * 6, by: 'u-jung', command: { event: 'runWork' } },
       { h: 24 * 6 - 1, ai: true },
       { h: 24 * 5, by: 'u-jung', command: { event: 'approveMerge' } },
@@ -408,6 +467,7 @@ const SCENARIOS: Scenario[] = [
     targetIds: ['t-mypage'],
     steps: () => [
       { h: 24 * 5 - 1, ai: true },
+      approve('u-kim', 24 * 5 - 3),
       { h: 24 * 4, by: 'u-choi', command: { event: 'runWork' } },
       { h: 24 * 4 - 1, ai: true },
       { h: 24 * 2, by: 'u-choi', command: { event: 'approveMerge' } },
@@ -421,6 +481,7 @@ const SCENARIOS: Scenario[] = [
     targetIds: ['t-report-api'],
     steps: (c) => [
       { h: 24 * 4 - 1, ai: true },
+      approve('u-lee', 24 * 4 - 3),
       { h: 24 * 3, by: 'u-jung', command: { event: 'requestInfo', questions: c.questions! } },
     ],
   },
@@ -432,6 +493,7 @@ const SCENARIOS: Scenario[] = [
     targetIds: ['t-task-list'],
     steps: (c) => [
       { h: 24 * 4 - 3, ai: true },
+      approve('u-lee', 24 * 4 - 5),
       { h: 24 * 3, by: 'u-jung', command: { event: 'runWork' } },
       { h: 24 * 3 - 1, ai: true },
       { h: 24 * 2, by: 'u-jung', command: { event: 'approveMerge' } },
@@ -457,9 +519,11 @@ const SCENARIOS: Scenario[] = [
     desiredInDays: 10,
     steps: (c) => [
       { h: 24 * 3 - 1, ai: true },
+      approve('u-kim', 24 * 3 - 2),
       { h: 24 * 2 + 6, by: 'u-choi', command: { event: 'requestInfo', questions: c.questions! } },
       { h: 24 * 2, by: 'u-kim', command: { event: 'provideInfo', answer: c.answer! } },
       { h: 24 * 2 - 1, ai: true },
+      approve('u-kim', 24 * 2 - 2),
       { h: 24, by: 'u-choi', command: { event: 'runWork', instructions: c.memo! } },
       { h: 23, ai: true },
     ],
@@ -473,16 +537,18 @@ const SCENARIOS: Scenario[] = [
     targetIds: ['t-roles'],
     steps: () => [
       { h: 25, ai: true },
+      approve('u-kim', 24),
       { h: 8 / 3600, by: 'u-choi', command: { event: 'runWork' } },
     ],
   },
-  /* 1026 */ {
+  /* 1026: report with an assumption and a constraint conflict */ {
     by: 'u-lee',
     h: 20,
     projectId: 'p-portal',
     type: 'change',
     targetIds: ['t-signup'],
-    steps: () => [{ h: 19, ai: true }],
+    steps: () => [{ h: 19, ai: true }, approve('u-lee', 18)],
+    patch: (r, lang) => showcase1026(r, lang),
   },
   /* 1027: report being written when the demo opens */ {
     by: 'u-kim',
@@ -490,6 +556,29 @@ const SCENARIOS: Scenario[] = [
     projectId: 'p-field',
     type: 'new_feature',
     targetIds: ['t-push', 't-task-detail'],
+  },
+  /* 1028: the AI's reading waits for the requester, with two choices to make */ {
+    by: 'u-kim',
+    h: 5,
+    projectId: 'p-admin',
+    type: 'new_feature',
+    targetIds: ['t-announce'],
+    steps: () => [{ h: 4.9, ai: true }],
+  },
+  /* 1029: audit findings, checked item by item */ {
+    by: 'u-kim',
+    h: 30,
+    projectId: 'p-portal',
+    type: 'checklist',
+    targetIds: ['t-login', 't-mypage'],
+    desiredInDays: 5,
+    steps: () => [
+      { h: 29.9, ai: true },
+      approve('u-kim', 29),
+      { h: 28, by: 'u-choi', command: { event: 'runWork' } },
+      { h: 27.9, ai: true },
+      { h: 26, by: 'u-choi', command: { event: 'approveMerge' } },
+    ],
   },
 ]
 
@@ -613,6 +702,44 @@ const SCENARIO_COPY: Record<ServerLanguage, ScenarioCopy[]> = {
       current: '모든 알림이 한꺼번에 온다',
       desired: '작업 배정, 마감 임박, 공지 중 받을 알림을 고른다',
       criteria: ['설정에서 마감 임박을 끄면 마감 임박 알림이 오지 않는다'],
+    },
+    {
+      title: '공지 예약 게시',
+      current: '공지는 저장하는 즉시 게시된다',
+      desired: '날짜와 시간을 정해 두면 그때 자동으로 게시된다',
+      criteria: [
+        '게시 시간을 정해 저장하면 그 시간에 공지가 게시된다',
+        '예약된 공지는 목록에 예약 표시와 함께 보인다',
+      ],
+      targetOther: '메인 배너',
+    },
+    {
+      title: '보안 점검 지적 3건 조치',
+      current: '',
+      desired: '현장평가에서 받은 화면 관련 지적 3건을 기준에 맞게 고친다',
+      criteria: [],
+      dateReason: '재점검 일정',
+      checklistSource: '보안 점검 현장평가',
+      checklist: [
+        {
+          ref: '지적 24',
+          clause: '2.3.1',
+          finding: '로그인 화면에 개인정보 처리방침 링크가 없다',
+          expected: '로그인 화면 아래에 처리방침 링크가 항상 보인다',
+        },
+        {
+          ref: '지적 25',
+          clause: '2.5.4',
+          finding: '로그인 오류 문구가 아이디가 있는지 없는지를 알려 준다',
+          expected: '아이디와 비밀번호 중 무엇이 틀렸는지 구분하지 않는다',
+        },
+        {
+          ref: '지적 27',
+          clause: '2.9.2',
+          finding: '마이페이지에서 연락처가 그대로 보인다',
+          expected: '연락처 가운데 네 자리가 가려져 보인다',
+        },
+      ],
     },
   ],
   en: [
@@ -738,6 +865,44 @@ const SCENARIO_COPY: Record<ServerLanguage, ScenarioCopy[]> = {
       desired: 'Pick between job assigned, due soon and announcements',
       criteria: ['When I turn off "due soon" in settings, due-soon notifications stop'],
     },
+    {
+      title: 'Schedule announcements',
+      current: 'An announcement goes live as soon as it is saved',
+      desired: 'Set a date and time, and it goes live then by itself',
+      criteria: [
+        'When I save an announcement with a publish time, it goes live at that time',
+        'Scheduled announcements show in the list with a scheduled mark',
+      ],
+      targetOther: 'Home banner',
+    },
+    {
+      title: 'Fix three security audit findings',
+      current: '',
+      desired: 'Fix the three screen findings from the on-site review so they meet the standard',
+      criteria: [],
+      dateReason: 'Re-inspection date',
+      checklistSource: 'Security audit, on-site review',
+      checklist: [
+        {
+          ref: 'Finding 24',
+          clause: '2.3.1',
+          finding: 'The sign-in screen has no link to the privacy policy',
+          expected: 'A privacy policy link is always visible under the sign-in form',
+        },
+        {
+          ref: 'Finding 25',
+          clause: '2.5.4',
+          finding: 'The sign-in error tells whether the user name exists',
+          expected: 'The error does not say whether the user name or the password was wrong',
+        },
+        {
+          ref: 'Finding 27',
+          clause: '2.9.2',
+          finding: 'My page shows the full phone number',
+          expected: 'The middle four digits of the phone number are masked',
+        },
+      ],
+    },
   ],
 }
 
@@ -802,6 +967,39 @@ function showcase1024(r: WorkRequest, lang: ServerLanguage): WorkRequest {
       source: `docs/llm-wiki/${docs[i]}`,
       result: 'pending' as const,
     })),
+  }
+}
+
+const SHOWCASE_1026: Record<ServerLanguage, { assumption: string; conflict: string }> = {
+  ko: {
+    assumption:
+      '약관 문구는 서버에서 받아 오므로, 문구만 바꾸면 앱을 다시 배포하지 않아도 된다고 가정했습니다.',
+    conflict:
+      '가입 단계 사이에 약관 동의 상태를 sessionStorage에 두는 지금 방식이 이 제약과 부딪힙니다. 동의 상태를 서버 임시 저장으로 옮겨야 합니다.',
+  },
+  en: {
+    assumption: 'Terms texts come from the server, so changing them needs no new app release.',
+    conflict:
+      'Sign-up keeps the consent state in sessionStorage between steps, which breaks this rule. The consent state should move to a server-side draft.',
+  },
+}
+
+/** The developer's queue shows what the report could not confirm and which rule the plan breaks. */
+function showcase1026(r: WorkRequest, lang: ServerLanguage): WorkRequest {
+  const c = SHOWCASE_1026[lang]
+  return {
+    ...r,
+    report: r.report && {
+      ...r.report,
+      verdict: 'conditional',
+      assumptions: [
+        ...r.report.assumptions,
+        { id: `a${r.report.assumptions.length + 1}`, text: c.assumption },
+      ],
+      constraintChecks: r.report.constraintChecks.map((k) =>
+        k.constraintId === 'pc-storage' ? { ...k, conflict: true, note: c.conflict } : k,
+      ),
+    },
   }
 }
 
@@ -938,7 +1136,29 @@ export function buildSeedState(now: Date, opts: EngineOptions, lang: ServerLangu
       engine.updateRelease(user(step.by), id, { scheduledDate: date }, t)
       return
     }
-    engine.transition(user(step.by), id, step.command, t, lang)
+    // Without a scope check (configuration, or nothing to confirm) the step does not apply.
+    const status = state.requests.find((r) => r.id === id)!.status
+    if (step.command.event === 'approveScope' && status !== 'scope_check') return
+    engine.transition(user(step.by), id, withDefaults(id, step.command), t, lang)
+  }
+
+  /**
+   * Scenarios leave out what a person would pick on screen: every assumption is
+   * confirmed and every scope question gets the AI's suggestion (or the first option).
+   */
+  const withDefaults = (id: number, command: TransitionCommand): TransitionCommand => {
+    const req = state.requests.find((r) => r.id === id)!
+    if (command.event === 'runWork' && !command.checkedAssumptions) {
+      return { ...command, checkedAssumptions: (req.report?.assumptions ?? []).map((a) => a.id) }
+    }
+    if (command.event === 'approveScope' && !command.choices.length) {
+      const questions = req.scope?.proposal.questions ?? []
+      return {
+        ...command,
+        choices: questions.map((q) => ({ questionId: q.id, optionId: q.recommended ?? q.options[0]!.id })),
+      }
+    }
+    return command
   }
 
   // Background history first (ids 990–1003), two to fifty days old.
@@ -976,6 +1196,8 @@ export function buildSeedState(now: Date, opts: EngineOptions, lang: ServerLangu
       currentBehavior: c.current,
       desiredBehavior: c.desired,
       acceptanceCriteria: c.criteria.map((text) => ({ text })),
+      ...(c.checklist ? { checklist: c.checklist } : {}),
+      ...(c.checklistSource ? { checklistSource: c.checklistSource } : {}),
       ...(c.outOfScope ? { outOfScope: c.outOfScope } : {}),
       attachmentIds: [],
       ...(s.desiredInDays !== undefined ? { desiredDate: addDays(today, s.desiredInDays) } : {}),

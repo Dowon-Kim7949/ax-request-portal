@@ -15,6 +15,7 @@ export async function startMockApi(language: ServerLanguage): Promise<MockStore>
     reportSeconds: appConfig.mock.reportSeconds,
     workSeconds: appConfig.mock.workSeconds,
     rolePermissions: appConfig.rolePermissions,
+    scopeCheck: appConfig.workflow.scopeCheck,
     storage: typeof localStorage === 'undefined' ? null : localStorage,
     language,
   })

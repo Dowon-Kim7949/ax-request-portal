@@ -3,6 +3,7 @@ import {
   Bot,
   Check,
   ChevronDown,
+  CircleHelp,
   ExternalLink,
   FileCode2,
   FlaskConical,
@@ -34,7 +35,9 @@ import type {
 } from '@/domain/model'
 import { cn } from '@/lib/cn'
 import { formatDateTime, formatKrw, toLocalDate } from '@/lib/format'
+import { uncheckedAssumptions } from '@/domain/lifecycle'
 import { useAiRunLimit } from './ai-limit'
+import { FeedbackBadge, PreviewImages } from './preview-panels'
 import { AiRunLimitReason } from './ai-usage-card'
 
 const errorText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback)
@@ -184,6 +187,59 @@ export function ReportPanel({
         </div>
       ) : null}
 
+      {report.assumptions.length ? (
+        <section aria-labelledby="report-assumptions" className="mt-3 rounded-2xl bg-warning-50 px-4 py-3">
+          <h3
+            id="report-assumptions"
+            className="flex items-center gap-1.5 text-[15px] font-bold text-warning-fg"
+          >
+            <CircleHelp className="size-4" aria-hidden />
+            {t('report.assumptions')}
+          </h3>
+          <p className="mt-0.5 text-[13px] text-ink-700">{t('report.assumptionsHint')}</p>
+          <ul className="mt-1.5 flex flex-col gap-1 text-[15px] text-ink-700">
+            {report.assumptions.map((a) => (
+              <li key={a.id}>· {a.text}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {report.constraintChecks.length ? (
+        <section aria-labelledby="report-constraints" className="mt-3">
+          <h3 id="report-constraints" className="mb-1.5 text-[13px] font-bold text-ink-600">
+            {t('report.constraints')}
+          </h3>
+          <ul className="flex flex-col gap-2">
+            {report.constraintChecks.map((k) => (
+              <li
+                key={k.constraintId}
+                className={cn(
+                  'flex flex-col gap-1 rounded-2xl px-3.5 py-2.5 sm:flex-row sm:items-start sm:gap-3',
+                  k.conflict ? 'bg-danger-50' : 'ring-1 ring-line',
+                )}
+              >
+                <Badge tone={k.conflict ? 'danger' : 'success'} className="w-fit shrink-0">
+                  {k.conflict ? t('report.constraintConflict') : t('report.constraintKept')}
+                </Badge>
+                <div className="min-w-0 flex-1 text-sm">
+                  <p className={k.conflict ? 'font-semibold text-ink-700' : 'font-semibold text-ink-900'}>
+                    {k.text}
+                    {k.reference ? (
+                      <span className={cn('font-normal', k.conflict ? 'text-ink-700' : 'text-ink-500')}>
+                        {' '}
+                        · {k.reference}
+                      </span>
+                    ) : null}
+                  </p>
+                  <p className="mt-0.5 text-ink-700">{k.note}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <button
         type="button"
         onClick={() => setShowEvidence((v) => !v)}
@@ -284,6 +340,13 @@ export function DecisionCard({
   const [edited, setQuestions] = useState<string[] | null>(null)
   const questions = edited ?? (askPrefill.length ? askPrefill : [''])
   const [reason, setReason] = useState('')
+  // Assumptions are confirmed once, before the first run.
+  const assumptions = request.status === 'review' ? (request.report?.assumptions ?? []) : []
+  const [checked, setChecked] = useState<string[]>([])
+  const left = uncheckedAssumptions(request, checked).length
+  const leftId = useId()
+  const toggle = (id: string) =>
+    setChecked((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]))
 
   const openAsk = () => setSheet('ask')
 
@@ -356,9 +419,15 @@ export function DecisionCard({
               size="lg"
               className="flex-1"
               loading={transition.isPending}
+              disabled={left > 0}
+              aria-describedby={left > 0 ? leftId : undefined}
               onClick={() =>
                 transition.mutate(
-                  { event: 'runWork', ...(memo.trim() ? { instructions: memo.trim() } : {}) },
+                  {
+                    event: 'runWork',
+                    ...(memo.trim() ? { instructions: memo.trim() } : {}),
+                    ...(assumptions.length ? { checkedAssumptions: checked } : {}),
+                  },
                   { onSuccess: done(t('decide.started')), onError: fail },
                 )
               }
@@ -368,6 +437,33 @@ export function DecisionCard({
           </>
         }
       >
+        {assumptions.length ? (
+          <fieldset className="mb-4 flex flex-col gap-2">
+            <legend className="mb-1 text-sm font-semibold text-ink-700">
+              {t('decide.checkAssumptions')}
+            </legend>
+            <p className="-mt-0.5 text-[13px] text-ink-500">{t('decide.checkAssumptionsHint')}</p>
+            {assumptions.map((a) => (
+              <label
+                key={a.id}
+                className="flex min-h-11 cursor-pointer items-start gap-3 rounded-xl px-3 py-2.5 text-[15px] ring-1 ring-line has-checked:bg-muted"
+              >
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-5 shrink-0 accent-brand-600"
+                  checked={checked.includes(a.id)}
+                  onChange={() => toggle(a.id)}
+                />
+                <span>{a.text}</span>
+              </label>
+            ))}
+            {left > 0 ? (
+              <p id={leftId} className="text-[13px] font-medium text-warning-fg" aria-live="polite">
+                {t('decide.assumptionsLeft', { count: left })}
+              </p>
+            ) : null}
+          </fieldset>
+        ) : null}
         <Field label={t('decide.memo')} optional optionalLabel={t('common.optional')}>
           {(p) => (
             <Textarea
@@ -494,9 +590,30 @@ export function WorkPanel({
   const limit = useAiRunLimit(request)
   const limitId = useId()
   const [reviseOpen, setReviseOpen] = useState(false)
+  const [approveAnyway, setApproveAnyway] = useState(false)
   const [note, setNote] = useState('')
   const work = request.work
   if (!work) return null
+  const feedback = work.previewFeedback
+  const changeAsked = feedback?.verdict === 'needs_change'
+
+  const approve = () =>
+    transition.mutate(
+      { event: 'approveMerge' },
+      {
+        onSuccess: () => {
+          setApproveAnyway(false)
+          toast.success(t('workRun.approved'))
+        },
+        onError: (e) => toast.error(errorText(e, t('errors.generic'))),
+      },
+    )
+  const openRevise = () => {
+    // Start from what the requester asked for in the preview.
+    if (!note && changeAsked && feedback.note) setNote(t('workRun.fromRequester', { note: feedback.note }))
+    setApproveAnyway(false)
+    setReviseOpen(true)
+  }
 
   const term = reviewTerm(project)
   const live = request.status === 'in_progress'
@@ -560,6 +677,19 @@ export function WorkPanel({
           {work.instructions}
         </p>
       ) : null}
+      {work.checkedAssumptions?.length ? (
+        <div className="mb-3 rounded-xl bg-muted px-3.5 py-2.5 text-sm">
+          <p className="font-semibold text-ink-600">{t('workRun.checkedAssumptions')}</p>
+          <ul className="mt-0.5 flex flex-col gap-0.5 text-ink-700">
+            {work.checkedAssumptions.map((id) => (
+              <li key={id} className="flex items-start gap-1.5">
+                <Check className="mt-0.5 size-3.5 shrink-0 text-accent" aria-hidden />
+                {request.report?.assumptions.find((a) => a.id === id)?.text ?? id}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {live ? (
         <p className="flex items-center gap-2 text-[15px] font-semibold text-ai-700" aria-live="polite">
@@ -612,6 +742,36 @@ export function WorkPanel({
           {work.wikiChanges?.pendingReview ? (
             <p className="mt-2 text-xs text-ink-400">{t('workRun.wikiNote')}</p>
           ) : null}
+          {work.preview ? (
+            <div className="mt-3 rounded-2xl p-3.5 ring-1 ring-line">
+              <p className="mb-2 text-[13px] font-bold text-ink-600">{t('workRun.preview')}</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+                <PreviewImages preview={work.preview} compact />
+                <div className="flex min-w-0 flex-col gap-2 text-sm">
+                  {work.preview.url ? (
+                    <a
+                      href={work.preview.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-11 items-center gap-1.5 font-semibold text-accent hover:underline"
+                    >
+                      <ExternalLink className="size-4" aria-hidden />
+                      {t('workRun.openPreview')}
+                    </a>
+                  ) : null}
+                  <div aria-live="polite">
+                    <p className="flex flex-wrap items-center gap-2 font-semibold text-ink-700">
+                      {t('workRun.requesterFeedback')}
+                      {feedback ? <FeedbackBadge feedback={feedback} /> : null}
+                    </p>
+                    <p className="mt-0.5 text-ink-600">
+                      {feedback ? (feedback.note ?? '') : t('workRun.feedbackWaiting')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </>
       )}
 
@@ -621,12 +781,7 @@ export function WorkPanel({
             size="lg"
             className="sm:flex-1"
             loading={transition.isPending && transition.variables?.event === 'approveMerge'}
-            onClick={() =>
-              transition.mutate(
-                { event: 'approveMerge' },
-                { onSuccess: () => toast.success(t('workRun.approved')), onError: fail },
-              )
-            }
+            onClick={() => (changeAsked ? setApproveAnyway(true) : approve())}
           >
             {t('workRun.approve')}
           </Button>
@@ -644,12 +799,34 @@ export function WorkPanel({
             className="sm:flex-1"
             disabled={limit.reached}
             aria-describedby={limit.reached ? limitId : undefined}
-            onClick={() => setReviseOpen(true)}
+            onClick={openRevise}
           >
             {t('workRun.revise')}
           </Button>
         </div>
       ) : null}
+
+      <Sheet
+        open={approveAnyway}
+        onOpenChange={setApproveAnyway}
+        title={t('workRun.approveAnywayTitle')}
+        description={t('workRun.approveAnywayBody')}
+        closeLabel={t('common.close')}
+        footer={
+          <>
+            <Button variant="secondary" size="lg" className="flex-1" onClick={openRevise}>
+              {t('workRun.revise')}
+            </Button>
+            <Button size="lg" className="flex-1" loading={transition.isPending} onClick={approve}>
+              {t('workRun.approveAnyway')}
+            </Button>
+          </>
+        }
+      >
+        {feedback?.note ? (
+          <p className="rounded-xl bg-warning-50 px-3.5 py-2.5 text-[15px] text-ink-700">{feedback.note}</p>
+        ) : null}
+      </Sheet>
       {canReview && request.status === 'code_review' && limit.reached ? (
         <div className="mt-2">
           <AiRunLimitReason id={limitId} reason={limit.reason} />

@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: change_log
 project: ax-request-portal
-last_updated: 2026-11-03
+last_updated: 2026-11-04
 author: cli-generated
 last_edited_by: llm-wiki-cli
 wiki_block_version: v1
@@ -23,6 +23,22 @@ contains_sensitive_info: false
 # LLM-WIKI Change Log
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
+
+## 2026-11-04 - Feature: scope check, report assumptions and project rules, preview feedback, audit-finding requests
+
+- status: needs_review
+- actor: claude-code
+- scope: code, docs
+- changed:
+  - src/domain/model.ts, src/domain/lifecycle.ts, src/domain/precheck.ts, src/api/contract.ts, src/api/queries.ts, src/config/ (workflow.scopeCheck, request type `checklist`), docs/openapi.json
+  - src/mocks/ (engine, ai, seed, handlers, copy, browser; STATE_VERSION 4), src/features/detail/ (scope-panels, preview-panels, developer-panels, request-content, request-detail-page), src/features/wizard/, src/features/admin/projects-page.tsx, src/i18n/, src/components/request/
+  - unit tests (lifecycle, precheck, wizard schema, mock API, seed) and e2e (requester, developer, admin, plus the route sweeps in cursor, i18n, layout and theme)
+  - docs/llm-wiki/domains/00_overview, 01_admin, 04_detail, 07_notifications, 11_wizard, 12_work, GLOSSARY.md, DOMAIN_FEATURES.md, E2E_WORKFLOWS.md, ARCHITECTURE_CONVENTIONS.md
+- summary:
+  - New status `scope_check` (requester's turn) between the report and developer review, with events `scopeReady`, `approveScope` and `reviseScope` (at most twice, counted against the per-request AI limit); reports with nothing to confirm still go straight to `review`.
+  - Reports list unconfirmed assumptions and check every project rule (`Project.constraints`); the first `runWork` needs every assumption confirmed.
+  - Work runs carry a preview; the requester's reaction (`PUT /requests/{id}/preview-feedback`) is advisory and does not change the status.
+  - Request type `checklist`: audit findings, each one an acceptance criterion; the wizard imports them from a pasted table.
 
 ## 2026-11-03 - Feature: operator role, AI agents and provider-aware AI usage (Claude / GPT)
 

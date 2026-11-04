@@ -17,7 +17,7 @@ import { Select, SwitchRow } from '@/components/ui/controls'
 import { ListSkeleton } from '@/components/ui/feedback'
 import { Field, Input, Label, Textarea } from '@/components/ui/field'
 import { Sheet } from '@/components/ui/sheet'
-import { ProjectIcon as ProjectIconSchema, type Project } from '@/domain/model'
+import { PROJECT_CONSTRAINTS_MAX, ProjectIcon as ProjectIconSchema, type Project } from '@/domain/model'
 import { cn } from '@/lib/cn'
 
 type FormValues = ProjectInput
@@ -30,6 +30,7 @@ const EMPTY: FormValues = {
   wikiPath: 'docs/llm-wiki',
   ownerIds: [],
   targets: [{ name: '', wikiDoc: '' }],
+  constraints: [],
   active: true,
 }
 
@@ -42,6 +43,7 @@ function toForm(p: Project): FormValues {
     wikiPath: p.wikiPath,
     ownerIds: [...p.ownerIds],
     targets: p.targets.map((t) => ({ id: t.id, name: t.name, wikiDoc: t.wikiDoc ?? '' })),
+    constraints: p.constraints.map((c) => ({ id: c.id, text: c.text, reference: c.reference ?? '' })),
     active: p.active,
   }
 }
@@ -55,6 +57,7 @@ function ProjectForm({ project, onDone }: { project: Project | null; onDone: () 
     defaultValues: project ? toForm(project) : EMPTY,
   })
   const targets = useFieldArray({ control: form.control, name: 'targets' })
+  const constraints = useFieldArray({ control: form.control, name: 'constraints' })
   const owners = dir.users.filter((u) => (u.role === 'developer' || u.role === 'admin') && u.active)
   const err = form.formState.errors
 
@@ -68,6 +71,11 @@ function ProjectForm({ project, onDone }: { project: Project | null; onDone: () 
           name: x.name.trim(),
           ...(x.wikiDoc?.trim() ? { wikiDoc: x.wikiDoc.trim() } : {}),
         })),
+      constraints: values.constraints.map((x) => ({
+        ...(x.id ? { id: x.id } : {}),
+        text: x.text.trim(),
+        ...(x.reference?.trim() ? { reference: x.reference.trim() } : {}),
+      })),
     }
     save.mutate(
       { id: project?.id, body },
@@ -205,6 +213,68 @@ function ProjectForm({ project, onDone }: { project: Project | null; onDone: () 
         </Button>
       </fieldset>
 
+      <fieldset className="flex flex-col gap-2" aria-describedby="constraints-hint">
+        <legend className="mb-1.5 text-sm font-semibold text-ink-700">
+          {t('projects.form.constraints')}
+        </legend>
+        <p id="constraints-hint" className="-mt-1 text-[13px] text-ink-500">
+          {t('projects.form.constraintsHint')}
+        </p>
+        {constraints.fields.map((f, i) => {
+          const error = err.constraints?.[i]?.text
+          return (
+            <div key={f.id} className="grid grid-cols-[minmax(0,2fr)_minmax(0,1fr)_auto] items-end gap-2">
+              <div className="flex flex-col gap-1">
+                {i === 0 ? <Label htmlFor={`ct-${i}`}>{t('projects.form.constraintText')}</Label> : null}
+                <Input
+                  id={`ct-${i}`}
+                  aria-label={t('projects.form.constraintText')}
+                  aria-invalid={error ? true : undefined}
+                  aria-describedby={error ? `ct-${i}-error` : undefined}
+                  {...form.register(`constraints.${i}.text`)}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                {i === 0 ? <Label htmlFor={`cr-${i}`}>{t('projects.form.constraintReference')}</Label> : null}
+                <Input
+                  id={`cr-${i}`}
+                  aria-label={t('projects.form.constraintReference')}
+                  placeholder={t('projects.form.constraintReferencePlaceholder')}
+                  {...form.register(`constraints.${i}.reference`)}
+                />
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={t('projects.form.removeConstraint', { n: i + 1 })}
+                onClick={() => constraints.remove(i)}
+              >
+                <Trash2 aria-hidden />
+              </Button>
+              {error ? (
+                <p
+                  id={`ct-${i}-error`}
+                  role="alert"
+                  className="col-span-3 text-[13px] font-medium text-danger-fg"
+                >
+                  {t('common.requiredField')}
+                </p>
+              ) : null}
+            </div>
+          )
+        })}
+        {constraints.fields.length < PROJECT_CONSTRAINTS_MAX ? (
+          <Button
+            variant="secondary"
+            className="w-fit"
+            onClick={() => constraints.append({ text: '', reference: '' })}
+          >
+            <Plus aria-hidden />
+            {t('projects.form.addConstraint')}
+          </Button>
+        ) : null}
+      </fieldset>
+
       <Controller
         control={form.control}
         name="active"
@@ -285,6 +355,7 @@ export default function ProjectsPage() {
                     {t('projects.wiki', { verified: p.wikiStats.verifiedDocs, total: p.wikiStats.totalDocs })}
                   </span>
                   <span>{t('projects.targets', { count: p.targets.length })}</span>
+                  <span>{t('projects.constraints', { count: p.constraints.length })}</span>
                 </div>
               </dl>
             </li>

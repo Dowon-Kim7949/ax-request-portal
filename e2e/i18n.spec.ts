@@ -41,6 +41,7 @@ test.describe('English browser', () => {
         '/requests/new?project=p-portal&step=1',
         '/requests',
         '/requests/1021',
+        '/requests/1028',
         '/schedule',
         '/notifications',
         '/settings',

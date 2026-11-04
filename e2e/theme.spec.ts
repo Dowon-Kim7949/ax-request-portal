@@ -34,7 +34,14 @@ test.describe('system dark mode', () => {
   test('every screen renders dark without overflow', async ({ page }) => {
     test.setTimeout(90_000)
     const plan = {
-      요청자: ['/', '/requests/new?project=p-portal&step=1', '/requests/1021', '/schedule', '/settings'],
+      요청자: [
+        '/',
+        '/requests/new?project=p-portal&step=1',
+        '/requests/1021',
+        '/requests/1028',
+        '/schedule',
+        '/settings',
+      ],
       담당자: ['/work', '/requests/1024', '/requests/1026'],
       경영진: ['/dashboard'],
       관리자: ['/admin/users'],

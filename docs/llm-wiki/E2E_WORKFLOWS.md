@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: e2e_workflows
 project: ax-request-portal
-last_updated: 2026-11-03
+last_updated: 2026-11-04
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -47,9 +47,9 @@ Every user workflow is tested end to end against the production build with the i
 
 | Spec | Workflow verified |
 | --- | --- |
-| `requester.spec.ts` | Requester files a request through the wizard; the draft survives a reload; confirms acceptance criteria; answers a developer's questions. |
-| `developer.spec.ts` | Developer runs AI work from the report and approves the merge request, asks questions, requests a revision and sees the rework, marks a release done; the assigned and regression queues fit the screen. |
-| `admin.spec.ts` | Executive reads the dashboard; admin changes a role and adds a project, and cannot assign or change the operator role; notifications are read and their settings changed. |
+| `requester.spec.ts` | Requester files a request through the wizard, and audit findings pasted from a table; the draft survives a reload; confirms acceptance criteria; answers a developer's questions; reacts to a preview in code review (#1024); confirms the AI's reading with choices and a note, and sends it back once (#1028). |
+| `developer.spec.ts` | Developer reads the report's assumptions and a rule conflict (#1026), ticks the assumption to enable the run, runs AI work and approves the merge request, sees the preview and that the requester has not reacted (#1024), asks questions, requests a revision and sees the rework, marks a release done; the assigned and regression queues fit the screen. |
+| `admin.spec.ts` | Executive reads the dashboard; admin changes a role and adds a project with a rule to keep, and cannot assign or change the operator role; notifications are read and their settings changed. |
 | `operator.spec.ts` | Operator replaces a provider key (only the last four characters come back), moves a task to another model, cannot disconnect a provider in use, edits the exchange rate, reads the usage dashboard and its table view, and sets the budget at `/admin/budget` → `/ops/budget`; a developer then sees the request's AI usage and the run button disabled with the reason. |
 | `smoke.spec.ts` | Login screen fits each viewport; per-device navigation (phone tab bar, tablet rail, desktop sidebar) reaches My requests and Schedule. |
 | `layout.spec.ts` | No horizontal scroll on any route for any role at 320 px and on a landscape tablet, in Korean and English. |

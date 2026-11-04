@@ -19,6 +19,8 @@ import { AiUsageCard } from './ai-usage-card'
 import { DecisionCard, RegressionChecks, ReleasePanel, ReportPanel, WorkPanel } from './developer-panels'
 import { ReleaseCard, RequestContent } from './request-content'
 import { CancelRequest, InfoAnswerCard, StatusExplainer, VerificationCard } from './requester-panels'
+import { PreviewCard } from './preview-panels'
+import { ScopeCheckCard, ScopeSummaryCard } from './scope-panels'
 
 function DetailSkeleton() {
   return (
@@ -32,6 +34,7 @@ function DetailSkeleton() {
 }
 
 const RELEASE_EDITABLE = ['code_review', 'verification', 'changes_requested', 'release_scheduled'] as const
+const REWRITING: readonly string[] = ['submitted', 'reporting']
 
 export default function RequestDetailPage() {
   const { t } = useTranslation()
@@ -126,8 +129,17 @@ export default function RequestDetailPage() {
           ) : null}
 
           {/* Requester: what needs my action */}
+          {events.includes('approveScope') ? <ScopeCheckCard request={request} /> : null}
           {events.includes('provideInfo') ? <InfoAnswerCard request={request} /> : null}
           {events.includes('confirmResult') ? <VerificationCard request={request} /> : null}
+          {isRequester && request.status === 'code_review' && request.work?.preview ? (
+            <PreviewCard request={request} />
+          ) : null}
+
+          {/* The scope the work follows; hidden while a new reading is being written */}
+          {request.scope && !events.includes('approveScope') && !REWRITING.includes(request.status) ? (
+            <ScopeSummaryCard request={request} />
+          ) : null}
 
           {technical && request.work ? (
             <WorkPanel request={request} project={project} canReview={responsible} />

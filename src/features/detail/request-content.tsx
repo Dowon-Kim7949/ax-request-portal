@@ -32,6 +32,31 @@ export function RequestContent({ request }: { request: WorkRequest }) {
         {targets.length ? <Row label={t('detail.targets')}>{targets.join(', ')}</Row> : null}
         {request.currentBehavior ? <Row label={t('detail.current')}>{request.currentBehavior}</Row> : null}
         <Row label={t('detail.desired')}>{request.desiredBehavior}</Row>
+        {request.checklist?.length ? (
+          <Row label={t('detail.checklist')}>
+            {request.checklistSource ? (
+              <p className="mb-2 text-sm text-ink-600">
+                {t('detail.checklistSource')}: {request.checklistSource}
+              </p>
+            ) : null}
+            <ol className="flex flex-col gap-2">
+              {request.checklist.map((k) => (
+                <li key={k.id} className="rounded-xl bg-muted px-3 py-2.5 text-sm">
+                  <p className="font-semibold text-ink-900">
+                    {k.ref}
+                    {k.clause ? <span className="font-normal text-ink-500"> · {k.clause}</span> : null}
+                  </p>
+                  <p className="mt-0.5 text-ink-700">{k.finding}</p>
+                  {k.expected ? (
+                    <p className="mt-0.5 text-ink-600">
+                      {t('detail.expected')}: {k.expected}
+                    </p>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          </Row>
+        ) : null}
         <Row label={t('detail.criteria')}>
           <ol className="flex flex-col gap-1.5">
             {request.acceptanceCriteria.map((c, i) => (

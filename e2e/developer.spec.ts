@@ -10,12 +10,20 @@ test('developer runs AI work from the report and approves the merge request', as
   await page.goto('/requests/1026')
   await expect(page.getByRole('heading', { name: '구현 확인 보고서' })).toBeVisible()
   await expect(page.getByText('조건부 가능').first()).toBeVisible()
+  // What the AI could not confirm, and the project rule the plan breaks
+  await expect(page.getByRole('heading', { name: '확인되지 않은 가정' })).toBeVisible()
+  await expect(page.getByText('충돌', { exact: true })).toBeVisible()
   await expectNoHorizontalScroll(page)
 
   await page.getByRole('button', { name: '작업 수행' }).click()
   const run = page.getByRole('dialog', { name: 'AI에게 작업을 맡길까요?' })
-  await run.getByLabel('담당자 메모').fill('약관 전문 팝업은 기존 컴포넌트를 재사용해 주세요.')
-  await run.getByRole('button', { name: '작업 수행' }).click()
+  // Every assumption has to be ticked before the AI may start.
+  const start = run.getByRole('button', { name: '작업 수행' })
+  await expect(start).toBeDisabled()
+  await run.getByRole('checkbox', { name: /앱을 다시 배포하지 않아도/ }).check()
+  await expect(start).toBeEnabled()
+  await run.getByLabel('담당자 메모').fill('동의 상태는 서버 임시 저장으로 옮겨 주세요.')
+  await start.click()
   await expect(page.getByText('AI 작업 중').first()).toBeVisible()
   await expect(page.getByText('AI가 작업하고 있어요')).toBeVisible()
 
@@ -55,6 +63,9 @@ test('developer sends the AI back with a revision note', async ({ page }) => {
   await page.goto('/requests/1024')
   await expect(page.getByText('MR !57')).toBeVisible()
   await expect(page.getByText('기존 테스트 128/128 통과')).toBeVisible()
+  // The preview the requester sees, and whether they have reacted yet
+  await expect(page.getByRole('link', { name: '미리보기 열기' })).toBeVisible()
+  await expect(page.getByText('요청자가 아직 의견을 남기지 않았어요(선택 사항).')).toBeVisible()
   await page.getByRole('button', { name: '수정 요청' }).click()
   const sheet = page.getByRole('dialog', { name: 'AI에게 무엇을 고치라고 할까요?' })
   await sheet.getByLabel('수정할 내용').fill('잠금 해제 버튼에 확인 대화상자를 추가해 주세요.')

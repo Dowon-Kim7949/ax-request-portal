@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-03
+last_updated: 2026-11-04
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -42,7 +42,7 @@ The in-app inbox at `/notifications` (authentication only). Preferences are edit
 
 ## Stored as key and parameters
 
-The mock stores `{ id, userId, requestId, key, params, createdAt }` — never the rendered text. `renderNotification(lang, key, params, requestId)` builds title and body on every read in the language of the request's `Accept-Language`, so switching language also translates notifications already received. Adding a notification type means adding a `NotificationKey` and its text in both languages in `src/mocks/copy.ts`; who receives which notification per status is in `notifyStatus`.
+The mock stores `{ id, userId, requestId, key, params, createdAt }` — never the rendered text. `renderNotification(lang, key, params, requestId)` builds title and body on every read in the language of the request's `Accept-Language`, so switching language also translates notifications already received. Adding a notification type means adding a `NotificationKey` and its text in both languages in `src/mocks/copy.ts`; who receives which notification per status is in `notifyStatus`. `scope_check` asks the requester (`scopeCheck`, action required); entering `review` tells the developers `scopeApproved` after an approval and `reportReady` otherwise; a rewrite after "not quite" notifies no one. `code_review` also tells the requester a preview is ready (`previewReady`, not action required), and their reaction reaches the developers as `previewGood` or `previewChange` (action required).
 
 Delivery rules at creation time: nothing is stored when the recipient has turned off in-app notifications, or has "only when action is required" on and the notification does not require action; the actor never notifies themselves. Changing settings therefore does not affect notifications already stored. E-mail and messenger channels are settings only; the mock delivers nothing on them.
 

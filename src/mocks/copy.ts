@@ -32,6 +32,10 @@ const ERRORS = {
     invalidTransition: '지금 단계에서는 할 수 없는 작업입니다.',
     needAllPassed: '모든 완료 기준이 통과해야 완료할 수 있습니다.',
     needOneFailed: '안 되는 완료 기준을 하나 이상 표시해 주세요.',
+    assumptionsUnchecked: '보고서의 가정을 모두 확인해야 AI 작업을 시작할 수 있습니다.',
+    scopeUnanswered: '골라야 할 항목에 모두 답해 주세요.',
+    scopeRevisionsUsed:
+      '다시 정리는 더 요청할 수 없습니다. 덧붙일 말을 적어 진행하거나 요청을 취소해 주세요.',
     requestBudgetExceeded: (p) =>
       `이 요청의 AI 비용이 요청당 한도(${Number(p.limit).toLocaleString('ko-KR')}원)에 도달해 AI 작업을 더 실행할 수 없습니다. 운영자가 한도를 올리거나 직접 처리해 주세요.`,
     operatorProvisioned: '운영자 계정은 서비스가 관리합니다. 여기서 만들거나 바꿀 수 없습니다.',
@@ -42,6 +46,8 @@ const ERRORS = {
       `${providerName(p.provider)}를 쓰는 작업이나 프로젝트가 있어 연결을 끊을 수 없습니다. 먼저 다른 모델로 바꿔 주세요.`,
     modelInUse: (p) => `지금 쓰고 있는 모델(${p.model})은 단가표에서 뺄 수 없습니다.`,
     requesterOnlyVerify: '요청자만 결과를 확인할 수 있습니다.',
+    requesterOnlyPreview: '요청자만 미리보기에 의견을 남길 수 있습니다.',
+    noPreviewNow: '지금은 미리보기에 의견을 남길 수 없습니다.',
     notInVerification: '지금은 결과 확인 단계가 아닙니다.',
     developerOnlyRegression: '담당 개발자만 기록할 수 있습니다.',
     developerOnlySchedule: '담당 개발자만 일정을 정할 수 있습니다.',
@@ -69,6 +75,9 @@ const ERRORS = {
     invalidTransition: 'This is not possible at the current step.',
     needAllPassed: 'Every acceptance criterion must pass before you confirm.',
     needOneFailed: 'Mark at least one acceptance criterion as not working.',
+    assumptionsUnchecked: 'Confirm every assumption in the report before the AI starts work.',
+    scopeUnanswered: 'Answer every question first.',
+    scopeRevisionsUsed: 'The scope cannot be summed up again. Go ahead with a note, or cancel the request.',
     requestBudgetExceeded: (p) =>
       `This request has used its per-request AI budget (₩${Number(p.limit).toLocaleString('en-US')}), so AI work cannot run again. Ask an operator to raise the limit, or handle it by hand.`,
     operatorProvisioned:
@@ -79,6 +88,8 @@ const ERRORS = {
       `A task or project still uses ${providerName(p.provider)}, so it cannot be disconnected. Switch them to another model first.`,
     modelInUse: (p) => `A model in use (${p.model}) cannot be removed from the price table.`,
     requesterOnlyVerify: 'Only the requester can check the result.',
+    requesterOnlyPreview: 'Only the requester can comment on the preview.',
+    noPreviewNow: 'There is no preview to comment on right now.',
     notInVerification: 'The request is not waiting for a result check.',
     developerOnlyRegression: 'Only the responsible developer can record this.',
     developerOnlySchedule: 'Only the responsible developer can set the release date.',
@@ -113,11 +124,19 @@ export function errorText(lang: ServerLanguage, key: ErrorKey, params: Params = 
 const NOTIFICATIONS = {
   ko: {
     reportReady: { title: '구현 확인 보고서가 준비되었습니다', body: (p) => String(p.title) },
+    scopeCheck: { title: '진행 범위를 확인해 주세요', body: (p) => String(p.title) },
+    scopeApproved: { title: '요청자가 진행 범위를 확인했습니다', body: (p) => String(p.title) },
     infoNeeded: { title: '추가 정보가 필요합니다', body: (p) => String(p.questions) },
     requesterAnswered: { title: '요청자가 답변했습니다', body: '보고서를 다시 쓰고 있습니다.' },
     rejected: { title: '진행하지 않기로 했습니다', body: (p) => String(p.reason) },
     workStarted: { title: '작업을 시작했습니다', body: (p) => String(p.title) },
     workFinished: { title: 'AI 작업이 끝났습니다', body: '변경 내용과 테스트 결과를 검토해 주세요.' },
+    previewReady: {
+      title: '바뀐 화면을 미리 볼 수 있습니다',
+      body: (p) => `${p.title} — 반영 전에 보고 의견을 주시면 먼저 고칠 수 있습니다.`,
+    },
+    previewGood: { title: '요청자가 미리보기를 좋다고 했습니다', body: (p) => String(p.title) },
+    previewChange: { title: '요청자가 미리보기에서 수정을 요청했습니다', body: (p) => String(p.note) },
     pleaseCheck: {
       title: '결과를 확인해 주세요',
       body: (p) => `완료 기준 ${p.count}개를 하나씩 확인해 주시면 됩니다.`,
@@ -130,11 +149,19 @@ const NOTIFICATIONS = {
   },
   en: {
     reportReady: { title: 'Feasibility report is ready', body: (p) => String(p.title) },
+    scopeCheck: { title: 'Please confirm the scope', body: (p) => String(p.title) },
+    scopeApproved: { title: 'The requester confirmed the scope', body: (p) => String(p.title) },
     infoNeeded: { title: 'More information needed', body: (p) => String(p.questions) },
     requesterAnswered: { title: 'The requester answered', body: 'The report is being rewritten.' },
     rejected: { title: 'This request will not go ahead', body: (p) => String(p.reason) },
     workStarted: { title: 'Work has started', body: (p) => String(p.title) },
     workFinished: { title: 'AI work is done', body: 'Review the changes and test results.' },
+    previewReady: {
+      title: 'You can preview the change',
+      body: (p) => `${p.title} — tell us what you think before it goes in, and it can be fixed first.`,
+    },
+    previewGood: { title: 'The requester likes the preview', body: (p) => String(p.title) },
+    previewChange: { title: 'The requester asked for a change in the preview', body: (p) => String(p.note) },
     pleaseCheck: {
       title: 'Please check the result',
       body: (p) => `Check the ${p.count} acceptance criteria one by one.`,

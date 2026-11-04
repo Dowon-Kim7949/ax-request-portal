@@ -22,6 +22,26 @@ describe('precheckDraft', () => {
     expect(precheckDraft(good, TODAY)).toEqual([])
   })
 
+  it('checks audit findings for repeated numbers and a missing "fixed when"', () => {
+    const issues = precheckDraft(
+      {
+        ...good,
+        type: 'checklist',
+        currentBehavior: '',
+        acceptanceCriteria: [],
+        checklist: [
+          { ref: '지적 1', finding: '링크가 없다', expected: '링크가 보인다' },
+          { ref: '지적 1', finding: '문구가 계정 유무를 알려 준다' },
+        ],
+      },
+      TODAY,
+    )
+    expect(issues.map((i) => `${i.field}:${i.severity}`)).toEqual([
+      'checklist.1.ref:warning',
+      'checklist.1.expected:info',
+    ])
+  })
+
   it('flags vague wording and non-checkable criteria without blocking', () => {
     const issues = precheckDraft(
       {

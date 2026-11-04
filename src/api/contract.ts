@@ -18,6 +18,8 @@ import {
   NotificationSettings,
   PrecheckIssue,
   Project,
+  PROJECT_CONSTRAINTS_MAX,
+  ProjectConstraint,
   ProjectIcon,
   ProjectTarget,
   RegressionCheck,
@@ -126,6 +128,9 @@ export const ProjectInput = named(
     wikiPath: z.string().trim().min(1),
     ownerIds: z.array(z.string()).min(1),
     targets: z.array(ProjectTarget.extend({ id: z.string().optional() })),
+    constraints: z
+      .array(ProjectConstraint.extend({ id: z.string().optional() }))
+      .max(PROJECT_CONSTRAINTS_MAX),
     active: z.boolean(),
   }),
 )
@@ -154,6 +159,16 @@ export const VerificationDraft = named(
   }),
   'Saves checklist progress without changing status. Submit with confirmResult / reportIssue.',
 )
+
+export const PreviewFeedbackInput = named(
+  'PreviewFeedbackInput',
+  z.discriminatedUnion('verdict', [
+    z.object({ verdict: z.literal('looks_good'), note: z.string().trim().max(1000).optional() }),
+    z.object({ verdict: z.literal('needs_change'), note: z.string().trim().min(1).max(1000) }),
+  ]),
+  'A change request needs a note so the developer knows what to change.',
+)
+export type PreviewFeedbackInput = z.infer<typeof PreviewFeedbackInput>
 
 export const RegressionUpdate = named(
   'RegressionUpdate',
@@ -344,6 +359,16 @@ export const api = {
     summary: 'Save QA checklist progress (requester, while in verification)',
     params: IdParam,
     body: VerificationDraft,
+    response: WorkRequest,
+  }),
+  sendPreviewFeedback: endpoint({
+    method: 'PUT',
+    path: '/requests/{id}/preview-feedback',
+    tag: 'requests',
+    summary:
+      "The requester's reaction to the preview while the change is in code review (advisory; status unchanged)",
+    params: IdParam,
+    body: PreviewFeedbackInput,
     response: WorkRequest,
   }),
   updateRegression: endpoint({

@@ -36,6 +36,16 @@ const draft: RequestDraft = {
   attachmentIds: [],
 }
 
+/** The requester confirms the AI's reading, taking its suggestion (or the first option) everywhere. */
+async function confirmScope(id: number) {
+  const req = await call(api.getRequest, { params: { id } })
+  const choices = (req.scope?.proposal.questions ?? []).map((q) => ({
+    questionId: q.id,
+    optionId: q.recommended ?? q.options[0]!.id,
+  }))
+  return call(api.transitionRequest, { params: { id }, body: { event: 'approveScope', choices } })
+}
+
 async function expectApiError(promise: Promise<unknown>, status: number, code?: string) {
   const err = await promise.then(
     () => null,
@@ -75,9 +85,49 @@ describe('request lifecycle through the API', () => {
     await expectApiError(call(api.transitionRequest, { params: { id }, body: { event: 'runWork' } }), 403)
 
     t.advance(6)
-    expect((await call(api.getRequest, { params: { id } })).status).toBe('review')
+    // The requester confirms the AI's reading before a developer spends time on it.
+    const proposed = await call(api.getRequest, { params: { id } })
+    expect(proposed.status).toBe('scope_check')
+    expect(proposed.scope?.proposal.changes).toEqual([draft.acceptanceCriteria[0]!.text])
+    expect(proposed.scope?.proposal.questions.map((q) => q.id)).toEqual(['q-extent'])
+
+    // "Not quite": the AI writes it up again with the note.
+    const revised = await call(api.transitionRequest, {
+      params: { id },
+      body: { event: 'reviseScope', note: '공지 본문은 검색하지 않아요' },
+    })
+    expect(revised.status).toBe('reporting')
+    t.advance(6)
+    const again = await call(api.getRequest, { params: { id } })
+    expect(again.status).toBe('scope_check')
+    expect(again.report?.revision).toBe(2)
+    expect(again.scope?.proposal.summary).toContain('공지 본문은 검색하지 않아요')
+
+    // Every choice must be made before going ahead.
+    await expectApiError(
+      call(api.transitionRequest, { params: { id }, body: { event: 'approveScope', choices: [] } }),
+      409,
+      'guard_failed',
+    )
+    const approved = await call(api.transitionRequest, {
+      params: { id },
+      body: {
+        event: 'approveScope',
+        choices: [{ questionId: 'q-extent', optionId: 'only' }],
+        note: '급하지 않아요',
+      },
+    })
+    expect(approved.status).toBe('review')
+    expect(approved.scope?.decision).toMatchObject({
+      by: 'u-kim',
+      choices: [{ questionId: 'q-extent', optionId: 'only' }],
+      note: '급하지 않아요',
+    })
 
     await loginAs('dev1@example.com')
+    expect((await call(api.listNotifications)).map((n) => n.title)).toContain(
+      `[#${id}] 요청자가 진행 범위를 확인했습니다`,
+    )
     const assigned = await call(api.listRequests, { query: { scope: 'assigned', status: 'review' } })
     expect(assigned.map((r) => r.id)).toContain(id)
     const asked = await call(api.transitionRequest, {
@@ -92,9 +142,17 @@ describe('request lifecycle through the API', () => {
       body: { event: 'provideInfo', answer: '제목만 검색합니다.' },
     })
     t.advance(6)
-    const rewritten = await call(api.getRequest, { params: { id } })
+    // A new report means a new reading to confirm.
+    expect((await call(api.getRequest, { params: { id } })).status).toBe('scope_check')
+    const rewritten = await confirmScope(id)
     expect(rewritten.status).toBe('review')
-    expect(rewritten.report?.revision).toBe(2)
+    expect(rewritten.report?.revision).toBe(3)
+    // Every project rule is checked against the plan; a reviewed wiki leaves nothing to assume.
+    expect(rewritten.report?.constraintChecks.map((k) => k.constraintId)).toEqual([
+      'pc-storage',
+      'pc-masking',
+    ])
+    expect(rewritten.report?.assumptions).toEqual([])
 
     await loginAs('dev1@example.com')
     await call(api.transitionRequest, {
@@ -141,6 +199,7 @@ describe('request lifecycle through the API', () => {
     const notes = await call(api.listNotifications)
     expect(notes.filter((n) => n.requestId === id).map((n) => n.title)).toEqual(
       expect.arrayContaining([
+        `[#${id}] 진행 범위를 확인해 주세요`,
         `[#${id}] 추가 정보가 필요합니다`,
         `[#${id}] 결과를 확인해 주세요`,
         `[#${id}] 반영되었습니다`,
@@ -148,6 +207,132 @@ describe('request lifecycle through the API', () => {
     )
     await call(api.markAllNotificationsRead)
     expect((await call(api.listNotifications)).every((n) => n.readAt)).toBe(true)
+  })
+
+  it('makes the developer confirm what the report could not before AI work starts', async () => {
+    await loginAs('planner@example.com')
+    const { id } = await call(api.createRequest, {
+      body: { ...draft, projectId: 'p-field', targetIds: ['t-task-list', 't-push'] },
+    })
+    t.advance(6)
+    const reviewed = await confirmScope(id)
+    // "Push notifications" has no wiki doc, so the AI could only guess where its code is.
+    expect(reviewed.report?.assumptions.map((a) => a.id)).toEqual(['a1'])
+
+    await loginAs('dev2@example.com')
+    await expectApiError(
+      call(api.transitionRequest, { params: { id }, body: { event: 'runWork' } }),
+      409,
+      'guard_failed',
+    )
+    const started = await call(api.transitionRequest, {
+      params: { id },
+      body: { event: 'runWork', checkedAssumptions: ['a1'] },
+    })
+    expect(started.status).toBe('in_progress')
+    expect(started.work?.checkedAssumptions).toEqual(['a1'])
+  })
+
+  it('lets the requester send the scope back twice, then only go ahead or cancel', async () => {
+    await loginAs('planner@example.com')
+    const { id } = await call(api.createRequest, { body: draft })
+    for (const note of ['첫 번째', '두 번째']) {
+      t.advance(6)
+      await call(api.transitionRequest, { params: { id }, body: { event: 'reviseScope', note } })
+    }
+    t.advance(6)
+    await expectApiError(
+      call(api.transitionRequest, { params: { id }, body: { event: 'reviseScope', note: '세 번째' } }),
+      409,
+      'guard_failed',
+    )
+    expect((await confirmScope(id)).status).toBe('review')
+  })
+
+  it('sends a report with nothing to confirm straight to the developer', async () => {
+    await loginAs('planner@example.com')
+    const { id } = await call(api.createRequest, { body: { ...draft, type: 'non_code', targetIds: [] } })
+    t.advance(6)
+    const req = await call(api.getRequest, { params: { id } })
+    expect(req.status).toBe('review')
+    expect(req.scope).toBeUndefined()
+  })
+
+  it('lets the requester react to a preview before the merge, without moving the request', async () => {
+    await loginAs('planner@example.com')
+    const { id } = await call(api.createRequest, { body: draft })
+    t.advance(6)
+    await confirmScope(id)
+    await loginAs('dev1@example.com')
+    await call(api.transitionRequest, { params: { id }, body: { event: 'runWork' } })
+    t.advance(20)
+
+    await loginAs('planner@example.com')
+    const inReview = await call(api.getRequest, { params: { id } })
+    expect(inReview.status).toBe('code_review')
+    expect(inReview.work?.preview?.screenshots[0]?.alt).toContain(draft.title)
+    expect((await call(api.listNotifications)).map((n) => n.title)).toContain(
+      `[#${id}] 바뀐 화면을 미리 볼 수 있습니다`,
+    )
+
+    // A change request needs a note.
+    await expectApiError(
+      call(api.sendPreviewFeedback, { params: { id }, body: { verdict: 'needs_change', note: ' ' } }),
+      400,
+    )
+    const sent = await call(api.sendPreviewFeedback, {
+      params: { id },
+      body: { verdict: 'needs_change', note: '검색창을 목록 위로 올려 주세요' },
+    })
+    expect(sent.status).toBe('code_review')
+    expect(sent.work?.previewFeedback).toMatchObject({ by: 'u-kim', verdict: 'needs_change' })
+
+    // Only the requester reacts.
+    await loginAs('dev1@example.com')
+    await expectApiError(
+      call(api.sendPreviewFeedback, { params: { id }, body: { verdict: 'looks_good' } }),
+      403,
+    )
+    expect((await call(api.listNotifications)).map((n) => n.title)).toContain(
+      `[#${id}] 요청자가 미리보기에서 수정을 요청했습니다`,
+    )
+    // A new run starts without the old reaction.
+    const revised = await call(api.transitionRequest, {
+      params: { id },
+      body: { event: 'requestRevision', note: '검색창 위치 변경' },
+    })
+    expect(revised.work?.previewFeedback).toBeUndefined()
+    await loginAs('planner@example.com')
+    await expectApiError(
+      call(api.sendPreviewFeedback, { params: { id }, body: { verdict: 'looks_good' } }),
+      409,
+    )
+  })
+
+  it('takes audit findings as the acceptance criteria of a checklist request', async () => {
+    await loginAs('planner@example.com')
+    const audit = {
+      ...draft,
+      type: 'checklist' as const,
+      acceptanceCriteria: [],
+      checklistSource: '보안 점검',
+      checklist: [
+        { ref: '지적 1', finding: '처리방침 링크가 없다', expected: '링크가 항상 보인다' },
+        { ref: '지적 2', clause: '2.5', finding: '오류 문구가 계정 유무를 알려 준다' },
+      ],
+    }
+    const created = await call(api.createRequest, { body: audit })
+    expect(created.acceptanceCriteria).toEqual([
+      { id: 'c1', text: '[지적 1] 링크가 항상 보인다' },
+      { id: 'c2', text: '[지적 2] 오류 문구가 계정 유무를 알려 준다' },
+    ])
+    expect(created.checklist?.[1]).toMatchObject({ id: 'k2', criterionId: 'c2', clause: '2.5' })
+    expect(created.checklistSource).toBe('보안 점검')
+
+    // A checklist request needs findings; other requests need criteria and no findings.
+    await expectApiError(call(api.createRequest, { body: { ...audit, checklist: [] } }), 400)
+    await expectApiError(call(api.createRequest, { body: { ...draft, acceptanceCriteria: [] } }), 400)
+    await expectApiError(call(api.createRequest, { body: { ...draft, checklist: audit.checklist } }), 400)
   })
 
   it('refuses transitions that do not fit the current status', async () => {
@@ -186,6 +371,23 @@ describe('visibility and permissions', () => {
 
     await loginAs('planner@example.com')
     await expectApiError(call(api.dashboard, { query: {} }), 403, 'forbidden')
+  })
+
+  it('keeps project rules with the project for the AI to respect', async () => {
+    await loginAs('admin@example.com')
+    const [portal] = await call(api.listProjects)
+    const { id, wikiStats: _stats, ...input } = portal!
+    const saved = await call(api.updateProject, {
+      params: { id },
+      body: { ...input, constraints: [...input.constraints, { text: '결제 금액은 서버에서만 계산한다' }] },
+    })
+    expect(saved.constraints).toHaveLength(3)
+    expect(saved.constraints[2]).toMatchObject({ text: '결제 금액은 서버에서만 계산한다' })
+    expect(saved.constraints[2]!.id).toBeTruthy()
+    await expectApiError(
+      call(api.updateProject, { params: { id }, body: { ...input, constraints: [{ text: ' ' }] } }),
+      400,
+    )
   })
 
   it('lets admins manage users but not demote themselves', async () => {
@@ -230,6 +432,13 @@ describe('AI budget', () => {
     await loginAs('planner@example.com')
     const { id } = await call(api.createRequest, { body: draft })
     t.advance(6)
+    // Asking for another reading is an AI job the requester chooses to repeat.
+    await expectApiError(
+      call(api.transitionRequest, { params: { id }, body: { event: 'reviseScope', note: '다시' } }),
+      409,
+      'guard_failed',
+    )
+    await confirmScope(id)
 
     await loginAs('dev1@example.com')
     await expectApiError(
@@ -265,6 +474,8 @@ describe('AI operations', () => {
       body: { ...draft, projectId: 'p-data', targetIds: ['t-report-api'] },
     })
     t.advance(6)
+    await confirmScope(onClaude.id)
+    await confirmScope(onOpenAi.id)
 
     await loginAs('dev1@example.com')
     const claude = await call(api.getRequest, { params: { id: onClaude.id } })
