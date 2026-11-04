@@ -2,8 +2,8 @@
 title: Component Inventory
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: component_inventory
 project: ax-request-portal
 last_updated: 2026-11-03
@@ -16,6 +16,8 @@ source_files:
   - src/components/ai
   - src/lib/cn.ts
 evidence:
+  - src/App.tsx
+  - src/app/update-notice.tsx#symbol:UpdateNotice
   - src/components/ui/button.tsx#symbol:Button
   - src/components/ui/badge.tsx#symbol:Badge
   - src/components/ui/card.tsx#symbol:Card
@@ -85,6 +87,7 @@ The primitives are written by hand in the shadcn style (Tailwind classes, `class
 - Add a primitive to `ui/` only when it is domain-free; anything that reads `WorkRequest` belongs in `request/` or the feature folder.
 - Every interactive primitive must keep the global cursor and focus contract described in [WCAG](WCAG.md); `e2e/cursor.spec.ts` fails if a new clickable element shows the wrong cursor.
 - Keep touch targets at 44 px (`h-11` / `size-11`) unless there is a documented exception.
+- Toasts: one `sonner` `Toaster` (top-center, follows the theme) in `src/App.tsx`; call `toast.*`. Sonner's styles are not in a Tailwind layer, so overriding them through `classNames` needs `!` utilities (`UpdateNotice` sizes its action button that way).
 - `vite.config.ts` puts `radix-ui` and `class-variance-authority` in a fixed `vendor-ui` chunk; a new heavy UI dependency should be placed in a vendor group deliberately.
 
 ## Evidence
@@ -99,6 +102,7 @@ The primitives are written by hand in the shadcn style (Tailwind classes, `class
 - `src/components/ui/sheet.tsx#symbol:Sheet` — Radix Dialog as sheet/dialog.
 - `src/components/request/request-card.tsx#symbol:RequestCard`, `src/components/request/status.tsx#symbol:StatusBadge`, `src/components/request/status.tsx#symbol:Stepper`, `src/components/request/timeline.tsx#symbol:Timeline` — request widgets.
 - `vite.config.ts` — `vendor-ui` chunk group.
+- `src/App.tsx` — the single `Toaster`; `src/app/update-notice.tsx#symbol:UpdateNotice` — a toast overriding sonner's action button size.
 
 ## Open Questions
 

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { RouterProvider } from 'react-router/dom'
 import { Toaster } from 'sonner'
 import { createRouter } from './app/router'
+import { UpdateNotice } from './app/update-notice'
 import './i18n'
 import { usePreferences } from './stores/preferences'
 
@@ -18,6 +19,7 @@ export default function App() {
         closeButton
         toastOptions={{ className: 'font-sans' }}
       />
+      <UpdateNotice />
     </>
   )
 }

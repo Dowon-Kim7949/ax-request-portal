@@ -21,6 +21,7 @@ evidence:
   - e2e/helpers.ts#symbol:loginAs
   - e2e/boot.spec.ts
   - e2e/mock-api.spec.ts
+  - e2e/update.spec.ts
   - src/test/mock-api.ts#symbol:createTestApi
   - vite.config.ts
 related:
@@ -61,6 +62,7 @@ Every user workflow is tested end to end against the production build with the i
 | `a11y.spec.ts` | The skip link is the first tab stop and focuses `main` (desktop only: WebKit does not tab to links by default); nothing animates under `prefers-reduced-motion: reduce`. |
 | `cursor.spec.ts` | Computed cursor of every visible interactive element matches the contract, including inside open dialogs. |
 | `mock-api.spec.ts` | The service-worker mock answers contract calls such as `POST /api/auth/login` in the browser; after the worker is stopped (as a browser does to an idle tab), the next screen still loads its data (Chromium only). |
+| `update.spec.ts` | A newer `version.json` shows the new-version toast when the tab becomes visible and its reload button loads the page; a page chunk that 404s after a deployment shows the same toast (Chromium only). |
 | `boot.spec.ts` | Reloading during the first load still ends on a usable screen (regression for WebKit refusing the MSW worker registration). |
 | `screens.spec.ts` | Only with `SCREENS=1`: captures screens for manual review; not an assertion suite. |
 | `readme-images.spec.ts` | Only with `README_IMAGES=1`: regenerates the README screenshots in `docs/images/`. |
@@ -71,6 +73,7 @@ Every user workflow is tested end to end against the production build with the i
 - `loginAs` picks a demo account by its Korean role label, so renaming those labels breaks the suite.
 - `boot.spec.ts` navigates with `waitUntil: 'commit'` and tolerates an `interrupted` navigation, because the app's own recovery may reload the page once; it then asserts the end state (a visible `h1`, no page errors other than the service-worker ones).
 - The worker-restart test in `mock-api.spec.ts` stops the service worker with the Chrome DevTools Protocol (`ServiceWorker.stopAllWorkers`), so it is skipped in the WebKit projects (phone, tablet). It then opens a screen whose data is not cached yet, without reloading, because a reload would register the worker again and hide the bug.
+- `update.spec.ts` fakes a deployment by routing `version.json` and a page chunk on both the page and its context: with the mock's service worker in between, Chromium shows a request the worker passes on only to context routes, and WebKit shows it to neither, so the spec skips WebKit. It waits for each `version.json` response, because checks made while one is in flight share its answer.
 - `.all()` on a locator does not wait. Wait for the page heading first, then collect elements.
 - A WebKit project can fail once with "browser has been closed" right after `playwright install`; a rerun passes.
 
@@ -87,6 +90,7 @@ Every user workflow is tested end to end against the production build with the i
 - `e2e/helpers.ts#symbol:loginAs` — demo login by role label.
 - `e2e/boot.spec.ts` — interrupted first load.
 - `e2e/mock-api.spec.ts` — mock API in the browser and recovery after its worker restarts.
+- `e2e/update.spec.ts` — new-version notice.
 - `src/test/mock-api.ts#symbol:createTestApi` — deterministic mock API for unit tests.
 - `vite.config.ts` — Vitest environment and include pattern.
 - `playwright.config.ts` — projects, locale, web server; `.github/workflows/ci.yml#L45-L47` — browsers installed and the suite run in CI.

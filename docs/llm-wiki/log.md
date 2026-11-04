@@ -24,6 +24,26 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-04 - Feature: notice when a newer version is deployed
+
+- status: needs_review
+- actor: claude-code
+- scope: code, docs
+- changed:
+  - vite.config.ts (build id, `__BUILD_ID__`, `ax:version-file` plugin writing `version.json`), src/vite-env.d.ts, .env.example (`VITE_BUILD_ID`)
+  - src/app/update-check.ts, src/app/update-notice.tsx (new), src/App.tsx, src/app/router.tsx (`page()` checks on a failed chunk load), src/i18n/ko.ts, src/i18n/en.ts (`update.*`)
+  - deploy/check-nginx.sh (check 7: `version.json` present and `no-cache`), deploy/nginx.conf (comment only)
+  - tests: src/app/update-check.test.ts, e2e/update.spec.ts (new)
+  - docs/llm-wiki/ARCHITECTURE_CONVENTIONS.md, E2E_WORKFLOWS.md, DOMAIN_FEATURES.md, COMPONENT_INVENTORY.md, WCAG.md, project-profile.md, profiles/frontend.md, domains/00_overview.md (status only: its claims still hold, re-review after the router change)
+- summary:
+  - Open tabs compare their build id with the deployed `version.json` when they become visible, every 5 minutes, and when page code fails to load; a newer id shows one persistent top-center toast with a 44 px reload button. Nothing reloads by itself.
+- evidence:
+  - e2e/update.spec.ts failed before the change (no notice) and passes after it on desktop/Chromium; src/app/update-check.test.ts covers once-per-build, unreadable files and shared requests.
+  - node_modules/vite/dist/node/chunks/node.js (`handlePreloadError`): `vite:preloadError` fires only for imports that go through the preload helper, hence the extra check in `page()`.
+- caveats:
+  - The E2E spec runs only in Chromium: WebKit cannot route requests that pass through the mock's service worker. The phone layout was checked by screenshot at 390 px in Chromium.
+  - On GitHub Pages a rerun of the deploy workflow for the same commit keeps the same id, so it is not announced.
+
 ## 2026-11-04 - Fix: mock API stops answering after its service worker restarts
 
 - status: needs_review

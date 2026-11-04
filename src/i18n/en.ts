@@ -41,6 +41,11 @@ const en: Messages = {
     body: 'The network may have dropped for a moment. Please try again.',
     retry: 'Try again',
   },
+  update: {
+    title: 'A new version is available',
+    body: 'Reload to start using it.',
+    reload: 'Reload',
+  },
   nav: {
     skipToContent: 'Skip to main content',
     home: 'Home',

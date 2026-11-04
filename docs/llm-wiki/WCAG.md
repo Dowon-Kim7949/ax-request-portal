@@ -2,8 +2,8 @@
 title: Accessibility (WCAG)
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: wcag
 project: ax-request-portal
 last_updated: 2026-11-03
@@ -21,6 +21,7 @@ source_files:
   - e2e/theme.spec.ts
   - e2e/a11y.spec.ts
 evidence:
+  - src/app/update-notice.tsx#symbol:UpdateNotice
   - src/theme.test.ts#symbol:PAIRS
   - src/theme.test.ts#L37-L39
   - src/index.css#L154-L188
@@ -68,7 +69,7 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 - Focus is shown by one global `:focus-visible` outline (2 px, offset 2 px, brand colour).
 - Form controls use 16 px text on coarse pointers so iOS does not zoom on focus.
 - Reduced motion: under `prefers-reduced-motion: reduce` every animation and transition finishes in 0.01 ms and smooth scrolling is off (`src/index.css`). Near-zero rather than `none`, so `animationend` / `transitionend` handlers still run. `e2e/a11y.spec.ts` counts elements that would move and expects none under reduce.
-- Touch targets are 44 px (`h-11` / `size-11`); the phone tab bar is taller. `Button size="sm"` is the documented exception.
+- Touch targets are 44 px (`h-11` / `size-11`); the phone tab bar is taller. `Button size="sm"` is the documented exception. Sonner's toast action button is 24 px; a toast whose action matters on a phone raises it to 44 px (`UpdateNotice`).
 
 ## Semantics and focus management
 
@@ -94,6 +95,7 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 - `src/components/request/status.tsx#symbol:Stepper` — `aria-current="step"`.
 - `src/features/wizard/steps.tsx#symbol:StepTitle` — focus target for step changes.
 - `e2e/cursor.spec.ts`, `e2e/layout.spec.ts`, `e2e/theme.spec.ts`, `e2e/a11y.spec.ts` — the automated checks.
+- `src/app/update-notice.tsx#symbol:UpdateNotice` — 44 px toast action.
 
 ## Open Questions
 

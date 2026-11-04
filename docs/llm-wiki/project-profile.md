@@ -2,8 +2,8 @@
 title: Project Profile
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: project_profile
 project: ax-request-portal
 last_updated: 2026-11-03
@@ -56,7 +56,7 @@ React 19, TypeScript (strict), Vite 8 (Rolldown), React Router 8 (data router, S
 ## Deployment
 
 - Static build served by nginx (`deploy/nginx.conf`, verified in CI by `deploy/check-nginx.sh`), or the GitHub Pages demo in mock mode.
-- Environment: `VITE_BASE`, `VITE_API_MOCK`, `VITE_API_BASE_URL` (`.env.example`).
+- Environment: `VITE_BASE`, `VITE_API_MOCK`, `VITE_API_BASE_URL`, optional `VITE_BUILD_ID` (`.env.example`). Each build writes `version.json`; open tabs offer a reload when the deployed id differs.
 
 ## Evidence
 
