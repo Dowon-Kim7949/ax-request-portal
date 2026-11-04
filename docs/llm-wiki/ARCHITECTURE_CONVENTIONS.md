@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: architecture_conventions
 project: ax-request-portal
-last_updated: 2026-11-03
+last_updated: 2026-11-04
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -98,11 +98,11 @@ A front-end-only SPA whose backend is a contract. One table of endpoints (`src/a
 - `VITE_API_MOCK` (default `true`) selects the in-browser mock; `VITE_API_BASE_URL` is the real backend; `VITE_BASE` is the public path (read only by `vite.config.ts`). `.env.example` documents all three.
 - Boot (`main.tsx`): i18n first (the language decides the seed), theme sync, client configuration, then in mock mode the service worker races an 8 s timeout. On failure the page reloads once (a `sessionStorage` flag prevents loops) and then shows a retry screen. Reason: WebKit can refuse or hang the worker registration when the page is reloaded during the first load; creating a second worker on the same page risks handling requests twice.
 - `createHandlers` derives one MSW handler per contract entry, validates params/query/body with the same schemas, adds 120–380 ms latency, reads the language and the mock token, advances simulated time (`engine.tick`) and runs the resolver.
-- State is `MockState` in `localStorage` (`ax-request-portal:mock-db`). Bumping `STATE_VERSION` discards every visitor's stored data and reseeds. The seed is produced by running the real engine through the lifecycle, so seeded requests are always reachable states. `dirty` marks data a person edited: untouched demo data is regenerated when the language changes, edited data keeps its language.
+- State is `MockState` in `localStorage` (`ax-request-portal:mock-db`). Bumping `STATE_VERSION` discards every visitor's stored data and reseeds. The seed is produced by running the real engine through the lifecycle, so seeded requests are always reachable states; steps a person would click (scope choices, assumption ticks) are filled in by `withDefaults` with the AI's suggestion. `dirty` marks data a person edited: untouched demo data is regenerated when the language changes, edited data keeps its language.
 
 ## Configuration
 
-- Template users change `src/config/app.config.ts`: brand (per locale), locales and default locale, enabled roles, role permissions, request types, mock timings. `AppConfigSchema` validates it at start-up and refuses a configuration without `admin`, without an active role that can manage users, or with a default locale that is not enabled.
+- Template users change `src/config/app.config.ts`: brand (per locale), locales and default locale, enabled roles, role permissions, request types, workflow (`scopeCheck`: ask the requester to confirm the AI's reading before developer review; the mock follows it and a real backend should read the same setting), mock timings. `AppConfigSchema` validates it at start-up and refuses a configuration without `admin`, without an active role that can manage users, or with a default locale that is not enabled.
 - Colours are tokens in `src/index.css`; texts are in `src/i18n/`; demo accounts and seed data are in `src/mocks/seed.ts`.
 
 ## i18n

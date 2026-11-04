@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: glossary
 project: ax-request-portal
-last_updated: 2026-11-03
+last_updated: 2026-11-04
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -43,12 +43,17 @@ Terms as the code uses them. Identifiers are kept in English in both UI language
 
 | Term | Meaning | Defined in |
 | --- | --- | --- |
-| Work request (`WorkRequest`) | One change asked for by a requester: project, type, targets, current and desired behaviour, 1–5 acceptance criteria, plus everything that happens to it. | `src/domain/model.ts` |
-| Request type (`RequestType`) | `new_feature`, `change`, `bug`, `copy_design`, `non_code`. `non_code` requests get no engineering report. | `src/domain/model.ts` |
-| Status (`RequestStatus`) | One of twelve lifecycle states, from `submitted` to `done` / `rejected` / `cancelled`. | `src/domain/model.ts` |
-| Event / transition (`TRANSITIONS`) | One of thirteen moves between statuses, each owned by a party. | `src/domain/lifecycle.ts` |
+| Work request (`WorkRequest`) | One change asked for by a requester: project, type, targets, current and desired behaviour, 1–5 acceptance criteria (or audit findings), plus everything that happens to it. | `src/domain/model.ts` |
+| Request type (`RequestType`) | `new_feature`, `change`, `bug`, `copy_design`, `non_code`, `checklist`. `non_code` requests get no engineering report; `checklist` requests list audit findings. | `src/domain/model.ts` |
+| Audit finding (`ChecklistItem`) | One finding of a `checklist` request: number, clause, finding, what counts as fixed. Each becomes one acceptance criterion. | `src/domain/model.ts` |
+| Status (`RequestStatus`) | One of thirteen lifecycle states, from `submitted` to `done` / `rejected` / `cancelled`. | `src/domain/model.ts` |
+| Event / transition (`TRANSITIONS`) | One of sixteen moves between statuses, each owned by a party. | `src/domain/lifecycle.ts` |
+| Scope check (`scope_check`, `ScopeProposal`) | The requester confirms the AI's reading of the request before a developer reviews it: summary, what changes, what does not, choices where the request reads two ways. | `src/domain/model.ts` |
+| Assumption (`ReportAssumption`) | A fact the report's plan relies on that neither the code nor a reviewed wiki confirmed; the developer confirms each before the first AI run. | `src/domain/model.ts` |
+| Project rule (`ProjectConstraint`) | A rule every change to a project must keep (security, data, operations), kept by the project and checked in every report (`ConstraintCheck`). | `src/domain/model.ts` |
+| Preview (`WorkPreview`, `PreviewFeedback`) | Screens and a link of the change before the merge, and the requester's advisory reaction to them. | `src/domain/model.ts` |
 | Party | Who performs an event: `requester`, `developer`, `ai`, `system`. | `src/domain/lifecycle.ts` |
-| Transition command (`TransitionCommand`) | The ten events a person can send from the UI, with their payloads. | `src/domain/lifecycle.ts` |
+| Transition command (`TransitionCommand`) | The twelve events a person can send from the UI, with their payloads. | `src/domain/lifecycle.ts` |
 | Turn (`turnOf`) | Whose move a status is: requester, developer, ai or none. Drives "your turn". | `src/domain/lifecycle.ts` |
 | Stage (`STAGES`) | Seven progress stages shown in the stepper; several statuses share a stage. | `src/domain/lifecycle.ts` |
 | Requester status (`RequesterStatus`) | Plain-language status shown to people without `report:read`. | `src/domain/lifecycle.ts` |

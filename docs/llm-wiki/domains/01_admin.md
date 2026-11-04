@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-03
+last_updated: 2026-11-04
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -42,7 +42,7 @@ Administration of the organization's side of the workflow: projects (repositorie
 
 ## Workflows
 
-- **Projects**: list plus an edit sheet (`editing` is a project, `'new'` or `null`). Fields: name, description, icon, repository (`provider` + URL), wiki path (default `docs/llm-wiki`), owners, targets (name + wiki document) and an active switch. Owner candidates are active developers and admins only. The provider decides whether review links say MR (GitLab) or PR (GitHub).
+- **Projects**: list plus an edit sheet (`editing` is a project, `'new'` or `null`). Fields: name, description, icon, repository (`provider` + URL), wiki path (default `docs/llm-wiki`), owners, targets (name + wiki document), rules to keep (`constraints`: text + optional source such as "Security policy 3.2", at most 20) and an active switch. The AI checks every rule in its report and the work instructions carry them, so requesters never have to repeat them. Owner candidates are active developers and admins only. The provider decides whether review links say MR (GitLab) or PR (GitHub).
 - **Users**: one row per user with a role select and an active toggle; invitations open a sheet. The select offers `appConfig.enabledRoles` minus `operator`. An admin cannot change their own role or deactivate themselves, and cannot change an operator's row: the controls are disabled with a `title`, an operator row also says so in visible text, and the server rejects both.
 
 ## API Services
@@ -50,7 +50,7 @@ Administration of the organization's side of the workflow: projects (repositorie
 | Hook | Endpoint | Payload → response | Errors and cache |
 | --- | --- | --- | --- |
 | `useDirectory` (`useProjects`, `useUsers`) | `GET /projects`, `GET /users` | → `Project[]`, `User[]` | 60 s stale time; shared with every page that shows names. |
-| `useSaveProject` | `POST /projects` or `PUT /projects/{id}` (chosen by presence of `id`) | `ProjectInput` (name 1–60, description ≤ 300, repository, ≥ 1 owner, targets with optional id) → `Project` | Server: owners must be developers/admins (`ownersMustBeDevelopers`, 400), unknown id 404, missing target ids are generated. Invalidates projects. |
+| `useSaveProject` | `POST /projects` or `PUT /projects/{id}` (chosen by presence of `id`) | `ProjectInput` (name 1–60, description ≤ 300, repository, ≥ 1 owner, targets with optional id, constraints with optional id) → `Project` | Server: owners must be developers/admins (`ownersMustBeDevelopers`, 400), unknown id 404, missing target and constraint ids are generated; an empty rule text is 400. Invalidates projects. |
 | `useCreateUser` | `POST /users` | `UserCreate { name, email, role, team? }` → `User` | Duplicate e-mail → 400 `emailTaken`. Invalidates users. |
 | `useUpdateUser` | `PATCH /users/{id}` | `UserPatch { role?, team?, active? }` → `User` | Self-change → 400 `cannotChangeSelf`. Invalidates users. |
 

@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: domain_overview
 project: ax-request-portal
-last_updated: 2026-11-03
+last_updated: 2026-11-04
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -15,7 +15,9 @@ source_files:
   - src/domain/model.ts
   - src/app/router.tsx
 evidence:
-  - src/domain/lifecycle.ts#L34-L48
+  - src/domain/lifecycle.ts#symbol:TRANSITIONS
+  - src/domain/lifecycle.ts#symbol:scopeRevisionsLeft
+  - src/domain/lifecycle.ts#symbol:uncheckedAssumptions
   - src/domain/lifecycle.ts#symbol:turnOf
   - src/domain/lifecycle.ts#symbol:STAGES
   - src/domain/lifecycle.ts#symbol:TERMINAL_STATUSES
@@ -44,16 +46,19 @@ contains_sensitive_info: false
 
 ## The product in one paragraph
 
-A person asks for a change to an internal system in plain language. An AI agent reads the project's code and its LLM-WIKI and writes a feasibility report. A developer decides: ask a question, reject, or let the AI do the work. The AI opens a merge request; the developer reviews it; the requester checks each acceptance criterion; the developer schedules and marks the release. Every step is a lifecycle event, and the UI only offers the events the current user may fire.
+A person asks for a change to an internal system in plain language. An AI agent reads the project's code and its LLM-WIKI and writes a feasibility report, together with a plain-language scope the requester confirms (what changes, what does not, a choice wherever the request reads two ways). A developer then decides: ask a question, reject, or let the AI do the work after confirming the report's unverified assumptions. The AI opens a merge request; the developer reviews it; the requester checks each acceptance criterion; the developer schedules and marks the release. Every step is a lifecycle event, and the UI only offers the events the current user may fire.
 
 ## Request lifecycle
 
-Twelve statuses (`RequestStatus`) and thirteen events (`TRANSITIONS` in `src/domain/lifecycle.ts`, the single source of truth for both the UI and the mock server):
+Thirteen statuses (`RequestStatus`) and sixteen events (`TRANSITIONS` in `src/domain/lifecycle.ts`, the single source of truth for both the UI and the mock server):
 
 | Event | From | To | By |
 | --- | --- | --- | --- |
 | `startReport` | `submitted` | `reporting` | system |
-| `reportReady` | `reporting` | `review` | ai |
+| `scopeReady` | `reporting` | `scope_check` | ai |
+| `reportReady` | `reporting` | `review` (nothing to confirm: verdict `out_of_scope` / `undetermined`, or `workflow.scopeCheck` off) | ai |
+| `approveScope` | `scope_check` | `review` | requester |
+| `reviseScope` | `scope_check` | `reporting` (the report and scope are rewritten) | requester |
 | `requestInfo` | `review` | `info_needed` | developer |
 | `provideInfo` | `info_needed` | `reporting` (the report is regenerated) | requester |
 | `reject` | `review`, `info_needed` | `rejected` | developer |
@@ -64,13 +69,15 @@ Twelve statuses (`RequestStatus`) and thirteen events (`TRANSITIONS` in `src/dom
 | `reportIssue` | `verification` | `changes_requested` | requester |
 | `confirmResult` | `verification` | `release_scheduled` | requester |
 | `markReleased` | `release_scheduled` | `done` | developer |
-| `cancel` | `submitted`, `reporting`, `review`, `info_needed` | `cancelled` | requester |
+| `cancel` | `submitted`, `reporting`, `scope_check`, `review`, `info_needed` | `cancelled` | requester |
 
 - Terminal statuses: `done`, `rejected`, `cancelled`.
 - `turnOf(status)` says whose move it is (requester, developer, ai, none); lists and the home page use it for "your turn".
 - `STAGES` folds the statuses into seven progress stages for the stepper; exceptions stay on the stage where they happened.
-- Guards: `confirmResult` needs every acceptance criterion passed, `reportIssue` at least one failed.
-- Only the ten human events can be sent by the client (`TransitionCommand`); `ai` and `system` events happen on the server (in the template, on a timer in the mock).
+- Guards (`LifecycleError.guard` names the rule): `confirmResult` needs every acceptance criterion passed, `reportIssue` at least one failed; `approveScope` needs a valid choice for every scope question; `reviseScope` is allowed `SCOPE_REVISIONS_MAX` (2) times per request; `runWork` from `review` needs every report assumption confirmed (`uncheckedAssumptions`), and a re-run after `changes_requested` keeps the earlier confirmation.
+- `scope_check` is the requester's turn and sits on the `review` stage; its requester label is `confirm_scope`.
+- Only the twelve human events can be sent by the client (`TransitionCommand`); `ai` and `system` events happen on the server (in the template, on a timer in the mock). The mock chooses `scopeReady` or `reportReady` when the report is done.
+- Preview feedback in `code_review` is not a transition: it is advisory and recorded on the work run (see [Request Detail](04_detail.md)).
 
 ## Domains
 
@@ -96,9 +103,10 @@ All 35 endpoints are declared once in `src/api/contract.ts` and published as `do
 
 ## Evidence
 
-- `src/domain/lifecycle.ts#L34-L48` — the transition table above.
+- `src/domain/lifecycle.ts#symbol:TRANSITIONS` — the transition table above.
+- `src/domain/lifecycle.ts#symbol:scopeRevisionsLeft`, `src/domain/lifecycle.ts#symbol:uncheckedAssumptions` — the scope and assumption guards.
 - `src/domain/lifecycle.ts#symbol:turnOf`, `src/domain/lifecycle.ts#symbol:STAGES`, `src/domain/lifecycle.ts#symbol:TERMINAL_STATUSES` — turn, stage and terminal rules.
-- `src/domain/model.ts#symbol:RequestStatus` — the twelve statuses.
+- `src/domain/model.ts#symbol:RequestStatus` — the thirteen statuses.
 - `src/app/router.tsx#symbol:routes` — routes and permissions.
 
 ## Review Notes

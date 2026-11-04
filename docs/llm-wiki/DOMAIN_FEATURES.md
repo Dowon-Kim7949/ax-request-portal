@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: domain_overview
 project: ax-request-portal
-last_updated: 2026-11-03
+last_updated: 2026-11-04
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -36,6 +36,9 @@ User-facing features by role. Each row names the domain document that holds the 
 | Feature | Domain | E2E |
 | --- | --- | --- |
 | File a request in seven steps with a saved draft and a non-blocking precheck | [Request Wizard](domains/11_wizard.md) | `requester.spec.ts` |
+| File audit findings item by item, pasted from a table | [Request Wizard](domains/11_wizard.md) | `requester.spec.ts` |
+| Confirm the AI's reading of the request (choices, a note, or "not quite" twice) | [Request Detail](domains/04_detail.md) | `requester.spec.ts` |
+| React to a preview of the change before it is merged | [Request Detail](domains/04_detail.md) | `requester.spec.ts` |
 | See own requests, filter by "your turn", open or closed | [My Requests](domains/08_requests.md) | `requester.spec.ts`, `smoke.spec.ts` |
 | Answer a developer's questions; check each acceptance criterion; report an issue; cancel early | [Request Detail](domains/04_detail.md) | `requester.spec.ts` |
 | Follow the plain-language status of a request | [Request Detail](domains/04_detail.md) | `requester.spec.ts` |
@@ -46,7 +49,8 @@ User-facing features by role. Each row names the domain document that holds the 
 | Feature | Domain | E2E |
 | --- | --- | --- |
 | Work queue filtered by turn, AI activity, waiting, open, closed | [Developer Work](domains/12_work.md) | `developer.spec.ts` |
-| Read the AI feasibility report with evidence and wiki trust | [Developer Work](domains/12_work.md) | `developer.spec.ts` |
+| Read the AI feasibility report with evidence, wiki trust, unconfirmed assumptions and project rules | [Developer Work](domains/12_work.md) | `developer.spec.ts` |
+| Confirm the report's assumptions before the first AI run; see the requester's preview reaction in code review | [Developer Work](domains/12_work.md) | `developer.spec.ts` |
 | Decide: run AI work, ask questions, reject | [Developer Work](domains/12_work.md) | `developer.spec.ts` |
 | Review the AI's merge request: approve or request a revision | [Developer Work](domains/12_work.md) | `developer.spec.ts` |
 | Regression checks queue | [Developer Work](domains/12_work.md) | `developer.spec.ts` |
@@ -63,7 +67,7 @@ User-facing features by role. Each row names the domain document that holds the 
 
 | Feature | Domain | E2E |
 | --- | --- | --- |
-| Projects: repository, owners, change targets, wiki path, active flag | [Admin](domains/01_admin.md) | `admin.spec.ts` |
+| Projects: repository, owners, change targets, rules to keep, wiki path, active flag | [Admin](domains/01_admin.md) | `admin.spec.ts` |
 | Users: invite, change role, deactivate | [Admin](domains/01_admin.md) | `admin.spec.ts` |
 | AI budget: monthly and per-request limits, alert threshold, spending by provider and model | [AI Operations](domains/13_ops.md) | `operator.spec.ts` |
 | AI agents: provider keys (write-only), model per task, per-project overrides | [AI Operations](domains/13_ops.md) | `operator.spec.ts` |
