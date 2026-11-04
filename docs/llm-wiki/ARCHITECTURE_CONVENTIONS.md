@@ -17,6 +17,7 @@ source_files:
   - src/api/openapi.ts
   - src/main.tsx
   - src/mocks/handlers.ts
+  - src/mocks/browser.ts
   - src/mocks/store.ts
   - src/config/schema.ts
   - src/config/env.ts
@@ -35,6 +36,11 @@ evidence:
   - src/main.tsx#symbol:MOCK_START_TIMEOUT_MS
   - src/main.tsx#symbol:BOOT_RELOAD_KEY
   - src/mocks/handlers.ts#symbol:createHandlers
+  - src/mocks/handlers.ts#symbol:MOCK_RESPONSE_HEADER
+  - src/mocks/browser.ts#symbol:reattachIfBypassed
+  - src/api/client.test.ts
+  - src/mocks/handlers.test.ts
+  - e2e/mock-api.spec.ts
   - src/mocks/engine.ts#symbol:STATE_VERSION
   - src/config/env.ts#symbol:env
   - src/config/schema.ts#symbol:AppConfigSchema
@@ -50,6 +56,8 @@ related:
   - docs/llm-wiki/COMPONENT_INVENTORY.md
 visibility: public
 contains_sensitive_info: false
+reviewed_by: Kim Dowon
+reviewed_at: 2026-11-04
 ---
 
 # Architecture Conventions
@@ -79,7 +87,7 @@ A front-end-only SPA whose backend is a contract. One table of endpoints (`src/a
 ## API contract
 
 - `EndpointSpec`: `method`, OpenAPI-style `path` (`/requests/{id}`), `summary`, `tag`, optional `public`, `params`, `query`, `body` (Zod), `multipart`, `status` (200/201) and `response` (`null` → 204). The table is `api`; it has 35 endpoints.
-- `call` in `client.ts` builds the URL from the spec, adds `Authorization: Bearer`, `Accept: application/json` and `Accept-Language`, and validates the response with the spec's schema: a mismatch throws `ApiError` with code `contract_violation`, a network failure `network`. A `401` from a non-public endpoint triggers `onUnauthorized` (session cleared). Error bodies follow `ApiErrorBody` (`bad_request`, `unauthorized`, `forbidden`, `not_found`, `invalid_transition`, `guard_failed`, `internal`) with a localized `message`.
+- `call` in `client.ts` builds the URL from the spec, adds `Authorization: Bearer`, `Accept: application/json` and `Accept-Language`, and validates the response with the spec's schema: a mismatch throws `ApiError` with code `contract_violation`, a network failure `network`. A `401` from a non-public endpoint triggers `onUnauthorized` (session cleared). The optional `recover` hook (set only in mock mode) sees every response first; when it resolves `true` the request is sent exactly once more. Error bodies follow `ApiErrorBody` (`bad_request`, `unauthorized`, `forbidden`, `not_found`, `invalid_transition`, `guard_failed`, `internal`) with a localized `message`.
 - Every schema used by the contract is registered with `named()` (`src/domain/registry.ts`); an unregistered schema makes OpenAPI generation throw.
 - `npm run openapi` regenerates `docs/openapi.json`. `src/api/openapi.test.ts` fails when the committed file differs byte for byte, when an endpoint lacks a unique `operationId`, or when a `$ref` is broken. The file is excluded from Prettier for that reason.
 
@@ -97,6 +105,7 @@ A front-end-only SPA whose backend is a contract. One table of endpoints (`src/a
 
 - `VITE_API_MOCK` (default `true`) selects the in-browser mock; `VITE_API_BASE_URL` is the real backend; `VITE_BASE` is the public path (read only by `vite.config.ts`). `.env.example` documents all three.
 - Boot (`main.tsx`): i18n first (the language decides the seed), theme sync, client configuration, then in mock mode the service worker races an 8 s timeout. On failure the page reloads once (a `sessionStorage` flag prevents loops) and then shows a retry screen. Reason: WebKit can refuse or hang the worker registration when the page is reloaded during the first load; creating a second worker on the same page risks handling requests twice.
+- Worker restarts after boot: browsers stop an idle service worker (Chrome after about 30 s), and MSW's 5 s keep-alive timer is throttled in a background tab, so a tab left alone loses its worker. The restarted worker has an empty `activeClientIds` and passes every request to the network (GitHub Pages answers `404`), which used to leave an error on every screen until a reload. Every mock response carries `X-Mock-Api: 1` (`MOCK_RESPONSE_HEADER`); a response without it makes `reattachIfBypassed` post MSW's `MOCK_ACTIVATE` to the registered worker, wait up to 3 s (`REATTACH_TIMEOUT_MS`) for `MOCKING_ENABLED`, and let the client resend the request once. Concurrent bypassed requests share one re-attach. A bypassed request never reached the mock, so resending a mutation does not apply it twice. `MOCK_ACTIVATE` / `MOCKING_ENABLED` are MSW's worker protocol, not a public API: `e2e/mock-api.spec.ts` stops the worker through the Chrome DevTools Protocol and fails if an MSW upgrade changes them (Chromium only).
 - `createHandlers` derives one MSW handler per contract entry, validates params/query/body with the same schemas, adds 120–380 ms latency, reads the language and the mock token, advances simulated time (`engine.tick`) and runs the resolver.
 - State is `MockState` in `localStorage` (`ax-request-portal:mock-db`). Bumping `STATE_VERSION` discards every visitor's stored data and reseeds. The seed is produced by running the real engine through the lifecycle, so seeded requests are always reachable states; steps a person would click (scope choices, assumption ticks) are filled in by `withDefaults` with the AI's suggestion. `dirty` marks data a person edited: untouched demo data is regenerated when the language changes, edited data keeps its language.
 
@@ -129,6 +138,7 @@ A front-end-only SPA whose backend is a contract. One table of endpoints (`src/a
 - `src/api/openapi.test.ts`, `src/domain/registry.ts#symbol:named` — OpenAPI generation and its test.
 - `src/main.tsx#symbol:MOCK_START_TIMEOUT_MS`, `src/main.tsx#symbol:BOOT_RELOAD_KEY` — boot recovery.
 - `src/mocks/handlers.ts#symbol:createHandlers`, `src/mocks/engine.ts#symbol:STATE_VERSION` — mock server.
+- `src/mocks/handlers.ts#symbol:MOCK_RESPONSE_HEADER`, `src/mocks/browser.ts#symbol:reattachIfBypassed`, `src/api/client.test.ts`, `src/mocks/handlers.test.ts`, `e2e/mock-api.spec.ts` — recovery after the mock worker restarts.
 - `src/config/env.ts#symbol:env`, `src/config/schema.ts#symbol:AppConfigSchema` — configuration.
 - `src/i18n/index.ts#symbol:initialLocale`, `src/i18n/en.ts` — language selection and the typed English messages.
 - `src/app/nav.ts#symbol:NAV_ITEMS` — navigation table.

@@ -1,4 +1,4 @@
-import { delay, http, HttpResponse, type HttpHandler } from 'msw'
+import { delay, http, HttpResponse, type HttpHandler, type PathParams } from 'msw'
 import type * as z from 'zod'
 import { api, type ApiErrorBody, type EndpointSpec } from '../api/contract'
 import type { User } from '../domain/model'
@@ -10,6 +10,13 @@ import type { MockStore } from './store'
 const TOKEN_PREFIX = 'mock-token.'
 const MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 const INLINE_UPLOAD_BYTES = 512 * 1024
+
+/**
+ * Set on every mock response. In the browser, an /api response without it did
+ * not come from the mock: the service worker restarted and sent the request to
+ * the network (see `reattachIfBypassed` in browser.ts).
+ */
+export const MOCK_RESPONSE_HEADER = 'X-Mock-Api'
 
 export interface HandlerOptions {
   /** Simulated network latency in ms; [min, max] */
@@ -79,7 +86,7 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
     const method = spec.method.toLowerCase() as 'get' | 'post' | 'put' | 'patch' | 'delete'
     const path = `*/api${spec.path.replace(/\{(\w+)\}/g, ':$1')}`
 
-    return http[method](path, async ({ request, params }) => {
+    const answer = async (request: Request, params: PathParams): Promise<Response> => {
       if (maxLatency > 0) await delay(minLatency + Math.random() * (maxLatency - minLatency))
       const now = store.now()
       const engine = store.engine
@@ -136,6 +143,12 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
         console.error('[mock api]', err)
         return errorResponse(lang, 500, 'internal', 'unknown')
       }
+    }
+
+    return http[method](path, async ({ request, params }) => {
+      const response = await answer(request, params)
+      response.headers.set(MOCK_RESPONSE_HEADER, '1')
+      return response
     })
   }
 

@@ -3,7 +3,7 @@ import i18n, { currentLocale } from './i18n'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { configureClient } from './api/client'
+import { configureClient, type ClientHooks } from './api/client'
 import { createQueryClient } from './api/query-client'
 import App from './App.tsx'
 import { BootError } from './app/boot'
@@ -22,9 +22,12 @@ const MOCK_START_TIMEOUT_MS = 8_000
  * requests twice, so the recovery is one automatic reload — by then the
  * worker has finished installing in the background — and after that a retry
  * screen instead of a blank page.
+ *
+ * Resolves with the client hook that re-attaches the mock after its worker
+ * restarts later on (an idle tab), see `reattachIfBypassed`.
  */
-async function startMockOrRecover(): Promise<void> {
-  const { startMockApi } = await import('./mocks/browser')
+async function startMockOrRecover(): Promise<NonNullable<ClientHooks['recover']>> {
+  const { startMockApi, reattachIfBypassed } = await import('./mocks/browser')
   try {
     await Promise.race([
       startMockApi(currentLocale()),
@@ -36,6 +39,7 @@ async function startMockOrRecover(): Promise<void> {
       ),
     ])
     sessionStorage.removeItem(BOOT_RELOAD_KEY)
+    return reattachIfBypassed
   } catch (err) {
     if (!sessionStorage.getItem(BOOT_RELOAD_KEY)) {
       sessionStorage.setItem(BOOT_RELOAD_KEY, '1')
@@ -53,7 +57,7 @@ async function bootstrap() {
   const root = createRoot(container)
   startThemeSync()
 
-  configureClient({
+  const clientHooks: ClientHooks = {
     getToken: () => useSession.getState().token,
     onUnauthorized: () => useSession.getState().clear(),
     getLanguage: currentLocale,
@@ -62,12 +66,13 @@ async function bootstrap() {
       http: (status) => i18n.t('errors.http', { status }),
       contract: () => i18n.t('errors.contract'),
     },
-  })
+  }
+  configureClient(clientHooks)
 
   if (env.apiMock) {
     // Loaded only in mock mode, so a production build against a real backend ships no mock code paths.
     try {
-      await startMockOrRecover()
+      configureClient({ ...clientHooks, recover: await startMockOrRecover() })
     } catch (err) {
       console.error('[boot] mock API failed to start', err)
       root.render(<BootError detail={err instanceof Error ? err.message : String(err)} />)

@@ -24,6 +24,25 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-04 - Fix: mock API stops answering after its service worker restarts
+
+- status: needs_review
+- actor: claude-code
+- scope: code, docs
+- changed:
+  - src/mocks/handlers.ts (`MOCK_RESPONSE_HEADER` on every mock response), src/mocks/browser.ts (`reattachIfBypassed`), src/api/client.ts (`recover` hook, `ClientHooks` exported), src/main.tsx (wires the hook in mock mode)
+  - tests: src/api/client.test.ts, src/mocks/handlers.test.ts (new), e2e/mock-api.spec.ts (worker-restart regression)
+  - docs/llm-wiki/ARCHITECTURE_CONVENTIONS.md, docs/llm-wiki/E2E_WORKFLOWS.md (both back to `needs_review`)
+- summary:
+  - A tab left alone in the mock-mode demo showed an error on every screen until a reload: the browser stopped the idle MSW worker, the restarted worker forgot the page (`activeClientIds` is in memory) and passed `/api` calls to the network, where GitHub Pages answers `404`.
+  - A response without the mock's mark now makes the client re-send MSW's `MOCK_ACTIVATE`, wait for `MOCKING_ENABLED` (3 s at most) and resend the request once.
+- evidence:
+  - public/mockServiceWorker.js (`activeClientIds`, the bypass when it is empty), node_modules/msw/lib/browser/index.js (5 s `KEEPALIVE_REQUEST` timer)
+  - e2e/mock-api.spec.ts failed before the fix with the same error screen and passes after it (desktop/Chromium).
+- caveats:
+  - `MOCK_ACTIVATE` / `MOCKING_ENABLED` are MSW's internal worker protocol; the E2E test is the guard on MSW upgrades and runs only in Chromium (CDP).
+  - `domains/02_auth.md` cites `src/api/client.ts` and `src/mocks/handlers.ts` by symbol (compared file by file); its claims still hold, but once it is `verified` the impact gate will ask for it to be re-reviewed.
+
 ## 2026-11-04 - Feature: scope check, report assumptions and project rules, preview feedback, audit-finding requests
 
 - status: needs_review
