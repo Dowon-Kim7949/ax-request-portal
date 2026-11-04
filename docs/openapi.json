@@ -3923,6 +3923,7 @@
         "enum": [
           "submitted",
           "reporting",
+          "scope_check",
           "review",
           "info_needed",
           "rejected",
@@ -3954,6 +3955,133 @@
           "developer",
           "admin",
           "operator"
+        ]
+      },
+      "ScopeDecision": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "by": {
+            "type": "string",
+            "description": "User id of the requester"
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "questionId": {
+                  "type": "string"
+                },
+                "optionId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "questionId",
+                "optionId"
+              ]
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "by",
+          "choices"
+        ]
+      },
+      "ScopeProposal": {
+        "description": "The AI's reading of the request in the requester's words, written with the feasibility report.",
+        "type": "object",
+        "properties": {
+          "revision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "Report revision this was written with"
+          },
+          "summary": {
+            "type": "string",
+            "description": "Two or three plain sentences, no technical terms"
+          },
+          "changes": {
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What will change"
+          },
+          "unchanged": {
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What this request will not change"
+          },
+          "questions": {
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ScopeQuestion"
+            }
+          }
+        },
+        "required": [
+          "revision",
+          "summary",
+          "changes",
+          "unchanged",
+          "questions"
+        ]
+      },
+      "ScopeQuestion": {
+        "description": "A choice the requester makes where the request can be read more than one way.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          },
+          "options": {
+            "minItems": 2,
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "label"
+              ]
+            }
+          },
+          "recommended": {
+            "description": "Option id the AI would pick; never preselected",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "options"
         ]
       },
       "Session": {
@@ -4089,6 +4217,60 @@
             "required": [
               "event",
               "answer"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string",
+                "const": "approveScope"
+              },
+              "choices": {
+                "maxItems": 3,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "questionId": {
+                      "type": "string"
+                    },
+                    "optionId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "questionId",
+                    "optionId"
+                  ]
+                }
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 1000
+              }
+            },
+            "required": [
+              "event",
+              "choices"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "event": {
+                "type": "string",
+                "const": "reviseScope"
+              },
+              "note": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            },
+            "required": [
+              "event",
+              "note"
             ]
           },
           {
@@ -4524,6 +4706,21 @@
           },
           "report": {
             "$ref": "#/components/schemas/FeasibilityReport"
+          },
+          "scope": {
+            "description": "Scope the requester confirmed (or is asked to); the developer and the AI work from it",
+            "type": "object",
+            "properties": {
+              "proposal": {
+                "$ref": "#/components/schemas/ScopeProposal"
+              },
+              "decision": {
+                "$ref": "#/components/schemas/ScopeDecision"
+              }
+            },
+            "required": [
+              "proposal"
+            ]
           },
           "work": {
             "$ref": "#/components/schemas/WorkRun"

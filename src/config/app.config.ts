@@ -2,7 +2,7 @@
  * ─────────────────────────────────────────────────────────────
  *  Template configuration — start customizing here.
  * ─────────────────────────────────────────────────────────────
- *  Branding, languages, roles/permissions, request types and mock timing.
+ *  Branding, languages, roles/permissions, request types, workflow and mock timing.
  *  Colors live in src/index.css (@theme), texts in src/i18n/.
  *  The object is validated at startup; an invalid edit fails fast.
  */
@@ -23,6 +23,9 @@ export const appConfig: AppConfig = AppConfigSchema.parse({
   enabledRoles: ['requester', 'executive', 'developer', 'admin', 'operator'],
   rolePermissions: DEFAULT_ROLE_PERMISSIONS,
   requestTypes: ['new_feature', 'change', 'bug', 'copy_design', 'non_code'],
+  workflow: {
+    scopeCheck: true,
+  },
   mock: {
     reportSeconds: 6,
     workSeconds: 20,

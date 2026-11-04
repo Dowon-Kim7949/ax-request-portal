@@ -8,6 +8,7 @@ import {
   isTerminal,
   LifecycleError,
   requesterStatusOf,
+  scopeRevisionsLeft,
   stageOf,
   TERMINAL_STATUSES,
   TRANSITIONS,
@@ -77,20 +78,32 @@ describe('transition table', () => {
       'reviewing',
       'reviewing',
     ])
+    expect(requesterStatusOf('scope_check')).toBe('confirm_scope')
+    expect(turnOf('scope_check')).toBe('requester')
+    expect(stageOf('scope_check')).toBe('review')
     expect(requesterStatusOf('code_review')).toBe('working')
     expect(requesterStatusOf('verification')).toBe('please_check')
   })
 
   it('exposes only human events to clients', () => {
     expect([...USER_EVENTS].sort()).toEqual(
-      ALL_EVENTS.filter((e) => !['startReport', 'reportReady', 'workFinished'].includes(e)).sort(),
+      ALL_EVENTS.filter(
+        (e) => !['startReport', 'reportReady', 'scopeReady', 'workFinished'].includes(e),
+      ).sort(),
     )
   })
 })
 
 describe('authorization', () => {
   it('lets only the requester answer, verify and withdraw (admin may withdraw)', () => {
-    for (const event of ['provideInfo', 'reportIssue', 'confirmResult', 'cancel'] as const) {
+    for (const event of [
+      'provideInfo',
+      'approveScope',
+      'reviseScope',
+      'reportIssue',
+      'confirmResult',
+      'cancel',
+    ] as const) {
       const r = request(TRANSITIONS[event].from[0])
       expect(isAuthorized(event, ctx(people.requester, r)), event).toBe(true)
       expect(isAuthorized(event, ctx(people.otherRequester, r)), event).toBe(false)
@@ -112,7 +125,7 @@ describe('authorization', () => {
   })
 
   it('never lets a person trigger AI or system events', () => {
-    for (const event of ['startReport', 'reportReady', 'workFinished'] as const) {
+    for (const event of ['startReport', 'reportReady', 'scopeReady', 'workFinished'] as const) {
       expect(isAuthorized(event, ctx(people.admin, request(TRANSITIONS[event].from[0])))).toBe(false)
     }
   })
@@ -124,6 +137,12 @@ describe('authorization', () => {
       'runWork',
     ])
     expect(availableEvents(ctx(people.requester, request('review')))).toEqual(['cancel'])
+    expect(availableEvents(ctx(people.requester, request('scope_check')))).toEqual([
+      'approveScope',
+      'reviseScope',
+      'cancel',
+    ])
+    expect(availableEvents(ctx(people.owner, request('scope_check')))).toEqual([])
     expect(availableEvents(ctx(people.requester, request('verification')))).toEqual([
       'reportIssue',
       'confirmResult',
@@ -297,6 +316,53 @@ describe('applyTransition', () => {
       opts(people.owner),
     )
     expect(rerun.work).toMatchObject({ attempt: 2, checkedAssumptions: ['a1', 'a2'] })
+  })
+
+  it('records the scope the requester confirmed, and lets them send it back twice', () => {
+    const scope = {
+      proposal: {
+        revision: 1,
+        summary: '로그인 화면에서 안내가 보이도록 바꿉니다.',
+        changes: ['5번 틀리면 안내가 보인다'],
+        unchanged: [],
+        questions: [
+          {
+            id: 'q1',
+            text: '관리자 화면도 바꿀까요?',
+            options: [
+              { id: 'no', label: '아니요' },
+              { id: 'yes', label: '네' },
+            ],
+            recommended: 'no',
+          },
+        ],
+      },
+    }
+    let r = applyTransition(request('reporting', { scope }), { event: 'scopeReady' }, opts('ai'))
+    expect(r.status).toBe('scope_check')
+
+    const approve = (choices: Array<{ questionId: string; optionId: string }>) =>
+      applyTransition(r, { event: 'approveScope', choices }, opts(people.requester))
+    expect(() => approve([])).toThrow(expect.objectContaining({ guard: 'scopeUnanswered' }))
+    expect(() => approve([{ questionId: 'q1', optionId: 'maybe' }])).toThrow(
+      expect.objectContaining({ guard: 'scopeUnanswered' }),
+    )
+    const approved = approve([{ questionId: 'q1', optionId: 'no' }])
+    expect(approved.status).toBe('review')
+    expect(approved.scope?.decision).toMatchObject({
+      by: 'req',
+      choices: [{ questionId: 'q1', optionId: 'no' }],
+    })
+
+    for (const note of ['범위를 줄여 주세요', '관리자 화면은 빼 주세요']) {
+      r = applyTransition(r, { event: 'reviseScope', note }, opts(people.requester))
+      expect(r.status).toBe('reporting')
+      r = applyTransition(r, { event: 'scopeReady' }, opts('ai'))
+    }
+    expect(scopeRevisionsLeft(r)).toBe(0)
+    expect(() =>
+      applyTransition(r, { event: 'reviseScope', note: '한 번 더' }, opts(people.requester)),
+    ).toThrow(expect.objectContaining({ guard: 'scopeRevisionsUsed' }))
   })
 
   it('does not mutate the input request', () => {

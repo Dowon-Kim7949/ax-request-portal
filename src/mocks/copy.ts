@@ -33,6 +33,9 @@ const ERRORS = {
     needAllPassed: '모든 완료 기준이 통과해야 완료할 수 있습니다.',
     needOneFailed: '안 되는 완료 기준을 하나 이상 표시해 주세요.',
     assumptionsUnchecked: '보고서의 가정을 모두 확인해야 AI 작업을 시작할 수 있습니다.',
+    scopeUnanswered: '골라야 할 항목에 모두 답해 주세요.',
+    scopeRevisionsUsed:
+      '다시 정리는 더 요청할 수 없습니다. 덧붙일 말을 적어 진행하거나 요청을 취소해 주세요.',
     requestBudgetExceeded: (p) =>
       `이 요청의 AI 비용이 요청당 한도(${Number(p.limit).toLocaleString('ko-KR')}원)에 도달해 AI 작업을 더 실행할 수 없습니다. 운영자가 한도를 올리거나 직접 처리해 주세요.`,
     operatorProvisioned: '운영자 계정은 서비스가 관리합니다. 여기서 만들거나 바꿀 수 없습니다.',
@@ -71,6 +74,8 @@ const ERRORS = {
     needAllPassed: 'Every acceptance criterion must pass before you confirm.',
     needOneFailed: 'Mark at least one acceptance criterion as not working.',
     assumptionsUnchecked: 'Confirm every assumption in the report before the AI starts work.',
+    scopeUnanswered: 'Answer every question first.',
+    scopeRevisionsUsed: 'The scope cannot be summed up again. Go ahead with a note, or cancel the request.',
     requestBudgetExceeded: (p) =>
       `This request has used its per-request AI budget (₩${Number(p.limit).toLocaleString('en-US')}), so AI work cannot run again. Ask an operator to raise the limit, or handle it by hand.`,
     operatorProvisioned:
@@ -115,6 +120,8 @@ export function errorText(lang: ServerLanguage, key: ErrorKey, params: Params = 
 const NOTIFICATIONS = {
   ko: {
     reportReady: { title: '구현 확인 보고서가 준비되었습니다', body: (p) => String(p.title) },
+    scopeCheck: { title: '진행 범위를 확인해 주세요', body: (p) => String(p.title) },
+    scopeApproved: { title: '요청자가 진행 범위를 확인했습니다', body: (p) => String(p.title) },
     infoNeeded: { title: '추가 정보가 필요합니다', body: (p) => String(p.questions) },
     requesterAnswered: { title: '요청자가 답변했습니다', body: '보고서를 다시 쓰고 있습니다.' },
     rejected: { title: '진행하지 않기로 했습니다', body: (p) => String(p.reason) },
@@ -132,6 +139,8 @@ const NOTIFICATIONS = {
   },
   en: {
     reportReady: { title: 'Feasibility report is ready', body: (p) => String(p.title) },
+    scopeCheck: { title: 'Please confirm the scope', body: (p) => String(p.title) },
+    scopeApproved: { title: 'The requester confirmed the scope', body: (p) => String(p.title) },
     infoNeeded: { title: 'More information needed', body: (p) => String(p.questions) },
     requesterAnswered: { title: 'The requester answered', body: 'The report is being rewritten.' },
     rejected: { title: 'This request will not go ahead', body: (p) => String(p.reason) },

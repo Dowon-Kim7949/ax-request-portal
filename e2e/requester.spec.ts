@@ -89,3 +89,37 @@ test('requester answers the developer’s questions', async ({ page }) => {
   await page.getByRole('button', { name: '답변 보내기' }).click()
   await expect(page.getByText('요청자 답변')).toBeVisible()
 })
+
+test('requester confirms how the AI read the request', async ({ page }) => {
+  await loginAs(page, '요청자')
+  await page.goto('/requests/1028')
+  await expect(page.getByRole('heading', { name: '이렇게 진행해도 될까요?' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: '이번에 바꾸지 않는 것' })).toBeVisible()
+  await expectNoHorizontalScroll(page)
+
+  // Going ahead without the choices points at what is missing instead of a dead button.
+  await page.getByRole('button', { name: '이대로 진행해 주세요' }).click()
+  await expect(page.getByRole('alert')).toHaveText('골라야 할 항목이 2개 남았어요.')
+  await expect(page.getByRole('radio').first()).toBeFocused()
+
+  await page.getByRole('radio', { name: '목록에 없는 새 화면이에요' }).check()
+  await page.getByRole('radio', { name: /아니요, 요청한 화면만/ }).check()
+  await page.getByLabel('덧붙일 말').fill('배너는 다음 달에 따로 요청할게요.')
+  await page.getByRole('button', { name: '이대로 진행해 주세요' }).click()
+
+  await expect(page.getByRole('heading', { name: '요청자가 확인한 진행 범위' })).toBeVisible()
+  // The note shows on the card and in the timeline.
+  await expect(page.getByText('배너는 다음 달에 따로 요청할게요.').first()).toBeVisible()
+  await expect(page.getByText('검토 중').first()).toBeVisible()
+})
+
+test('requester sends the AI’s reading back with a note', async ({ page }) => {
+  await loginAs(page, '요청자')
+  await page.goto('/requests/1028')
+  await page.getByRole('button', { name: '다르게 해 주세요' }).click()
+  await page.getByLabel('어떻게 다른지 알려 주세요').fill('메인 배너는 빼고 공지 목록만 바꿔 주세요.')
+  await page.getByRole('button', { name: '다시 정리해 주세요' }).click()
+  // The AI rewrites it (6 s in the mock) and asks again, with the note in the summary.
+  await expect(page.getByText('다시 정리는 1번 더 요청할 수 있어요.')).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText(/말씀하신 ‘메인 배너는 빼고 공지 목록만/)).toBeVisible()
+})

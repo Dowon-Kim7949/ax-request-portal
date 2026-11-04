@@ -10,6 +10,7 @@ import { cn } from '@/lib/cn'
 const TONE: Record<RequestStatus, BadgeTone> = {
   submitted: 'neutral',
   reporting: 'ai',
+  scope_check: 'warning',
   review: 'brand',
   info_needed: 'warning',
   rejected: 'danger',
@@ -24,6 +25,7 @@ const TONE: Record<RequestStatus, BadgeTone> = {
 
 const REQUESTER_TONE: Record<RequesterStatus, BadgeTone> = {
   reviewing: 'neutral',
+  confirm_scope: 'warning',
   info_needed: 'warning',
   working: 'ai',
   please_check: 'warning',

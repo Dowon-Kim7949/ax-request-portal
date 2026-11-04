@@ -60,7 +60,7 @@ import type {
 } from '../domain/model'
 import { precheckDraft } from '../domain/precheck'
 import { hasPermission, type Permission, type RolePermissions } from '../domain/roles'
-import { finishWork, generateReport, phaseAt, simulateUsage, type UsageShape } from './ai'
+import { finishWork, generateReport, generateScope, phaseAt, simulateUsage, type UsageShape } from './ai'
 import { renderNotification, type ErrorKey, type NotificationKey, type ServerLanguage } from './copy'
 
 /* ------------------------------------------------------------------ */
@@ -113,6 +113,8 @@ export interface EngineOptions {
   reportSeconds: number
   workSeconds: number
   rolePermissions: RolePermissions
+  /** Ask the requester to confirm the AI's reading before a developer reviews it (default on) */
+  scopeCheck?: boolean
 }
 
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
@@ -149,6 +151,8 @@ const GUARD_ERRORS: Record<GuardName, ErrorKey> = {
   criteriaAllPassed: 'needAllPassed',
   criteriaOneFailed: 'needOneFailed',
   assumptionsUnchecked: 'assumptionsUnchecked',
+  scopeUnanswered: 'scopeUnanswered',
+  scopeRevisionsUsed: 'scopeRevisionsUsed',
 }
 
 export function toDate(iso: string): string {
@@ -332,9 +336,13 @@ export class MockEngine {
       action: boolean,
     ) => this.notify(to, key, params, req.id, action, now, actorId)
 
+    const last = req.timeline.at(-1)?.event
     switch (req.status) {
+      case 'scope_check':
+        send(requester, 'scopeCheck', { title: req.title }, true)
+        break
       case 'review':
-        send(devs, 'reportReady', { title: req.title }, true)
+        send(devs, last === 'approveScope' ? 'scopeApproved' : 'reportReady', { title: req.title }, true)
         break
       case 'info_needed':
         send(
@@ -345,7 +353,8 @@ export class MockEngine {
         )
         break
       case 'reporting':
-        if (req.infoRequest?.answer) send(devs, 'requesterAnswered', {}, false)
+        // A new reading after "not quite" stays between the requester and the AI.
+        if (last === 'provideInfo') send(devs, 'requesterAnswered', {}, false)
         break
       case 'rejected':
         send(requester, 'rejected', { reason: req.rejectionReason ?? req.title }, false)
@@ -431,7 +440,16 @@ export class MockEngine {
         req.id,
       )
       const report = { ...generateReport(req, project, at, lang), generatedBy: selection }
-      req = this.apply({ ...req, report }, { event: 'reportReady' }, { type: 'ai' }, at)
+      // Nothing to confirm when the AI cannot or need not do the work: a developer takes over.
+      const confirm =
+        this.opts.scopeCheck !== false && (report.verdict === 'feasible' || report.verdict === 'conditional')
+      const scope = confirm ? { proposal: generateScope(req, project, report, lang) } : undefined
+      req = this.apply(
+        { ...req, report, scope },
+        { event: confirm ? 'scopeReady' : 'reportReady' },
+        { type: 'ai' },
+        at,
+      )
       this.replace(req)
       this.notifyStatus(req, at)
       return true
@@ -561,12 +579,20 @@ export class MockEngine {
     }
     if (!isAuthorized(command.event, ctx)) throw new HttpError(403, 'forbidden', 'notYourStep')
     let next = this.apply(req, command, { type: 'user', userId: user.id }, now)
-    if (command.event === 'runWork' || command.event === 'requestRevision') {
-      // Both start an AI run, the cost that repeats per request. 0 means no limit.
+    if (
+      command.event === 'runWork' ||
+      command.event === 'requestRevision' ||
+      command.event === 'reviseScope'
+    ) {
+      // Each starts an AI job someone chose to repeat. 0 means no limit. Answering a
+      // developer's question (provideInfo) also rewrites the report but is never refused,
+      // or the requester would be stuck.
       const limit = this.state.budget.perRequestLimitKrw
       if (overRequestLimit(this.requestSpentKrw(req.id), limit)) {
         throw new HttpError(409, 'guard_failed', 'requestBudgetExceeded', { limit })
       }
+    }
+    if (command.event === 'runWork' || command.event === 'requestRevision') {
       if (!next.assigneeId) next = { ...next, assigneeId: user.id }
       if (next.work) next = { ...next, work: { ...next.work, agent: this.agentFor(next.projectId) } }
     }

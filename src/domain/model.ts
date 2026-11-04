@@ -176,6 +176,7 @@ export const RequestStatus = named(
   z.enum([
     'submitted',
     'reporting',
+    'scope_check',
     'review',
     'info_needed',
     'rejected',
@@ -262,6 +263,52 @@ export const FeasibilityReport = named(
   }),
 )
 export type FeasibilityReport = z.infer<typeof FeasibilityReport>
+
+/* ------------------------------------------------------------------ */
+/* Scope check: the requester confirms the AI's reading of the request */
+/* ------------------------------------------------------------------ */
+
+/** How many times a requester may send the scope back to be rewritten. */
+export const SCOPE_REVISIONS_MAX = 2
+
+export const ScopeQuestion = named(
+  'ScopeQuestion',
+  z.object({
+    id: z.string(),
+    text: z.string(),
+    options: z
+      .array(z.object({ id: z.string(), label: z.string() }))
+      .min(2)
+      .max(4),
+    recommended: z.string().optional().describe('Option id the AI would pick; never preselected'),
+  }),
+  'A choice the requester makes where the request can be read more than one way.',
+)
+export type ScopeQuestion = z.infer<typeof ScopeQuestion>
+
+export const ScopeProposal = named(
+  'ScopeProposal',
+  z.object({
+    revision: z.int().positive().describe('Report revision this was written with'),
+    summary: z.string().describe('Two or three plain sentences, no technical terms'),
+    changes: z.array(z.string()).max(5).describe('What will change'),
+    unchanged: z.array(z.string()).max(5).describe('What this request will not change'),
+    questions: z.array(ScopeQuestion).max(3),
+  }),
+  "The AI's reading of the request in the requester's words, written with the feasibility report.",
+)
+export type ScopeProposal = z.infer<typeof ScopeProposal>
+
+export const ScopeDecision = named(
+  'ScopeDecision',
+  z.object({
+    at: Timestamp,
+    by: z.string().describe('User id of the requester'),
+    choices: z.array(z.object({ questionId: z.string(), optionId: z.string() })),
+    note: z.string().optional(),
+  }),
+)
+export type ScopeDecision = z.infer<typeof ScopeDecision>
 
 /* ------------------------------------------------------------------ */
 /* AI work run (branch -> tests -> merge request)                      */
@@ -422,6 +469,10 @@ export const WorkRequest = named(
       .optional(),
     rejectionReason: z.string().optional(),
     report: FeasibilityReport.optional(),
+    scope: z
+      .object({ proposal: ScopeProposal, decision: ScopeDecision.optional() })
+      .optional()
+      .describe('Scope the requester confirmed (or is asked to); the developer and the AI work from it'),
     work: WorkRun.optional(),
     regression: z.array(RegressionCheck),
     verification: z.array(CriterionCheck),

@@ -48,10 +48,19 @@ describe('seed data', () => {
       1025: 'in_progress',
       1026: 'review',
       1027: 'reporting',
+      1028: 'scope_check',
     }
     for (const [id, status] of Object.entries(expected))
       expect(byId(Number(id)).status, `#${id}`).toBe(status)
-    expect(state.nextRequestId).toBe(1028)
+    expect(state.nextRequestId).toBe(1029)
+  })
+
+  it('asks the requester of #1028 to pick the screen and how far the change goes', () => {
+    const questions = byId(1028).scope?.proposal.questions ?? []
+    expect(questions.map((q) => q.id)).toEqual(['q-screen', 'q-extent'])
+    expect(questions[1]?.recommended).toBe('only')
+    // Every request a developer works on has a confirmed scope.
+    for (const id of [1017, 1021, 1024, 1026]) expect(byId(id).scope?.decision, `#${id}`).toBeDefined()
   })
 
   it('reproduces the work-detail showcase for #1024', () => {
@@ -86,7 +95,7 @@ describe('seed data', () => {
     const engine = new MockEngine(structuredClone(state), OPTS)
     engine.tick(new Date(NOW.getTime() + 30_000), 'ko')
     expect(engine.state.requests.find((r) => r.id === 1025)?.status).toBe('code_review')
-    expect(engine.state.requests.find((r) => r.id === 1027)?.status).toBe('review')
+    expect(engine.state.requests.find((r) => r.id === 1027)?.status).toBe('scope_check')
   })
 
   it('compares an unfinished month with the same span of the previous one', () => {

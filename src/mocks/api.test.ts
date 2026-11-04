@@ -36,6 +36,16 @@ const draft: RequestDraft = {
   attachmentIds: [],
 }
 
+/** The requester confirms the AI's reading, taking its suggestion (or the first option) everywhere. */
+async function confirmScope(id: number) {
+  const req = await call(api.getRequest, { params: { id } })
+  const choices = (req.scope?.proposal.questions ?? []).map((q) => ({
+    questionId: q.id,
+    optionId: q.recommended ?? q.options[0]!.id,
+  }))
+  return call(api.transitionRequest, { params: { id }, body: { event: 'approveScope', choices } })
+}
+
 async function expectApiError(promise: Promise<unknown>, status: number, code?: string) {
   const err = await promise.then(
     () => null,
@@ -75,9 +85,49 @@ describe('request lifecycle through the API', () => {
     await expectApiError(call(api.transitionRequest, { params: { id }, body: { event: 'runWork' } }), 403)
 
     t.advance(6)
-    expect((await call(api.getRequest, { params: { id } })).status).toBe('review')
+    // The requester confirms the AI's reading before a developer spends time on it.
+    const proposed = await call(api.getRequest, { params: { id } })
+    expect(proposed.status).toBe('scope_check')
+    expect(proposed.scope?.proposal.changes).toEqual([draft.acceptanceCriteria[0]!.text])
+    expect(proposed.scope?.proposal.questions.map((q) => q.id)).toEqual(['q-extent'])
+
+    // "Not quite": the AI writes it up again with the note.
+    const revised = await call(api.transitionRequest, {
+      params: { id },
+      body: { event: 'reviseScope', note: '공지 본문은 검색하지 않아요' },
+    })
+    expect(revised.status).toBe('reporting')
+    t.advance(6)
+    const again = await call(api.getRequest, { params: { id } })
+    expect(again.status).toBe('scope_check')
+    expect(again.report?.revision).toBe(2)
+    expect(again.scope?.proposal.summary).toContain('공지 본문은 검색하지 않아요')
+
+    // Every choice must be made before going ahead.
+    await expectApiError(
+      call(api.transitionRequest, { params: { id }, body: { event: 'approveScope', choices: [] } }),
+      409,
+      'guard_failed',
+    )
+    const approved = await call(api.transitionRequest, {
+      params: { id },
+      body: {
+        event: 'approveScope',
+        choices: [{ questionId: 'q-extent', optionId: 'only' }],
+        note: '급하지 않아요',
+      },
+    })
+    expect(approved.status).toBe('review')
+    expect(approved.scope?.decision).toMatchObject({
+      by: 'u-kim',
+      choices: [{ questionId: 'q-extent', optionId: 'only' }],
+      note: '급하지 않아요',
+    })
 
     await loginAs('dev1@example.com')
+    expect((await call(api.listNotifications)).map((n) => n.title)).toContain(
+      `[#${id}] 요청자가 진행 범위를 확인했습니다`,
+    )
     const assigned = await call(api.listRequests, { query: { scope: 'assigned', status: 'review' } })
     expect(assigned.map((r) => r.id)).toContain(id)
     const asked = await call(api.transitionRequest, {
@@ -92,9 +142,11 @@ describe('request lifecycle through the API', () => {
       body: { event: 'provideInfo', answer: '제목만 검색합니다.' },
     })
     t.advance(6)
-    const rewritten = await call(api.getRequest, { params: { id } })
+    // A new report means a new reading to confirm.
+    expect((await call(api.getRequest, { params: { id } })).status).toBe('scope_check')
+    const rewritten = await confirmScope(id)
     expect(rewritten.status).toBe('review')
-    expect(rewritten.report?.revision).toBe(2)
+    expect(rewritten.report?.revision).toBe(3)
     // Every project rule is checked against the plan; a reviewed wiki leaves nothing to assume.
     expect(rewritten.report?.constraintChecks.map((k) => k.constraintId)).toEqual([
       'pc-storage',
@@ -147,6 +199,7 @@ describe('request lifecycle through the API', () => {
     const notes = await call(api.listNotifications)
     expect(notes.filter((n) => n.requestId === id).map((n) => n.title)).toEqual(
       expect.arrayContaining([
+        `[#${id}] 진행 범위를 확인해 주세요`,
         `[#${id}] 추가 정보가 필요합니다`,
         `[#${id}] 결과를 확인해 주세요`,
         `[#${id}] 반영되었습니다`,
@@ -162,7 +215,7 @@ describe('request lifecycle through the API', () => {
       body: { ...draft, projectId: 'p-field', targetIds: ['t-task-list', 't-push'] },
     })
     t.advance(6)
-    const reviewed = await call(api.getRequest, { params: { id } })
+    const reviewed = await confirmScope(id)
     // "Push notifications" has no wiki doc, so the AI could only guess where its code is.
     expect(reviewed.report?.assumptions.map((a) => a.id)).toEqual(['a1'])
 
@@ -178,6 +231,31 @@ describe('request lifecycle through the API', () => {
     })
     expect(started.status).toBe('in_progress')
     expect(started.work?.checkedAssumptions).toEqual(['a1'])
+  })
+
+  it('lets the requester send the scope back twice, then only go ahead or cancel', async () => {
+    await loginAs('planner@example.com')
+    const { id } = await call(api.createRequest, { body: draft })
+    for (const note of ['첫 번째', '두 번째']) {
+      t.advance(6)
+      await call(api.transitionRequest, { params: { id }, body: { event: 'reviseScope', note } })
+    }
+    t.advance(6)
+    await expectApiError(
+      call(api.transitionRequest, { params: { id }, body: { event: 'reviseScope', note: '세 번째' } }),
+      409,
+      'guard_failed',
+    )
+    expect((await confirmScope(id)).status).toBe('review')
+  })
+
+  it('sends a report with nothing to confirm straight to the developer', async () => {
+    await loginAs('planner@example.com')
+    const { id } = await call(api.createRequest, { body: { ...draft, type: 'non_code', targetIds: [] } })
+    t.advance(6)
+    const req = await call(api.getRequest, { params: { id } })
+    expect(req.status).toBe('review')
+    expect(req.scope).toBeUndefined()
   })
 
   it('refuses transitions that do not fit the current status', async () => {
@@ -277,6 +355,13 @@ describe('AI budget', () => {
     await loginAs('planner@example.com')
     const { id } = await call(api.createRequest, { body: draft })
     t.advance(6)
+    // Asking for another reading is an AI job the requester chooses to repeat.
+    await expectApiError(
+      call(api.transitionRequest, { params: { id }, body: { event: 'reviseScope', note: '다시' } }),
+      409,
+      'guard_failed',
+    )
+    await confirmScope(id)
 
     await loginAs('dev1@example.com')
     await expectApiError(
@@ -312,6 +397,8 @@ describe('AI operations', () => {
       body: { ...draft, projectId: 'p-data', targetIds: ['t-report-api'] },
     })
     t.advance(6)
+    await confirmScope(onClaude.id)
+    await confirmScope(onOpenAi.id)
 
     await loginAs('dev1@example.com')
     const claude = await call(api.getRequest, { params: { id: onClaude.id } })

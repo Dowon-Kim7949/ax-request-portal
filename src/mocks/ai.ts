@@ -11,6 +11,8 @@ import type {
   Project,
   RegressionCheck,
   ReportVerdict,
+  ScopeProposal,
+  ScopeQuestion,
   WorkPhase,
   WorkRequest,
   WorkRun,
@@ -177,6 +179,112 @@ export function generateReport(
     wikiTrust,
     size: score <= 3 ? 'S' : score <= 5 ? 'M' : 'L',
     risks,
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Scope proposal (the requester's view of the report)                 */
+/* ------------------------------------------------------------------ */
+
+const SCOPE_COPY = {
+  ko: {
+    thisService: '이 서비스',
+    summary: (where: string, desired: string) => `${where}에서 ‘${desired}’ 되도록 바꿉니다.`,
+    criteria: (n: number) => `아래 ${n}가지가 되면 끝난 것으로 봅니다.`,
+    revised: (note: string) => `말씀하신 ‘${note}’를 반영해 다시 정리했어요.`,
+    keep: (name: string) =>
+      `‘${name}’ 화면은 바꾸지 않아요. 같은 코드를 써서, 영향이 없는지만 다시 확인해요.`,
+    whichScreen: (other: string) => `‘${other}’은 어느 화면을 말씀하신 건가요?`,
+    newScreen: '목록에 없는 새 화면이에요',
+    notSure: '잘 모르겠어요',
+    alsoChange: (name: string) => `‘${name}’ 화면도 같이 바뀌어야 하나요?`,
+    onlyRequested: '아니요, 요청한 화면만 바꿔 주세요',
+    both: (name: string) => `네, ‘${name}’도 같이 바꿔 주세요`,
+  },
+  en: {
+    thisService: 'this service',
+    summary: (where: string, desired: string) => `On ${where}, change it so that “${desired}”.`,
+    criteria: (n: number) => `It is done when the ${n} item(s) below work.`,
+    revised: (note: string) => `Summed up again with your note: “${note}”.`,
+    keep: (name: string) =>
+      `“${name}” stays as it is. It shares code, so it is only re-checked for side effects.`,
+    whichScreen: (other: string) => `Which screen do you mean by “${other}”?`,
+    newScreen: 'A new screen that is not listed',
+    notSure: 'Not sure',
+    alsoChange: (name: string) => `Should “${name}” change as well?`,
+    onlyRequested: 'No, only the screens I asked for',
+    both: (name: string) => `Yes, change “${name}” too`,
+  },
+} satisfies Record<ServerLanguage, Record<string, unknown>>
+
+/** The note of the last "not quite" since the scope was last written, if any. */
+function lastRevisionNote(req: WorkRequest): string | undefined {
+  for (let i = req.timeline.length - 1; i >= 0; i--) {
+    const e = req.timeline[i]!
+    if (e.event === 'scopeReady') return undefined
+    if (e.event === 'reviseScope') return e.note
+  }
+  return undefined
+}
+
+/**
+ * What the requester confirms: the report in plain words, plus a choice
+ * wherever the request can be read two ways. Written in the same model call
+ * as the report, so it costs nothing extra.
+ */
+export function generateScope(
+  req: WorkRequest,
+  project: Project,
+  report: FeasibilityReport,
+  lang: ServerLanguage = 'ko',
+): ScopeProposal {
+  const c = SCOPE_COPY[lang]
+  const names = selectedTargets(req, project).map((t) => t.name)
+  const where = names.length ? names.join(', ') : req.targetOther?.trim() || c.thisService
+  const note = lastRevisionNote(req)
+  const criteria = req.acceptanceCriteria.map((cr) => cr.text)
+
+  const questions: ScopeQuestion[] = []
+  const other = req.targetOther?.trim()
+  if (other && !req.infoRequest?.answer) {
+    const candidates = project.targets.filter((t) => !req.targetIds.includes(t.id)).slice(0, 2)
+    questions.push({
+      id: 'q-screen',
+      text: c.whichScreen(other),
+      options: [
+        ...candidates.map((t) => ({ id: t.id, label: t.name })),
+        { id: 'new', label: c.newScreen },
+        ...(candidates.length ? [] : [{ id: 'unsure', label: c.notSure }]),
+      ],
+    })
+  }
+  const neighbour = report.impact.recheck[0]
+  if (neighbour) {
+    // The AI tends to widen a change to code it shares; ask instead of assuming.
+    questions.push({
+      id: 'q-extent',
+      text: c.alsoChange(neighbour),
+      options: [
+        { id: 'only', label: c.onlyRequested },
+        { id: 'both', label: c.both(neighbour) },
+      ],
+      recommended: 'only',
+    })
+  }
+
+  return {
+    revision: report.revision,
+    summary: [
+      c.summary(where, req.desiredBehavior.trim().replace(/[.。]$/, '')),
+      c.criteria(criteria.length),
+      ...(note ? [c.revised(note)] : []),
+    ].join(' '),
+    changes: criteria.slice(0, 5),
+    unchanged: [
+      ...(req.outOfScope?.trim() ? [req.outOfScope.trim()] : []),
+      ...report.impact.recheck.map(c.keep),
+    ].slice(0, 5),
+    questions: questions.slice(0, 3),
   }
 }
 
