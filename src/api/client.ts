@@ -23,10 +23,16 @@ export class ApiError extends Error {
   }
 }
 
-interface ClientHooks {
+export interface ClientHooks {
   getToken: () => string | null
   /** Called on 401 so the app can drop the session and show the login screen */
   onUnauthorized: () => void
+  /**
+   * Mock mode: given a response that did not come from the mock, re-attaches
+   * the mock and resolves true, and the request is sent once more. A bypassed
+   * request never reached the mock, so repeating it cannot apply a change twice.
+   */
+  recover?: (response: Response) => Promise<boolean>
   /** Sent as Accept-Language: the server writes notifications, errors and AI text in it */
   getLanguage?: () => string
   /** Messages for errors the client raises itself (no server body to show) */
@@ -102,12 +108,10 @@ export async function call<E extends EndpointSpec>(spec: E, ...rest: [Args<E>] |
 
   let res: Response
   try {
-    res = await fetch(buildUrl(spec.path, args.params, args.query), {
-      method: spec.method,
-      headers,
-      body,
-      signal: args.signal,
-    })
+    const url = buildUrl(spec.path, args.params, args.query)
+    const send = () => fetch(url, { method: spec.method, headers, body, signal: args.signal })
+    res = await send()
+    if (hooks.recover && (await hooks.recover(res))) res = await send()
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') throw err
     throw new ApiError(0, 'network', messages().network())
