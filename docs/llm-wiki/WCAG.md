@@ -2,8 +2,8 @@
 title: Accessibility (WCAG)
 tags:
   - llm-wiki
-  - needs-review
-status: needs_review
+  - verified
+status: verified
 doc_type: wcag
 project: ax-request-portal
 last_updated: 2026-11-03
@@ -39,6 +39,8 @@ related:
   - docs/llm-wiki/profiles/frontend.md
 visibility: public
 contains_sensitive_info: false
+reviewed_by: Kim Dowon
+reviewed_at: 2026-11-04
 ---
 
 # Accessibility (WCAG)
