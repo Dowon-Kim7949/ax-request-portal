@@ -2858,6 +2858,77 @@
           "alertThresholdPct"
         ]
       },
+      "ChecklistItem": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "description": "The finding's own number, e.g. \"Finding 24\""
+          },
+          "clause": {
+            "description": "Clause of the standard, e.g. \"2.3.1\"",
+            "type": "string",
+            "maxLength": 60
+          },
+          "finding": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "What the reviewer found, in their words"
+          },
+          "expected": {
+            "description": "What counts as fixed",
+            "type": "string",
+            "maxLength": 300
+          },
+          "id": {
+            "type": "string"
+          },
+          "criterionId": {
+            "type": "string",
+            "description": "The acceptance criterion made from this item"
+          }
+        },
+        "required": [
+          "ref",
+          "finding",
+          "id",
+          "criterionId"
+        ]
+      },
+      "ChecklistItemInput": {
+        "type": "object",
+        "properties": {
+          "ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60,
+            "description": "The finding's own number, e.g. \"Finding 24\""
+          },
+          "clause": {
+            "description": "Clause of the standard, e.g. \"2.3.1\"",
+            "type": "string",
+            "maxLength": 60
+          },
+          "finding": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "What the reviewer found, in their words"
+          },
+          "expected": {
+            "description": "What counts as fixed",
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "ref",
+          "finding"
+        ]
+      },
       "ConstraintCheck": {
         "type": "object",
         "properties": {
@@ -4014,7 +4085,6 @@
             "maxLength": 2000
           },
           "acceptanceCriteria": {
-            "minItems": 1,
             "maxItems": 5,
             "type": "array",
             "items": {
@@ -4029,6 +4099,20 @@
               "required": [
                 "text"
               ]
+            },
+            "description": "1–5; ignored for checklist requests"
+          },
+          "checklistSource": {
+            "description": "Who raised the findings, e.g. \"Security audit, on-site review\"",
+            "type": "string",
+            "maxLength": 100
+          },
+          "checklist": {
+            "description": "Checklist requests only: each item becomes an acceptance criterion",
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChecklistItemInput"
             }
           },
           "outOfScope": {
@@ -4091,13 +4175,15 @@
         ]
       },
       "RequestType": {
+        "description": "checklist = findings from an outside review (audit, inspection, certification) handled item by item",
         "type": "string",
         "enum": [
           "new_feature",
           "change",
           "bug",
           "copy_design",
-          "non_code"
+          "non_code",
+          "checklist"
         ]
       },
       "Role": {
@@ -4834,6 +4920,15 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/AcceptanceCriterion"
+            }
+          },
+          "checklistSource": {
+            "type": "string"
+          },
+          "checklist": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChecklistItem"
             }
           },
           "outOfScope": {

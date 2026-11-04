@@ -532,6 +532,25 @@ export class MockEngine {
       .map((aid) => this.state.attachments.find((a) => a.id === aid))
       .filter((a): a is Attachment => Boolean(a))
 
+    // A checklist request is checked item by item: every finding becomes an acceptance criterion.
+    const checklist =
+      draft.type === 'checklist'
+        ? (draft.checklist ?? []).map((item, i) => ({
+            id: `k${i + 1}`,
+            criterionId: `c${i + 1}`,
+            ref: item.ref,
+            ...(item.clause ? { clause: item.clause } : {}),
+            finding: item.finding,
+            ...(item.expected ? { expected: item.expected } : {}),
+          }))
+        : undefined
+    const criteria = checklist
+      ? checklist.map((k) => ({
+          id: k.criterionId,
+          text: `[${k.ref}] ${k.expected ?? k.finding}`.slice(0, 300),
+        }))
+      : draft.acceptanceCriteria.map((c, i) => ({ id: `c${i + 1}`, text: c.text }))
+
     let req: WorkRequest = {
       id,
       title: draft.title,
@@ -541,7 +560,9 @@ export class MockEngine {
       ...(draft.targetOther ? { targetOther: draft.targetOther } : {}),
       currentBehavior: draft.currentBehavior,
       desiredBehavior: draft.desiredBehavior,
-      acceptanceCriteria: draft.acceptanceCriteria.map((c, i) => ({ id: `c${i + 1}`, text: c.text })),
+      acceptanceCriteria: criteria,
+      ...(checklist ? { checklist } : {}),
+      ...(checklist && draft.checklistSource ? { checklistSource: draft.checklistSource } : {}),
       ...(draft.outOfScope ? { outOfScope: draft.outOfScope } : {}),
       attachments,
       ...(draft.desiredDate ? { desiredDate: draft.desiredDate } : {}),

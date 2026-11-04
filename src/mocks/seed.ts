@@ -301,6 +301,8 @@ interface ScenarioCopy {
   targetOther?: string
   outOfScope?: string
   dateReason?: string
+  checklistSource?: string
+  checklist?: RequestDraft['checklist']
   questions?: string[]
   answer?: string
   reason?: string
@@ -563,6 +565,21 @@ const SCENARIOS: Scenario[] = [
     targetIds: ['t-announce'],
     steps: () => [{ h: 4.9, ai: true }],
   },
+  /* 1029: audit findings, checked item by item */ {
+    by: 'u-kim',
+    h: 30,
+    projectId: 'p-portal',
+    type: 'checklist',
+    targetIds: ['t-login', 't-mypage'],
+    desiredInDays: 5,
+    steps: () => [
+      { h: 29.9, ai: true },
+      approve('u-kim', 29),
+      { h: 28, by: 'u-choi', command: { event: 'runWork' } },
+      { h: 27.9, ai: true },
+      { h: 26, by: 'u-choi', command: { event: 'approveMerge' } },
+    ],
+  },
 ]
 
 const SCENARIO_COPY: Record<ServerLanguage, ScenarioCopy[]> = {
@@ -695,6 +712,34 @@ const SCENARIO_COPY: Record<ServerLanguage, ScenarioCopy[]> = {
         '예약된 공지는 목록에 예약 표시와 함께 보인다',
       ],
       targetOther: '메인 배너',
+    },
+    {
+      title: '보안 점검 지적 3건 조치',
+      current: '',
+      desired: '현장평가에서 받은 화면 관련 지적 3건을 기준에 맞게 고친다',
+      criteria: [],
+      dateReason: '재점검 일정',
+      checklistSource: '보안 점검 현장평가',
+      checklist: [
+        {
+          ref: '지적 24',
+          clause: '2.3.1',
+          finding: '로그인 화면에 개인정보 처리방침 링크가 없다',
+          expected: '로그인 화면 아래에 처리방침 링크가 항상 보인다',
+        },
+        {
+          ref: '지적 25',
+          clause: '2.5.4',
+          finding: '로그인 오류 문구가 아이디가 있는지 없는지를 알려 준다',
+          expected: '아이디와 비밀번호 중 무엇이 틀렸는지 구분하지 않는다',
+        },
+        {
+          ref: '지적 27',
+          clause: '2.9.2',
+          finding: '마이페이지에서 연락처가 그대로 보인다',
+          expected: '연락처 가운데 네 자리가 가려져 보인다',
+        },
+      ],
     },
   ],
   en: [
@@ -829,6 +874,34 @@ const SCENARIO_COPY: Record<ServerLanguage, ScenarioCopy[]> = {
         'Scheduled announcements show in the list with a scheduled mark',
       ],
       targetOther: 'Home banner',
+    },
+    {
+      title: 'Fix three security audit findings',
+      current: '',
+      desired: 'Fix the three screen findings from the on-site review so they meet the standard',
+      criteria: [],
+      dateReason: 'Re-inspection date',
+      checklistSource: 'Security audit, on-site review',
+      checklist: [
+        {
+          ref: 'Finding 24',
+          clause: '2.3.1',
+          finding: 'The sign-in screen has no link to the privacy policy',
+          expected: 'A privacy policy link is always visible under the sign-in form',
+        },
+        {
+          ref: 'Finding 25',
+          clause: '2.5.4',
+          finding: 'The sign-in error tells whether the user name exists',
+          expected: 'The error does not say whether the user name or the password was wrong',
+        },
+        {
+          ref: 'Finding 27',
+          clause: '2.9.2',
+          finding: 'My page shows the full phone number',
+          expected: 'The middle four digits of the phone number are masked',
+        },
+      ],
     },
   ],
 }
@@ -1123,6 +1196,8 @@ export function buildSeedState(now: Date, opts: EngineOptions, lang: ServerLangu
       currentBehavior: c.current,
       desiredBehavior: c.desired,
       acceptanceCriteria: c.criteria.map((text) => ({ text })),
+      ...(c.checklist ? { checklist: c.checklist } : {}),
+      ...(c.checklistSource ? { checklistSource: c.checklistSource } : {}),
       ...(c.outOfScope ? { outOfScope: c.outOfScope } : {}),
       attachmentIds: [],
       ...(s.desiredInDays !== undefined ? { desiredDate: addDays(today, s.desiredInDays) } : {}),

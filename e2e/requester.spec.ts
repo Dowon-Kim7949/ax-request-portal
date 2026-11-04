@@ -143,3 +143,34 @@ test('requester sends the AI’s reading back with a note', async ({ page }) => 
   await expect(page.getByText('다시 정리는 1번 더 요청할 수 있어요.')).toBeVisible({ timeout: 20_000 })
   await expect(page.getByText(/말씀하신 ‘메인 배너는 빼고 공지 목록만/)).toBeVisible()
 })
+
+test('requester files audit findings pasted from a table', async ({ page }) => {
+  await loginAs(page, '요청자')
+  await page.goto('/requests/new?project=p-portal')
+  await page.getByRole('radio', { name: /외부 요건 대응/ }).click() // auto-advances
+  await page.getByRole('button', { name: '로그인', exact: true }).click()
+  await page.getByRole('button', { name: '다음' }).click()
+  await page.getByLabel('요청 제목').fill('보안 점검 지적 조치')
+  await page.getByLabel('원하는 동작').fill('현장평가 지적 2건을 기준에 맞게 고친다')
+  await page.getByRole('button', { name: '다음' }).click()
+
+  await expect(page.getByRole('heading', { name: '받은 지적을 항목별로 적어 주세요' })).toBeVisible()
+  await page.getByLabel('어디서 받은 지적인가요?').fill('보안 점검 현장평가')
+  await page
+    .getByLabel('표에서 붙여 넣기')
+    .fill(
+      '지적 24\t2.3.1\t처리방침 링크가 없다\t링크가 항상 보인다\n지적 25\t오류 문구가 계정 유무를 알려 준다',
+    )
+  await page.getByRole('button', { name: '항목으로 가져오기' }).click()
+  await expect(page.getByText('항목 2', { exact: true })).toBeVisible()
+  await expectNoHorizontalScroll(page)
+  await page.getByRole('button', { name: '다음' }).click()
+  await page.getByRole('button', { name: '다음' }).click()
+
+  await expect(page.getByRole('heading', { name: '이대로 제출할까요?' })).toBeVisible()
+  await page.getByRole('button', { name: '요청 제출' }).click()
+  await expect(page).toHaveURL(/\/requests\/\d+$/)
+  // Each finding became an acceptance criterion.
+  await expect(page.getByText('[지적 24] 링크가 항상 보인다')).toBeVisible()
+  await expect(page.getByText('[지적 25] 오류 문구가 계정 유무를 알려 준다')).toBeVisible()
+})

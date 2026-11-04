@@ -309,6 +309,32 @@ describe('request lifecycle through the API', () => {
     )
   })
 
+  it('takes audit findings as the acceptance criteria of a checklist request', async () => {
+    await loginAs('planner@example.com')
+    const audit = {
+      ...draft,
+      type: 'checklist' as const,
+      acceptanceCriteria: [],
+      checklistSource: '보안 점검',
+      checklist: [
+        { ref: '지적 1', finding: '처리방침 링크가 없다', expected: '링크가 항상 보인다' },
+        { ref: '지적 2', clause: '2.5', finding: '오류 문구가 계정 유무를 알려 준다' },
+      ],
+    }
+    const created = await call(api.createRequest, { body: audit })
+    expect(created.acceptanceCriteria).toEqual([
+      { id: 'c1', text: '[지적 1] 링크가 항상 보인다' },
+      { id: 'c2', text: '[지적 2] 오류 문구가 계정 유무를 알려 준다' },
+    ])
+    expect(created.checklist?.[1]).toMatchObject({ id: 'k2', criterionId: 'c2', clause: '2.5' })
+    expect(created.checklistSource).toBe('보안 점검')
+
+    // A checklist request needs findings; other requests need criteria and no findings.
+    await expectApiError(call(api.createRequest, { body: { ...audit, checklist: [] } }), 400)
+    await expectApiError(call(api.createRequest, { body: { ...draft, acceptanceCriteria: [] } }), 400)
+    await expectApiError(call(api.createRequest, { body: { ...draft, checklist: audit.checklist } }), 400)
+  })
+
   it('refuses transitions that do not fit the current status', async () => {
     await loginAs('dev1@example.com')
     await expectApiError(

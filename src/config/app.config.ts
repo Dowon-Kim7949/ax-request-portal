@@ -22,7 +22,7 @@ export const appConfig: AppConfig = AppConfigSchema.parse({
   defaultLocale: 'ko',
   enabledRoles: ['requester', 'executive', 'developer', 'admin', 'operator'],
   rolePermissions: DEFAULT_ROLE_PERMISSIONS,
-  requestTypes: ['new_feature', 'change', 'bug', 'copy_design', 'non_code'],
+  requestTypes: ['new_feature', 'change', 'bug', 'copy_design', 'checklist', 'non_code'],
   workflow: {
     scopeCheck: true,
   },

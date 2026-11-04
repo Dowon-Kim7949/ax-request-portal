@@ -197,6 +197,7 @@ const SCOPE_COPY = {
     thisService: '이 서비스',
     summary: (where: string, desired: string) => `${where}에서 ‘${desired}’ 되도록 바꿉니다.`,
     criteria: (n: number) => `아래 ${n}가지가 되면 끝난 것으로 봅니다.`,
+    more: (n: number) => `그 밖에 ${n}건 (요청서의 항목 그대로)`,
     revised: (note: string) => `말씀하신 ‘${note}’를 반영해 다시 정리했어요.`,
     keep: (name: string) =>
       `‘${name}’ 화면은 바꾸지 않아요. 같은 코드를 써서, 영향이 없는지만 다시 확인해요.`,
@@ -211,6 +212,7 @@ const SCOPE_COPY = {
     thisService: 'this service',
     summary: (where: string, desired: string) => `On ${where}, change it so that “${desired}”.`,
     criteria: (n: number) => `It is done when the ${n} item(s) below work.`,
+    more: (n: number) => `${n} more, as listed in the request`,
     revised: (note: string) => `Summed up again with your note: “${note}”.`,
     keep: (name: string) =>
       `“${name}” stays as it is. It shares code, so it is only re-checked for side effects.`,
@@ -285,7 +287,7 @@ export function generateScope(
       c.criteria(criteria.length),
       ...(note ? [c.revised(note)] : []),
     ].join(' '),
-    changes: criteria.slice(0, 5),
+    changes: criteria.length > 5 ? [...criteria.slice(0, 4), c.more(criteria.length - 4)] : criteria,
     unchanged: [
       ...(req.outOfScope?.trim() ? [req.outOfScope.trim()] : []),
       ...report.impact.recheck.map(c.keep),

@@ -49,10 +49,22 @@ describe('seed data', () => {
       1026: 'review',
       1027: 'reporting',
       1028: 'scope_check',
+      1029: 'verification',
     }
     for (const [id, status] of Object.entries(expected))
       expect(byId(Number(id)).status, `#${id}`).toBe(status)
-    expect(state.nextRequestId).toBe(1029)
+    expect(state.nextRequestId).toBe(1030)
+  })
+
+  it('turns each audit finding of #1029 into its own acceptance criterion', () => {
+    const r = byId(1029)
+    expect(r.checklist?.map((k) => k.criterionId)).toEqual(['c1', 'c2', 'c3'])
+    expect(r.acceptanceCriteria.map((c) => c.text)).toEqual([
+      '[지적 24] 로그인 화면 아래에 처리방침 링크가 항상 보인다',
+      '[지적 25] 아이디와 비밀번호 중 무엇이 틀렸는지 구분하지 않는다',
+      '[지적 27] 연락처 가운데 네 자리가 가려져 보인다',
+    ])
+    expect(r.verification.map((v) => v.criterionId)).toEqual(['c1', 'c2', 'c3'])
   })
 
   it('asks the requester of #1028 to pick the screen and how far the change goes', () => {

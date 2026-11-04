@@ -49,6 +49,8 @@ const MESSAGES = {
     criterionForm: '‘~하면 ~된다’ 형식으로 쓰면 맞는지 하나씩 확인할 수 있습니다.',
     pastDate: '희망 일정이 이미 지난 날짜입니다.',
     dateReason: '날짜에 이유가 있으면 우선순위를 정할 때 도움이 됩니다. (예: 고객 약속)',
+    duplicateRef: (ref: string) => `‘${ref}’ 번호가 두 번 나옵니다. 같은 지적이면 하나로 합쳐 주세요.`,
+    expected: '어떻게 되면 해결된 것인지 적으면, 나중에 항목별로 확인하기 쉬워집니다.',
   },
   en: {
     targets: 'Picking the screens or features helps the AI find the right code.',
@@ -61,6 +63,8 @@ const MESSAGES = {
     criterionForm: 'Writing it as "when X, Y happens" makes it easy to check one by one.',
     pastDate: 'The wanted-by date is already in the past.',
     dateReason: 'A reason for the date helps with prioritising (e.g. a customer commitment).',
+    duplicateRef: (ref: string) => `"${ref}" appears twice. If it is the same finding, merge them.`,
+    expected: 'Saying what counts as fixed makes each item easy to check later.',
   },
 } as const
 
@@ -92,7 +96,7 @@ export function precheckDraft(
   if (draft.type === 'bug') {
     const steps = draft.currentBehavior.split('\n').filter((l) => l.trim()).length
     if (steps < 2) issues.push({ field: 'currentBehavior', severity: 'warning', message: m.reproSteps })
-  } else if (draft.type !== 'new_feature' && !draft.currentBehavior.trim()) {
+  } else if (draft.type !== 'new_feature' && draft.type !== 'checklist' && !draft.currentBehavior.trim()) {
     issues.push({ field: 'currentBehavior', severity: 'info', message: m.current })
   }
 
@@ -109,6 +113,18 @@ export function precheckDraft(
       })
     } else if (!looksLikeAcceptanceCriterion(c.text)) {
       issues.push({ field: `acceptanceCriteria.${i}`, severity: 'info', message: m.criterionForm })
+    }
+  })
+
+  const seen = new Set<string>()
+  draft.checklist?.forEach((item, i) => {
+    const ref = item.ref.trim()
+    if (seen.has(ref)) {
+      issues.push({ field: `checklist.${i}.ref`, severity: 'warning', message: m.duplicateRef(ref) })
+    }
+    seen.add(ref)
+    if (!item.expected?.trim()) {
+      issues.push({ field: `checklist.${i}.expected`, severity: 'info', message: m.expected })
     }
   })
 

@@ -62,6 +62,7 @@ test('requester screens', async ({ page }) => {
     '/requests',
     '/requests/1021',
     '/requests/1028',
+    '/requests/1029',
     '/schedule',
     '/notifications',
     '/settings',

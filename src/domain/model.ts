@@ -105,7 +105,8 @@ export type Project = z.infer<typeof Project>
 
 export const RequestType = named(
   'RequestType',
-  z.enum(['new_feature', 'change', 'bug', 'copy_design', 'non_code']),
+  z.enum(['new_feature', 'change', 'bug', 'copy_design', 'non_code', 'checklist']),
+  'checklist = findings from an outside review (audit, inspection, certification) handled item by item',
 )
 export type RequestType = z.infer<typeof RequestType>
 
@@ -132,27 +133,74 @@ export type Attachment = z.infer<typeof Attachment>
 
 export const ACCEPTANCE_CRITERIA_MIN = 1
 export const ACCEPTANCE_CRITERIA_MAX = 5
+export const CHECKLIST_ITEMS_MAX = 30
+
+export const ChecklistItemInput = named(
+  'ChecklistItemInput',
+  z.object({
+    ref: z.string().trim().min(1).max(60).describe('The finding\'s own number, e.g. "Finding 24"'),
+    clause: z.string().trim().max(60).optional().describe('Clause of the standard, e.g. "2.3.1"'),
+    finding: z.string().trim().min(1).max(500).describe('What the reviewer found, in their words'),
+    expected: z.string().trim().max(300).optional().describe('What counts as fixed'),
+  }),
+)
+export type ChecklistItemInput = z.infer<typeof ChecklistItemInput>
+
+export const ChecklistItem = named(
+  'ChecklistItem',
+  ChecklistItemInput.extend({
+    id: z.string(),
+    criterionId: z.string().describe('The acceptance criterion made from this item'),
+  }),
+)
+export type ChecklistItem = z.infer<typeof ChecklistItem>
 
 /** Fields the requester fills in. Field names are fixed so they reach the AI verbatim. */
 export const RequestDraft = named(
   'RequestDraft',
-  z.object({
-    projectId: z.string().min(1),
-    type: RequestType,
-    title: z.string().trim().min(2).max(120),
-    targetIds: z.array(z.string()),
-    targetOther: z.string().max(200).optional(),
-    currentBehavior: z.string().trim().max(2000),
-    desiredBehavior: z.string().trim().min(1).max(2000),
-    acceptanceCriteria: z
-      .array(z.object({ text: z.string().trim().min(1).max(300) }))
-      .min(ACCEPTANCE_CRITERIA_MIN)
-      .max(ACCEPTANCE_CRITERIA_MAX),
-    outOfScope: z.string().max(1000).optional(),
-    attachmentIds: z.array(z.string()),
-    desiredDate: CalendarDate.optional(),
-    desiredDateReason: z.string().max(300).optional(),
-  }),
+  z
+    .object({
+      projectId: z.string().min(1),
+      type: RequestType,
+      title: z.string().trim().min(2).max(120),
+      targetIds: z.array(z.string()),
+      targetOther: z.string().max(200).optional(),
+      currentBehavior: z.string().trim().max(2000),
+      desiredBehavior: z.string().trim().min(1).max(2000),
+      acceptanceCriteria: z
+        .array(z.object({ text: z.string().trim().min(1).max(300) }))
+        .max(ACCEPTANCE_CRITERIA_MAX)
+        .describe(`${ACCEPTANCE_CRITERIA_MIN}–${ACCEPTANCE_CRITERIA_MAX}; ignored for checklist requests`),
+      checklistSource: z
+        .string()
+        .trim()
+        .max(100)
+        .optional()
+        .describe('Who raised the findings, e.g. "Security audit, on-site review"'),
+      checklist: z
+        .array(ChecklistItemInput)
+        .max(CHECKLIST_ITEMS_MAX)
+        .optional()
+        .describe('Checklist requests only: each item becomes an acceptance criterion'),
+      outOfScope: z.string().max(1000).optional(),
+      attachmentIds: z.array(z.string()),
+      desiredDate: CalendarDate.optional(),
+      desiredDateReason: z.string().max(300).optional(),
+    })
+    .superRefine((d, ctx) => {
+      if (d.type === 'checklist') {
+        if (!d.checklist?.length) {
+          ctx.addIssue({ code: 'custom', path: ['checklist'], message: 'At least one checklist item' })
+        }
+      } else {
+        if (d.acceptanceCriteria.length < ACCEPTANCE_CRITERIA_MIN) {
+          ctx.addIssue({ code: 'custom', path: ['acceptanceCriteria'], message: 'At least one criterion' })
+        }
+        if (d.checklist?.length) {
+          ctx.addIssue({ code: 'custom', path: ['checklist'], message: 'Only for checklist requests' })
+        }
+      }
+    }),
 )
 export type RequestDraft = z.infer<typeof RequestDraft>
 
@@ -491,6 +539,8 @@ export const WorkRequest = named(
     currentBehavior: z.string(),
     desiredBehavior: z.string(),
     acceptanceCriteria: z.array(AcceptanceCriterion),
+    checklistSource: z.string().optional(),
+    checklist: z.array(ChecklistItem).optional(),
     outOfScope: z.string().optional(),
     attachments: z.array(Attachment),
     desiredDate: CalendarDate.optional(),

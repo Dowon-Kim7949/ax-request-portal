@@ -1,5 +1,5 @@
 import { Check, CircleAlert, FileText, ImagePlus, Paperclip, Plus, Sparkles, Trash2, X } from 'lucide-react'
-import { useRef, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -10,10 +10,10 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/feedback'
 import { Field, Input, Textarea, type Advice } from '@/components/ui/field'
 import { appConfig } from '@/config/app.config'
-import { ACCEPTANCE_CRITERIA_MAX, type PrecheckIssue } from '@/domain/model'
+import { ACCEPTANCE_CRITERIA_MAX, CHECKLIST_ITEMS_MAX, type PrecheckIssue } from '@/domain/model'
 import { cn } from '@/lib/cn'
 import { formatBytes, formatDate, toLocalDate } from '@/lib/format'
-import { STEPS, stepOfField, type WizardValues } from './schema'
+import { EMPTY_ROW, parseChecklist, STEPS, stepOfField, type WizardValues } from './schema'
 
 type TFn = ReturnType<typeof useTranslation>['t']
 
@@ -273,6 +273,134 @@ export function DescribeStep({ advice }: { advice: Map<string, PrecheckIssue[]> 
 /* 5 ---------------------------------------------------------------- */
 
 export function CriteriaStep({ advice }: { advice: Map<string, PrecheckIssue[]> }) {
+  const { control } = useFormContext<WizardValues>()
+  const type = useWatch({ control, name: 'type' })
+  return type === 'checklist' ? <ChecklistStep advice={advice} /> : <CriteriaList advice={advice} />
+}
+
+/** An audit request: the findings themselves, pasted from a table or typed. */
+function ChecklistStep({ advice }: { advice: Map<string, PrecheckIssue[]> }) {
+  const { t } = useTranslation()
+  const { control, register, getValues, formState } = useFormContext<WizardValues>()
+  const { fields, append, remove, replace } = useFieldArray({ control, name: 'checklist' })
+  const error = useErrorText()('checklist')
+  const [paste, setPaste] = useState('')
+  const itemErrors = formState.errors.checklist as Array<{ message?: string } | undefined> | undefined
+
+  const importRows = () => {
+    const rows = parseChecklist(paste)
+    if (!rows.length) {
+      toast.error(t('wizard.checklist.pasteNothing'))
+      return
+    }
+    // Keep what was typed; drop the empty starter rows.
+    const kept = getValues('checklist').filter((r) => r.ref.trim() || r.finding.trim())
+    const next = [...kept, ...rows].slice(0, CHECKLIST_ITEMS_MAX)
+    replace(next)
+    setPaste('')
+    toast.success(t('wizard.checklist.pasted', { count: next.length - kept.length }))
+  }
+
+  return (
+    <>
+      <StepTitle hint={t('wizard.checklist.hint')}>{t('wizard.checklist.title')}</StepTitle>
+      <div className="flex flex-col gap-5">
+        <Field label={t('wizard.checklist.source')} optional optionalLabel={t('common.optional')}>
+          {(p) => (
+            <Input
+              placeholder={t('wizard.checklist.sourcePlaceholder')}
+              {...p}
+              {...register('checklistSource')}
+            />
+          )}
+        </Field>
+
+        <div className="flex flex-col gap-2 rounded-2xl bg-muted p-3.5">
+          <Field label={t('wizard.checklist.paste')} hint={t('wizard.checklist.pasteHint')}>
+            {(p) => (
+              <Textarea
+                rows={3}
+                className="min-h-0 font-mono text-[13px]"
+                value={paste}
+                onChange={(e) => setPaste(e.target.value)}
+                {...p}
+              />
+            )}
+          </Field>
+          <Button variant="secondary" className="w-fit" disabled={!paste.trim()} onClick={importRows}>
+            {t('wizard.checklist.pasteAction')}
+          </Button>
+        </div>
+
+        <ol className="flex flex-col gap-3">
+          {fields.map((f, i) => {
+            const rowError = itemErrors?.[i]?.message
+            return (
+              <li key={f.id} className="rounded-2xl p-3.5 ring-1 ring-line">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="text-sm font-bold text-ink-700">{t('wizard.checklist.item', { n: i + 1 })}</p>
+                  {fields.length > 1 ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={t('wizard.checklist.remove', { n: i + 1 })}
+                      onClick={() => remove(i)}
+                    >
+                      <Trash2 aria-hidden />
+                    </Button>
+                  ) : null}
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label={t('wizard.checklist.ref')} advice={advice.get(`checklist.${i}.ref`)}>
+                    {(p) => (
+                      <Input
+                        placeholder={t('wizard.checklist.refPlaceholder')}
+                        {...p}
+                        {...register(`checklist.${i}.ref`)}
+                      />
+                    )}
+                  </Field>
+                  <Field label={t('wizard.checklist.clause')} optional optionalLabel={t('common.optional')}>
+                    {(p) => <Input {...p} {...register(`checklist.${i}.clause`)} />}
+                  </Field>
+                </div>
+                <div className="mt-3 flex flex-col gap-3">
+                  <Field label={t('wizard.checklist.finding')}>
+                    {(p) => (
+                      <Textarea rows={2} className="min-h-0" {...p} {...register(`checklist.${i}.finding`)} />
+                    )}
+                  </Field>
+                  <Field
+                    label={t('wizard.checklist.expected')}
+                    optional
+                    optionalLabel={t('common.optional')}
+                    advice={advice.get(`checklist.${i}.expected`)}
+                  >
+                    {(p) => <Input {...p} {...register(`checklist.${i}.expected`)} />}
+                  </Field>
+                </div>
+                {rowError ? (
+                  <p role="alert" className="mt-2 text-sm font-medium text-danger-fg">
+                    {(t as unknown as (k: string) => string)(rowError)}
+                  </p>
+                ) : null}
+              </li>
+            )
+          })}
+        </ol>
+        {error ? <p className="text-sm font-medium text-danger-fg">{error}</p> : null}
+        {fields.length < CHECKLIST_ITEMS_MAX ? (
+          <Button variant="secondary" className="w-fit" onClick={() => append(EMPTY_ROW)}>
+            <Plus aria-hidden />
+            {t('wizard.checklist.add')}
+          </Button>
+        ) : null}
+      </div>
+    </>
+  )
+}
+
+function CriteriaList({ advice }: { advice: Map<string, PrecheckIssue[]> }) {
   const { t } = useTranslation()
   const { control, register } = useFormContext<WizardValues>()
   const { fields, append, remove } = useFieldArray({ control, name: 'acceptanceCriteria' })
@@ -604,15 +732,32 @@ export function ReviewStep({
         <ReviewRow t={t} label={t('wizard.field.desiredBehavior')} onEdit={() => goTo(step('describe'))}>
           {v.desiredBehavior || none}
         </ReviewRow>
-        <ReviewRow t={t} label={t('wizard.field.acceptanceCriteria')} onEdit={() => goTo(step('criteria'))}>
-          <ol className="flex list-decimal flex-col gap-1 pl-4">
-            {v.acceptanceCriteria
-              .filter((c) => c.text.trim())
-              .map((c, i) => (
-                <li key={i}>{c.text}</li>
-              ))}
-          </ol>
-        </ReviewRow>
+        {v.type === 'checklist' ? (
+          <ReviewRow t={t} label={t('wizard.field.checklist')} onEdit={() => goTo(step('criteria'))}>
+            {v.checklistSource.trim() ? (
+              <p className="mb-1 text-ink-600">{v.checklistSource.trim()}</p>
+            ) : null}
+            <ol className="flex flex-col gap-1">
+              {v.checklist
+                .filter((r) => r.ref.trim() || r.finding.trim())
+                .map((r, i) => (
+                  <li key={i}>
+                    <span className="font-semibold">{r.ref}</span> {r.finding}
+                  </li>
+                ))}
+            </ol>
+          </ReviewRow>
+        ) : (
+          <ReviewRow t={t} label={t('wizard.field.acceptanceCriteria')} onEdit={() => goTo(step('criteria'))}>
+            <ol className="flex list-decimal flex-col gap-1 pl-4">
+              {v.acceptanceCriteria
+                .filter((c) => c.text.trim())
+                .map((c, i) => (
+                  <li key={i}>{c.text}</li>
+                ))}
+            </ol>
+          </ReviewRow>
+        )}
         <ReviewRow t={t} label={t('wizard.field.outOfScope')} onEdit={() => goTo(step('extra'))}>
           {v.outOfScope.trim() || none}
         </ReviewRow>
