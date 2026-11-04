@@ -18,6 +18,8 @@ import {
   NotificationSettings,
   PrecheckIssue,
   Project,
+  PROJECT_CONSTRAINTS_MAX,
+  ProjectConstraint,
   ProjectIcon,
   ProjectTarget,
   RegressionCheck,
@@ -126,6 +128,9 @@ export const ProjectInput = named(
     wikiPath: z.string().trim().min(1),
     ownerIds: z.array(z.string()).min(1),
     targets: z.array(ProjectTarget.extend({ id: z.string().optional() })),
+    constraints: z
+      .array(ProjectConstraint.extend({ id: z.string().optional() }))
+      .max(PROJECT_CONSTRAINTS_MAX),
     active: z.boolean(),
   }),
 )

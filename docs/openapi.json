@@ -2775,6 +2775,34 @@
           "alertThresholdPct"
         ]
       },
+      "ConstraintCheck": {
+        "type": "object",
+        "properties": {
+          "constraintId": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "description": "Copy of the project constraint when the report was written"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "conflict": {
+            "type": "boolean",
+            "description": "The plan, or the code it touches, breaks this constraint"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "constraintId",
+          "text",
+          "conflict",
+          "note"
+        ]
+      },
       "CriterionCheck": {
         "type": "object",
         "properties": {
@@ -3059,6 +3087,19 @@
               "type": "string"
             }
           },
+          "assumptions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportAssumption"
+            }
+          },
+          "constraintChecks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConstraintCheck"
+            },
+            "description": "Every project constraint and how the plan keeps it; a conflict makes the verdict conditional"
+          },
           "wikiTrust": {
             "$ref": "#/components/schemas/WikiTrust"
           },
@@ -3086,6 +3127,8 @@
           "plan",
           "verification",
           "openQuestions",
+          "assumptions",
+          "constraintChecks",
           "wikiTrust",
           "size",
           "risks"
@@ -3329,6 +3372,13 @@
               "$ref": "#/components/schemas/ProjectTarget"
             }
           },
+          "constraints": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectConstraint"
+            }
+          },
           "active": {
             "type": "boolean"
           }
@@ -3343,7 +3393,32 @@
           "wikiStats",
           "ownerIds",
           "targets",
+          "constraints",
           "active"
+        ]
+      },
+      "ProjectConstraint": {
+        "description": "A project rule the AI must respect when it plans and makes a change (security, data, operations). Kept by the project, so requesters never have to repeat it.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300,
+            "description": "A rule every change must keep, in plain words"
+          },
+          "reference": {
+            "description": "Where the rule comes from, e.g. \"Security policy 3.2\"",
+            "type": "string",
+            "maxLength": 60
+          }
+        },
+        "required": [
+          "id",
+          "text"
         ]
       },
       "ProjectIcon": {
@@ -3418,6 +3493,32 @@
               ]
             }
           },
+          "constraints": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300,
+                  "description": "A rule every change must keep, in plain words"
+                },
+                "reference": {
+                  "description": "Where the rule comes from, e.g. \"Security policy 3.2\"",
+                  "type": "string",
+                  "maxLength": 60
+                }
+              },
+              "required": [
+                "text"
+              ]
+            }
+          },
           "active": {
             "type": "boolean"
           }
@@ -3430,6 +3531,7 @@
           "wikiPath",
           "ownerIds",
           "targets",
+          "constraints",
           "active"
         ]
       },
@@ -3671,6 +3773,22 @@
         "items": {
           "$ref": "#/components/schemas/ReleaseScheduleItem"
         }
+      },
+      "ReportAssumption": {
+        "description": "A fact the plan relies on that neither the code nor a reviewed wiki confirmed. The developer checks each one before the AI starts work.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ]
       },
       "ReportVerdict": {
         "type": "string",
@@ -4001,6 +4119,14 @@
               "instructions": {
                 "type": "string",
                 "maxLength": 2000
+              },
+              "checkedAssumptions": {
+                "description": "Ids of the report's assumptions the developer confirmed; all of them on the first run",
+                "maxItems": 50,
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               }
             },
             "required": [
@@ -4550,6 +4676,13 @@
           "instructions": {
             "description": "Developer memo or revision note passed to the AI",
             "type": "string"
+          },
+          "checkedAssumptions": {
+            "description": "Report assumption ids the developer confirmed before this run started",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           },
           "branch": {
             "type": "string"

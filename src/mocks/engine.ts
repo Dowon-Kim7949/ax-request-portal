@@ -37,6 +37,7 @@ import {
   isTerminal,
   LifecycleError,
   type AnyCommand,
+  type GuardName,
   type TransitionCommand,
 } from '../domain/lifecycle'
 import type {
@@ -67,7 +68,7 @@ import { renderNotification, type ErrorKey, type NotificationKey, type ServerLan
 /* ------------------------------------------------------------------ */
 
 /** Bump when the stored shape changes: older demo data is discarded and reseeded. */
-export const STATE_VERSION = 3
+export const STATE_VERSION = 4
 
 /** What the operator configures. Keys are never stored, only their last four characters. */
 export interface AiOperations {
@@ -143,6 +144,12 @@ export class HttpError extends Error {
 }
 
 const DAY = 86_400_000
+
+const GUARD_ERRORS: Record<GuardName, ErrorKey> = {
+  criteriaAllPassed: 'needAllPassed',
+  criteriaOneFailed: 'needOneFailed',
+  assumptionsUnchecked: 'assumptionsUnchecked',
+}
 
 export function toDate(iso: string): string {
   return iso.slice(0, 10)
@@ -388,10 +395,7 @@ export class MockEngine {
       return applyTransition(req, command, { actor, now, newId: () => this.newId('tl') })
     } catch (err) {
       if (err instanceof LifecycleError) {
-        if (err.code === 'guard_failed') {
-          const key = command.event === 'reportIssue' ? 'needOneFailed' : 'needAllPassed'
-          throw new HttpError(409, 'guard_failed', key)
-        }
+        if (err.code === 'guard_failed') throw new HttpError(409, 'guard_failed', GUARD_ERRORS[err.guard!])
         if (err.code === 'forbidden') throw new HttpError(403, 'forbidden', 'notYourStep')
         throw new HttpError(409, 'invalid_transition', 'invalidTransition')
       }
@@ -757,6 +761,11 @@ export class MockEngine {
       id: existing?.id ?? this.newId('p'),
       ...input,
       targets: input.targets.map((t) => ({ ...t, id: t.id ?? this.newId('t') })),
+      constraints: input.constraints.map(({ id, text, reference }) => ({
+        id: id ?? this.newId('pc'),
+        text,
+        ...(reference ? { reference } : {}),
+      })),
       wikiStats: existing?.wikiStats ?? { verifiedDocs: 0, totalDocs: 0 },
     }
     if (existing) this.state.projects[this.state.projects.indexOf(existing)] = project

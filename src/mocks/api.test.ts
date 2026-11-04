@@ -95,6 +95,12 @@ describe('request lifecycle through the API', () => {
     const rewritten = await call(api.getRequest, { params: { id } })
     expect(rewritten.status).toBe('review')
     expect(rewritten.report?.revision).toBe(2)
+    // Every project rule is checked against the plan; a reviewed wiki leaves nothing to assume.
+    expect(rewritten.report?.constraintChecks.map((k) => k.constraintId)).toEqual([
+      'pc-storage',
+      'pc-masking',
+    ])
+    expect(rewritten.report?.assumptions).toEqual([])
 
     await loginAs('dev1@example.com')
     await call(api.transitionRequest, {
@@ -150,6 +156,30 @@ describe('request lifecycle through the API', () => {
     expect((await call(api.listNotifications)).every((n) => n.readAt)).toBe(true)
   })
 
+  it('makes the developer confirm what the report could not before AI work starts', async () => {
+    await loginAs('planner@example.com')
+    const { id } = await call(api.createRequest, {
+      body: { ...draft, projectId: 'p-field', targetIds: ['t-task-list', 't-push'] },
+    })
+    t.advance(6)
+    const reviewed = await call(api.getRequest, { params: { id } })
+    // "Push notifications" has no wiki doc, so the AI could only guess where its code is.
+    expect(reviewed.report?.assumptions.map((a) => a.id)).toEqual(['a1'])
+
+    await loginAs('dev2@example.com')
+    await expectApiError(
+      call(api.transitionRequest, { params: { id }, body: { event: 'runWork' } }),
+      409,
+      'guard_failed',
+    )
+    const started = await call(api.transitionRequest, {
+      params: { id },
+      body: { event: 'runWork', checkedAssumptions: ['a1'] },
+    })
+    expect(started.status).toBe('in_progress')
+    expect(started.work?.checkedAssumptions).toEqual(['a1'])
+  })
+
   it('refuses transitions that do not fit the current status', async () => {
     await loginAs('dev1@example.com')
     await expectApiError(
@@ -186,6 +216,23 @@ describe('visibility and permissions', () => {
 
     await loginAs('planner@example.com')
     await expectApiError(call(api.dashboard, { query: {} }), 403, 'forbidden')
+  })
+
+  it('keeps project rules with the project for the AI to respect', async () => {
+    await loginAs('admin@example.com')
+    const [portal] = await call(api.listProjects)
+    const { id, wikiStats: _stats, ...input } = portal!
+    const saved = await call(api.updateProject, {
+      params: { id },
+      body: { ...input, constraints: [...input.constraints, { text: '결제 금액은 서버에서만 계산한다' }] },
+    })
+    expect(saved.constraints).toHaveLength(3)
+    expect(saved.constraints[2]).toMatchObject({ text: '결제 금액은 서버에서만 계산한다' })
+    expect(saved.constraints[2]!.id).toBeTruthy()
+    await expectApiError(
+      call(api.updateProject, { params: { id }, body: { ...input, constraints: [{ text: ' ' }] } }),
+      400,
+    )
   })
 
   it('lets admins manage users but not demote themselves', async () => {

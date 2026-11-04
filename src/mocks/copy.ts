@@ -32,6 +32,7 @@ const ERRORS = {
     invalidTransition: '지금 단계에서는 할 수 없는 작업입니다.',
     needAllPassed: '모든 완료 기준이 통과해야 완료할 수 있습니다.',
     needOneFailed: '안 되는 완료 기준을 하나 이상 표시해 주세요.',
+    assumptionsUnchecked: '보고서의 가정을 모두 확인해야 AI 작업을 시작할 수 있습니다.',
     requestBudgetExceeded: (p) =>
       `이 요청의 AI 비용이 요청당 한도(${Number(p.limit).toLocaleString('ko-KR')}원)에 도달해 AI 작업을 더 실행할 수 없습니다. 운영자가 한도를 올리거나 직접 처리해 주세요.`,
     operatorProvisioned: '운영자 계정은 서비스가 관리합니다. 여기서 만들거나 바꿀 수 없습니다.',
@@ -69,6 +70,7 @@ const ERRORS = {
     invalidTransition: 'This is not possible at the current step.',
     needAllPassed: 'Every acceptance criterion must pass before you confirm.',
     needOneFailed: 'Mark at least one acceptance criterion as not working.',
+    assumptionsUnchecked: 'Confirm every assumption in the report before the AI starts work.',
     requestBudgetExceeded: (p) =>
       `This request has used its per-request AI budget (₩${Number(p.limit).toLocaleString('en-US')}), so AI work cannot run again. Ask an operator to raise the limit, or handle it by hand.`,
     operatorProvisioned:

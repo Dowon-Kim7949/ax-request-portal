@@ -67,7 +67,15 @@ export const TransitionCommand = named(
     z.object({ event: z.literal('requestInfo'), questions: z.array(z.string().trim().min(1)).min(1).max(5) }),
     z.object({ event: z.literal('provideInfo'), answer: z.string().trim().min(1).max(2000) }),
     z.object({ event: z.literal('reject'), reason: z.string().trim().min(1).max(1000) }),
-    z.object({ event: z.literal('runWork'), instructions: z.string().trim().max(2000).optional() }),
+    z.object({
+      event: z.literal('runWork'),
+      instructions: z.string().trim().max(2000).optional(),
+      checkedAssumptions: z
+        .array(z.string())
+        .max(50)
+        .optional()
+        .describe("Ids of the report's assumptions the developer confirmed; all of them on the first run"),
+    }),
     z.object({ event: z.literal('requestRevision'), note: z.string().trim().min(1).max(2000) }),
     z.object({ event: z.literal('approveMerge') }),
     z.object({ event: z.literal('reportIssue'), checks, note: z.string().trim().max(2000).optional() }),
@@ -88,12 +96,17 @@ export const USER_EVENTS = TransitionCommand.options.map((o) => o.shape.event.va
 
 export type LifecycleErrorCode = 'invalid_transition' | 'forbidden' | 'guard_failed'
 
+/** Which rule a `guard_failed` broke, so the caller can explain it. */
+export type GuardName = 'criteriaAllPassed' | 'criteriaOneFailed' | 'assumptionsUnchecked'
+
 export class LifecycleError extends Error {
   readonly code: LifecycleErrorCode
-  constructor(code: LifecycleErrorCode, message: string) {
+  readonly guard?: GuardName
+  constructor(code: LifecycleErrorCode, message: string, guard?: GuardName) {
     super(message)
     this.name = 'LifecycleError'
     this.code = code
+    if (guard) this.guard = guard
   }
 }
 
@@ -242,16 +255,41 @@ export interface ApplyOptions {
   newId: () => string
 }
 
+/**
+ * Assumptions the developer still has to confirm before the first AI run.
+ * A re-run after a failed check reuses what was confirmed then.
+ */
+export function uncheckedAssumptions(request: WorkRequest, checked: readonly string[] = []): string[] {
+  if (request.status !== 'review') return []
+  const done = new Set(checked)
+  return (request.report?.assumptions ?? []).map((a) => a.id).filter((id) => !done.has(id))
+}
+
 function assertGuards(request: WorkRequest, command: AnyCommand): void {
   if (command.event === 'confirmResult' || command.event === 'reportIssue') {
     const byId = new Map(command.checks.map((c) => [c.criterionId, c.result]))
     const results = request.acceptanceCriteria.map((c) => byId.get(c.id) ?? 'pending')
     if (command.event === 'confirmResult' && results.some((r) => r !== 'passed')) {
-      throw new LifecycleError('guard_failed', 'Every acceptance criterion must pass before confirming.')
+      throw new LifecycleError(
+        'guard_failed',
+        'Every acceptance criterion must pass before confirming.',
+        'criteriaAllPassed',
+      )
     }
     if (command.event === 'reportIssue' && !results.includes('failed')) {
-      throw new LifecycleError('guard_failed', 'Mark at least one acceptance criterion as failed.')
+      throw new LifecycleError(
+        'guard_failed',
+        'Mark at least one acceptance criterion as failed.',
+        'criteriaOneFailed',
+      )
     }
+  }
+  if (command.event === 'runWork' && uncheckedAssumptions(request, command.checkedAssumptions).length) {
+    throw new LifecycleError(
+      'guard_failed',
+      'Confirm every assumption in the report before the AI starts work.',
+      'assumptionsUnchecked',
+    )
   }
 }
 
@@ -293,12 +331,18 @@ export function applyTransition(request: WorkRequest, command: AnyCommand, opts:
     case 'runWork':
     case 'requestRevision': {
       const instructions = command.event === 'runWork' ? command.instructions : command.note
+      // Confirmed on the first run; later runs keep the record.
+      const checked =
+        command.event === 'runWork' && request.status === 'review'
+          ? (request.report?.assumptions ?? []).map((a) => a.id)
+          : request.work?.checkedAssumptions
       next.work = {
         attempt: (request.work?.attempt ?? 0) + 1,
         startedAt: at,
         phase: 'queued',
         branch: slug(request.id),
         ...(instructions ? { instructions } : {}),
+        ...(checked?.length ? { checkedAssumptions: checked } : {}),
       }
       note = instructions
       break

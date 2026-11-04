@@ -39,6 +39,11 @@ const COPY = {
     done: (n: number) => `완료 기준 ${n}개를 반영했습니다.`,
     followedMemo: (memo: string) => `담당자 메모(“${memo}”)를 따랐습니다.`,
     testFailed: '기존 테스트 1개가 실패해 확인이 필요합니다.',
+    noWikiAssumption: (name: string) =>
+      `‘${name}’은 위키 문서가 없어, 화면 이름으로 관련 코드를 찾았다고 가정했습니다.`,
+    unverifiedAssumption: (titles: string) =>
+      `사람이 검토하지 않은 위키(${titles})의 설명이 지금 코드와 같다고 보고 계획했습니다.`,
+    constraintKept: '작업 계획과 AI 작업 지시에 이 제약을 넣었습니다.',
   },
   en: {
     summary: {
@@ -61,6 +66,11 @@ const COPY = {
     done: (n: number) => `Implemented the ${n} acceptance criteria.`,
     followedMemo: (memo: string) => `Followed the developer's note (“${memo}”).`,
     testFailed: 'One existing test fails and needs a look.',
+    noWikiAssumption: (name: string) =>
+      `“${name}” has no wiki doc, so the related code was found by the screen name alone.`,
+    unverifiedAssumption: (titles: string) =>
+      `The plan takes the wiki docs no person has reviewed (${titles}) to match the current code.`,
+    constraintKept: 'Added to the plan and to the AI work instructions.',
   },
 } satisfies Record<ServerLanguage, { summary: Record<ReportVerdict, string> } & Record<string, unknown>>
 
@@ -116,10 +126,26 @@ export function generateReport(
     }
   }
 
+  const assumptionTexts: string[] = []
+  for (const t of targets) if (!t.wikiDoc) assumptionTexts.push(c.noWikiAssumption(t.name))
+  const unreviewed = wikiDocs.filter((d) => !d.verified).map((d) => d.title)
+  if (unreviewed.length) assumptionTexts.push(c.unverifiedAssumption(unreviewed.join(', ')))
+  const assumptions = assumptionTexts.map((text, i) => ({ id: `a${i + 1}`, text }))
+
+  // The simulated AI never finds a conflict; a real model compares the plan with each rule.
+  const constraintChecks = project.constraints.map((k) => ({
+    constraintId: k.id,
+    text: k.text,
+    ...(k.reference ? { reference: k.reference } : {}),
+    conflict: false,
+    note: c.constraintKept,
+  }))
+  const conflict = constraintChecks.some((k) => k.conflict)
+
   let verdict: ReportVerdict
   if (req.type === 'non_code') verdict = 'out_of_scope'
   else if (wikiDocs.length === 0) verdict = 'undetermined'
-  else if (openQuestions.length > 0 || wikiTrust === 'low') verdict = 'conditional'
+  else if (openQuestions.length > 0 || wikiTrust === 'low' || conflict) verdict = 'conditional'
   else verdict = 'feasible'
 
   const criteria = req.acceptanceCriteria
@@ -146,6 +172,8 @@ export function generateReport(
       method: automatable ? c.autoMethod : c.manualMethod,
     })),
     openQuestions,
+    assumptions: verdict === 'out_of_scope' ? [] : assumptions,
+    constraintChecks: verdict === 'out_of_scope' ? [] : constraintChecks,
     wikiTrust,
     size: score <= 3 ? 'S' : score <= 5 ? 'M' : 'L',
     risks,

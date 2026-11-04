@@ -1,5 +1,5 @@
 /** Small builders shared by unit tests. Not used by the app. */
-import type { Project, RequestStatus, User, WorkRequest } from './model'
+import type { FeasibilityReport, Project, RequestStatus, User, WorkRequest } from './model'
 
 export function user(id: string, role: User['role']): User {
   return { id, name: id, email: `${id}@example.com`, role, active: true }
@@ -42,6 +42,26 @@ export function request(
     regression: [],
     verification: [],
     timeline: [],
+    ...overrides,
+  }
+}
+
+export function report(overrides: Partial<FeasibilityReport> = {}): FeasibilityReport {
+  return {
+    revision: 1,
+    generatedAt: '2026-10-27T01:10:00.000Z',
+    verdict: 'feasible',
+    summary: '바로 작업할 수 있습니다.',
+    evidence: { wikiDocs: [], codeFiles: [] },
+    impact: { changedScreens: [], recheck: [] },
+    plan: [],
+    verification: [],
+    openQuestions: [],
+    assumptions: [],
+    constraintChecks: [],
+    wikiTrust: 'high',
+    size: 'S',
+    risks: [],
     ...overrides,
   }
 }

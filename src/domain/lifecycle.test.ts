@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { people, project, request } from './fixtures'
+import { people, project, report, request } from './fixtures'
 import {
   applyTransition,
   availableEvents,
@@ -266,6 +266,37 @@ describe('applyTransition', () => {
         opts(people.requester),
       )
     expect(issueWithoutFailure).toThrow(expect.objectContaining({ code: 'guard_failed' }))
+  })
+
+  it('starts the first AI run only after every assumption in the report is confirmed', () => {
+    const r = request('review', {
+      report: report({
+        assumptions: [
+          { id: 'a1', text: '잠금 정책은 서버에만 있다' },
+          { id: 'a2', text: '안내 문구는 번역 파일에 있다' },
+        ],
+      }),
+    })
+    const run = (checkedAssumptions?: string[]) =>
+      applyTransition(
+        r,
+        { event: 'runWork', ...(checkedAssumptions ? { checkedAssumptions } : {}) },
+        opts(people.owner),
+      )
+
+    expect(() => run()).toThrow(
+      expect.objectContaining({ code: 'guard_failed', guard: 'assumptionsUnchecked' }),
+    )
+    expect(() => run(['a1'])).toThrow(expect.objectContaining({ guard: 'assumptionsUnchecked' }))
+    expect(run(['a2', 'a1']).work?.checkedAssumptions).toEqual(['a1', 'a2'])
+
+    // A re-run after a failed check keeps what was confirmed and asks nothing new.
+    const rerun = applyTransition(
+      { ...run(['a1', 'a2']), status: 'changes_requested' },
+      { event: 'runWork' },
+      opts(people.owner),
+    )
+    expect(rerun.work).toMatchObject({ attempt: 2, checkedAssumptions: ['a1', 'a2'] })
   })
 
   it('does not mutate the input request', () => {

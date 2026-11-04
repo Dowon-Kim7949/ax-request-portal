@@ -67,13 +67,16 @@ export function seedUsers(lang: ServerLanguage): User[] {
 /* Projects                                                            */
 /* ------------------------------------------------------------------ */
 
-type ProjectBase = Omit<Project, 'name' | 'description' | 'targets'> & {
+type ProjectBase = Omit<Project, 'name' | 'description' | 'targets' | 'constraints'> & {
   targets: Array<{ id: string; wikiDoc?: string }>
+  /** Ids of the project rules; the words are in CONSTRAINT_COPY */
+  constraints: string[]
 }
 
 const PROJECTS: ProjectBase[] = [
   {
     id: 'p-portal',
+    constraints: ['pc-storage', 'pc-masking'],
     icon: 'globe',
     repository: { provider: 'gitlab', url: 'https://gitlab.example.com/acme/customer-portal' },
     wikiPath: 'docs/llm-wiki',
@@ -92,6 +95,7 @@ const PROJECTS: ProjectBase[] = [
   },
   {
     id: 'p-field',
+    constraints: ['pc-offline'],
     icon: 'smartphone',
     repository: { provider: 'github', url: 'https://github.com/acme/field-worker-app' },
     wikiPath: 'docs/llm-wiki',
@@ -108,6 +112,7 @@ const PROJECTS: ProjectBase[] = [
   },
   {
     id: 'p-admin',
+    constraints: ['pc-audit'],
     icon: 'layout-dashboard',
     repository: { provider: 'gitlab', url: 'https://gitlab.example.com/acme/admin-console' },
     wikiPath: 'docs/llm-wiki',
@@ -123,6 +128,7 @@ const PROJECTS: ProjectBase[] = [
   },
   {
     id: 'p-data',
+    constraints: [],
     icon: 'server',
     repository: { provider: 'github', url: 'https://github.com/acme/analytics-server' },
     wikiPath: 'docs/llm-wiki',
@@ -225,6 +231,45 @@ const PROJECT_COPY: Record<
   },
 }
 
+const CONSTRAINT_COPY: Record<ServerLanguage, Record<string, { text: string; reference: string }>> = {
+  ko: {
+    'pc-storage': {
+      text: '인증 정보와 개인정보는 브라우저 저장소(localStorage·sessionStorage)에 두지 않는다',
+      reference: '보안 정책 3.2',
+    },
+    'pc-masking': {
+      text: '고객 이름과 연락처는 화면에 가려서(마스킹) 보여 준다',
+      reference: '개인정보 처리 지침 5조',
+    },
+    'pc-offline': {
+      text: '통신이 끊겨도 작업 완료를 기록할 수 있어야 한다',
+      reference: '현장 운영 요건',
+    },
+    'pc-audit': {
+      text: '사용자나 권한을 바꾸는 동작은 모두 감사 로그를 남긴다',
+      reference: '내부 통제 기준 2.1',
+    },
+  },
+  en: {
+    'pc-storage': {
+      text: 'Never keep credentials or personal data in browser storage (localStorage, sessionStorage)',
+      reference: 'Security policy 3.2',
+    },
+    'pc-masking': {
+      text: 'Show customer names and phone numbers masked on screen',
+      reference: 'Privacy guideline art. 5',
+    },
+    'pc-offline': {
+      text: 'Workers must be able to record a finished job without a connection',
+      reference: 'Field operations requirement',
+    },
+    'pc-audit': {
+      text: 'Every change to users or permissions writes an audit log entry',
+      reference: 'Internal control 2.1',
+    },
+  },
+}
+
 function seedProjects(lang: ServerLanguage): Project[] {
   return PROJECTS.map((p) => {
     const c = PROJECT_COPY[lang][p.id]!
@@ -233,6 +278,7 @@ function seedProjects(lang: ServerLanguage): Project[] {
       name: c.name,
       description: c.description,
       targets: p.targets.map((t) => ({ ...t, name: c.targets[t.id]! })),
+      constraints: p.constraints.map((id) => ({ id, ...CONSTRAINT_COPY[lang][id]! })),
     }
   })
 }
@@ -476,13 +522,14 @@ const SCENARIOS: Scenario[] = [
       { h: 8 / 3600, by: 'u-choi', command: { event: 'runWork' } },
     ],
   },
-  /* 1026 */ {
+  /* 1026: report with an assumption and a constraint conflict */ {
     by: 'u-lee',
     h: 20,
     projectId: 'p-portal',
     type: 'change',
     targetIds: ['t-signup'],
     steps: () => [{ h: 19, ai: true }],
+    patch: (r, lang) => showcase1026(r, lang),
   },
   /* 1027: report being written when the demo opens */ {
     by: 'u-kim',
@@ -805,6 +852,39 @@ function showcase1024(r: WorkRequest, lang: ServerLanguage): WorkRequest {
   }
 }
 
+const SHOWCASE_1026: Record<ServerLanguage, { assumption: string; conflict: string }> = {
+  ko: {
+    assumption:
+      '약관 문구는 서버에서 받아 오므로, 문구만 바꾸면 앱을 다시 배포하지 않아도 된다고 가정했습니다.',
+    conflict:
+      '가입 단계 사이에 약관 동의 상태를 sessionStorage에 두는 지금 방식이 이 제약과 부딪힙니다. 동의 상태를 서버 임시 저장으로 옮겨야 합니다.',
+  },
+  en: {
+    assumption: 'Terms texts come from the server, so changing them needs no new app release.',
+    conflict:
+      'Sign-up keeps the consent state in sessionStorage between steps, which breaks this rule. The consent state should move to a server-side draft.',
+  },
+}
+
+/** The developer's queue shows what the report could not confirm and which rule the plan breaks. */
+function showcase1026(r: WorkRequest, lang: ServerLanguage): WorkRequest {
+  const c = SHOWCASE_1026[lang]
+  return {
+    ...r,
+    report: r.report && {
+      ...r.report,
+      verdict: 'conditional',
+      assumptions: [
+        ...r.report.assumptions,
+        { id: `a${r.report.assumptions.length + 1}`, text: c.assumption },
+      ],
+      constraintChecks: r.report.constraintChecks.map((k) =>
+        k.constraintId === 'pc-storage' ? { ...k, conflict: true, note: c.conflict } : k,
+      ),
+    },
+  }
+}
+
 /** Older finished requests so the dashboard has a believable history. */
 const BACKGROUND: Array<[string, RequestDraft['type'], string]> = [
   ['p-portal', 'bug', 't-notice'],
@@ -938,7 +1018,16 @@ export function buildSeedState(now: Date, opts: EngineOptions, lang: ServerLangu
       engine.updateRelease(user(step.by), id, { scheduledDate: date }, t)
       return
     }
-    engine.transition(user(step.by), id, step.command, t, lang)
+    engine.transition(user(step.by), id, withDefaults(id, step.command), t, lang)
+  }
+
+  /** Scenarios leave out what a person would tick on screen: every assumption is confirmed. */
+  const withDefaults = (id: number, command: TransitionCommand): TransitionCommand => {
+    const req = state.requests.find((r) => r.id === id)!
+    if (command.event === 'runWork' && !command.checkedAssumptions) {
+      return { ...command, checkedAssumptions: (req.report?.assumptions ?? []).map((a) => a.id) }
+    }
+    return command
   }
 
   // Background history first (ids 990–1003), two to fifty days old.
