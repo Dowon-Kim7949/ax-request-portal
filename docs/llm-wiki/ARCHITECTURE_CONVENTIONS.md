@@ -24,6 +24,7 @@ source_files:
   - src/i18n/index.ts
   - vite.config.ts
   - deploy/nginx.conf
+  - src/app/update-check.ts
 evidence:
   - src/api/contract.ts#symbol:EndpointSpec
   - src/api/contract.ts#symbol:ApiErrorBody
@@ -49,6 +50,12 @@ evidence:
   - src/app/nav.ts#symbol:NAV_ITEMS
   - vite.config.ts
   - deploy/nginx.conf
+  - src/app/update-check.ts#symbol:watchForUpdates
+  - src/app/update-notice.tsx#symbol:UpdateNotice
+  - src/app/update-check.test.ts
+  - src/vite-env.d.ts
+  - deploy/check-nginx.sh
+  - e2e/update.spec.ts
 related:
   - docs/llm-wiki/project-profile.md
   - docs/llm-wiki/domains/00_overview.md
@@ -129,6 +136,7 @@ A front-end-only SPA whose backend is a contract. One table of endpoints (`src/a
 - `vite.config.ts` splits fixed vendor chunks with `build.rolldownOptions.output.codeSplitting.groups` (Vite 8 / Rolldown; the Rollup `manualChunks` option does not apply): react, router, query + zustand, i18n, zod, ui, and one chunk per message file. Icons are deliberately left to the pages that use them.
 - Production is static files behind nginx (`deploy/nginx.conf`): SPA fallback to `index.html` with `no-cache`, hashed `/assets/` cached for a year as `immutable`, a missing asset answers `404` instead of HTML, `mockServiceWorker.js` is `no-cache`, security headers repeated per `location` (nginx does not inherit `add_header`). An `/api/` proxy block is provided commented out. `deploy/check-nginx.sh` verifies these rules in CI.
 - The GitHub Pages demo is a mock-mode build with `VITE_BASE=/<repository>/` and `404.html` copied from `index.html`.
+- New-version notice: every build has an id (`VITE_BUILD_ID`, else the commit from `GITHUB_SHA` or git, else the build time) compiled in as `__BUILD_ID__` and written to `dist/version.json` by the `ax:version-file` plugin. `watchForUpdates` (production builds only) fetches `version.json` with a unique query and `cache: 'no-store'` (GitHub Pages caches files for 10 minutes) when the tab becomes visible, every 5 minutes, on `vite:preloadError`, and when a lazy page fails to load (`checkForUpdateNow` in `page()`). A different id shows one persistent toast (`UpdateNotice`, id `app-update`) with a reload button, once per new id; it never reloads by itself. A failed page load still ends on `RouteErrorPage`; the toast explains it. nginx serves `version.json` through `location /` (`no-cache`); `deploy/check-nginx.sh` checks it.
 
 ## Evidence
 
@@ -143,6 +151,7 @@ A front-end-only SPA whose backend is a contract. One table of endpoints (`src/a
 - `src/i18n/index.ts#symbol:initialLocale`, `src/i18n/en.ts` — language selection and the typed English messages.
 - `src/app/nav.ts#symbol:NAV_ITEMS` — navigation table.
 - `vite.config.ts`, `deploy/nginx.conf` — chunks and serving rules.
+- `src/app/update-check.ts#symbol:watchForUpdates`, `src/app/update-notice.tsx#symbol:UpdateNotice`, `src/app/update-check.test.ts`, `e2e/update.spec.ts` — new-version notice; `src/vite-env.d.ts` — `__BUILD_ID__` and `VITE_BUILD_ID` types; `deploy/check-nginx.sh` — serving checks, including `version.json`.
 
 ## Open Questions
 

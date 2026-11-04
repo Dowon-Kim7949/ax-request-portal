@@ -2,8 +2,8 @@
 title: Frontend Profile
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: profile
 project: ax-request-portal
 last_updated: 2026-11-03
@@ -16,6 +16,7 @@ source_files:
   - src/app/page.tsx
   - src/index.css
 evidence:
+  - src/app/update-check.ts#symbol:checkForUpdateNow
   - src/app/shell.tsx#symbol:AppShell
   - src/app/router.tsx#symbol:page
   - src/app/nav.ts#symbol:phoneTabs
@@ -46,9 +47,9 @@ Front-end rules that apply to every screen. The deeper references are [Architect
 
 ## Pages
 
-- Each page is a lazy route created with `page(load, permission?)`; a declared permission wraps it in `RequirePermission`.
+- Each page is a lazy route created with `page(load, permission?)`; a declared permission wraps it in `RequirePermission`. A page whose code fails to load triggers an immediate new-version check (`checkForUpdateNow`) before the error page shows.
 - Use `PageHeader` for the page heading and `usePageTitle` for the document title (`<page> · <brand>`).
-- Server state comes only from hooks in `src/api/queries.ts`; components never call `fetch`. Client-only state lives in the component, in the URL (filters, wizard step) when it should survive a reload or be shareable, or in a zustand store when it is global.
+- Server state comes only from hooks in `src/api/queries.ts`; components never call `fetch` (the one other `fetch` is `src/app/update-check.ts`, which reads the static `version.json`, not the API). Client-only state lives in the component, in the URL (filters, wizard step) when it should survive a reload or be shareable, or in a zustand store when it is global.
 - Errors: a failed query renders `ErrorState` with retry; a failed mutation shows a toast with the localized server message.
 
 ## Checklist for a UI change
@@ -65,6 +66,7 @@ Front-end rules that apply to every screen. The deeper references are [Architect
 - `src/app/nav.ts#symbol:phoneTabs` — phone tab selection.
 - `src/app/router.tsx#symbol:page` — lazy pages with permissions.
 - `src/app/page.tsx#symbol:PageHeader`, `src/app/title.ts#symbol:usePageTitle` — page heading and title.
+- `src/app/update-check.ts#symbol:checkForUpdateNow` — new-version check when a page fails to load.
 
 ## Open Questions
 

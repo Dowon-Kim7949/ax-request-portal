@@ -31,4 +31,8 @@ code="$(curl -s -o /dev/null -w '%{http_code}' "$BASE/assets/does-not-exist.js")
 [[ "$(curl -fsS -H 'Accept-Encoding: gzip' -o /dev/null -D - "$BASE/$asset" | tr -d '\r' | grep -i '^content-encoding:' | cut -d' ' -f2)" == "gzip" ]] \
   || fail "scripts are not gzip-compressed"
 
+# 7. version.json, which open tabs poll to learn of a new deployment, is revalidated
+curl -fsS "$BASE/version.json" | grep -q '"buildId"' || fail "version.json is missing from the build"
+[[ "$(header /version.json cache-control)" == "no-cache" ]] || fail "version.json must not be cached"
+
 echo "nginx checks passed"

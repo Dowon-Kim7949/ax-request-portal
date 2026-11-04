@@ -5,6 +5,7 @@ import type { Permission } from '@/domain/roles'
 import { BootScreen } from './boot'
 import { RequireAuth, RequirePermission } from './guards'
 import { NotFoundPage, RouteErrorPage } from './pages'
+import { checkForUpdateNow } from './update-check'
 import { AppShell } from './shell'
 
 export interface RouteHandle {
@@ -19,7 +20,11 @@ function page(
 ): { lazy: () => Promise<{ Component: ComponentType }> } {
   return {
     lazy: async () => {
-      const { default: Page } = await load()
+      const { default: Page } = await load().catch((err: unknown) => {
+        // The usual cause is a deployment that removed this tab's chunk: say so next to the error page.
+        checkForUpdateNow()
+        throw err
+      })
       return {
         Component: permission
           ? () => (

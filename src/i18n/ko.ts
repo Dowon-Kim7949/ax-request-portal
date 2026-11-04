@@ -42,6 +42,11 @@ const ko = {
     body: '네트워크가 잠깐 끊겼을 수 있어요. 다시 시도해 주세요.',
     retry: '다시 시도',
   },
+  update: {
+    title: '새 버전이 나왔어요',
+    body: '새로고침하면 바로 적용돼요.',
+    reload: '새로고침',
+  },
   nav: {
     skipToContent: '본문으로 건너뛰기',
     home: '홈',

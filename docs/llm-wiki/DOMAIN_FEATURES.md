@@ -2,8 +2,8 @@
 title: Domain Features
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain_overview
 project: ax-request-portal
 last_updated: 2026-11-04
@@ -15,6 +15,7 @@ source_files:
   - src/app/nav.ts
   - src/domain/roles.ts
 evidence:
+  - e2e/update.spec.ts
   - src/app/router.tsx#symbol:routes
   - src/app/nav.ts#symbol:NAV_ITEMS
   - src/domain/roles.ts#symbol:DEFAULT_ROLE_PERMISSIONS
@@ -83,6 +84,7 @@ User-facing features by role. Each row names the domain document that holds the 
 | Sign in, including one-click demo accounts in mock mode | [Login](domains/06_login.md) | `smoke.spec.ts` |
 | Notifications inbox, rendered in the current language | [Notifications](domains/07_notifications.md) | `admin.spec.ts` |
 | Language (Korean / English), theme (system / light / dark), notification preferences | [Settings](domains/10_settings.md) | `i18n.spec.ts`, `theme.spec.ts`, `admin.spec.ts` |
+| Notice when a newer version is deployed, with a reload button | [Architecture Conventions](ARCHITECTURE_CONVENTIONS.md) | `update.spec.ts` |
 | Same workflows on phone, tablet and desktop, down to 320 px | [Architecture Conventions](ARCHITECTURE_CONVENTIONS.md) | `layout.spec.ts`, `smoke.spec.ts` |
 
 ## API Services
@@ -95,6 +97,7 @@ The 35 endpoints of `src/api/contract.ts` are listed per domain in the domain do
 - `src/app/nav.ts#symbol:NAV_ITEMS` — navigation per permission.
 - `src/domain/roles.ts#symbol:DEFAULT_ROLE_PERMISSIONS` — what each role may do.
 - `src/api/contract.ts#symbol:api` — the endpoint table.
+- `e2e/update.spec.ts` — new-version notice.
 
 ## Open Questions
 
