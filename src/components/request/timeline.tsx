@@ -11,6 +11,8 @@ const KNOWN_EVENTS = new Set([
   'scopeReady',
   'approveScope',
   'reviseScope',
+  'preview_looks_good',
+  'preview_needs_change',
   'requestInfo',
   'provideInfo',
   'reject',

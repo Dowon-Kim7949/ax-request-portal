@@ -320,6 +320,41 @@ export const WorkPhase = named(
 )
 export type WorkPhase = z.infer<typeof WorkPhase>
 
+export const WorkPreview = named(
+  'WorkPreview',
+  z.object({
+    url: z.url().optional().describe('A running build of the change, e.g. a preview deployment'),
+    screenshots: z
+      .array(
+        z.object({
+          id: z.string(),
+          url: z.string().describe('Image URL (data: URLs allowed)'),
+          alt: z.string(),
+          caption: z.string().optional(),
+        }),
+      )
+      .max(6),
+    expiresAt: Timestamp.optional(),
+  }),
+  'What the requester can look at before the merge. Filled by CI or the coding agent; costs no AI.',
+)
+export type WorkPreview = z.infer<typeof WorkPreview>
+
+export const PreviewVerdict = named('PreviewVerdict', z.enum(['looks_good', 'needs_change']))
+export type PreviewVerdict = z.infer<typeof PreviewVerdict>
+
+export const PreviewFeedback = named(
+  'PreviewFeedback',
+  z.object({
+    at: Timestamp,
+    by: z.string(),
+    verdict: PreviewVerdict,
+    note: z.string().optional(),
+  }),
+  "The requester's reaction to the preview. Advisory: the developer still decides on the merge.",
+)
+export type PreviewFeedback = z.infer<typeof PreviewFeedback>
+
 export const WorkRun = named(
   'WorkRun',
   z.object({
@@ -356,6 +391,8 @@ export const WorkRun = named(
       .optional()
       .describe('Wiki docs edited in the same merge request; always pending human review'),
     summary: z.string().optional(),
+    preview: WorkPreview.optional(),
+    previewFeedback: PreviewFeedback.optional().describe('Reset with every new run'),
     costKrw: z.number().nonnegative().optional(),
     agent: z
       .object({ provider: AiProvider, model: z.string(), runtime: AiRuntime })

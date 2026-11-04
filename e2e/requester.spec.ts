@@ -90,6 +90,26 @@ test('requester answers the developer’s questions', async ({ page }) => {
   await expect(page.getByText('요청자 답변')).toBeVisible()
 })
 
+test('requester reacts to the preview before the change goes in', async ({ page }) => {
+  await loginAs(page, '요청자')
+  await page.goto('/requests/1024')
+  await expect(page.getByRole('heading', { name: '바뀐 화면 미리 보기' })).toBeVisible()
+  await expect(page.getByRole('img', { name: /바뀐 화면 미리보기/ })).toBeVisible()
+  await expect(page.getByRole('link', { name: '미리보기 열기' })).toHaveAttribute(
+    'href',
+    /preview\.example\.com/,
+  )
+  await expectNoHorizontalScroll(page)
+
+  await page.getByRole('button', { name: '바꿔 주세요' }).click()
+  const send = page.getByRole('button', { name: '의견 보내기' })
+  await expect(send).toBeDisabled()
+  await page.getByLabel('무엇을 바꿀까요?').fill('안내 문구를 빨간색으로 보여 주세요.')
+  await send.click()
+  await expect(page.getByText('보낸 의견')).toBeVisible()
+  await expect(page.getByText('안내 문구를 빨간색으로 보여 주세요.').first()).toBeVisible()
+})
+
 test('requester confirms how the AI read the request', async ({ page }) => {
   await loginAs(page, '요청자')
   await page.goto('/requests/1028')

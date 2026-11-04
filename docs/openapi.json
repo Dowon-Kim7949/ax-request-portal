@@ -980,6 +980,89 @@
         }
       }
     },
+    "/requests/{id}/preview-feedback": {
+      "put": {
+        "operationId": "sendPreviewFeedback",
+        "summary": "The requester's reaction to the preview while the change is in code review (advisory; status unchanged)",
+        "tags": [
+          "requests"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewFeedbackInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkRequest"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/requests/{id}/regression": {
       "put": {
         "operationId": "updateRegression",
@@ -3301,6 +3384,77 @@
           "issues"
         ]
       },
+      "PreviewFeedback": {
+        "description": "The requester's reaction to the preview. Advisory: the developer still decides on the merge.",
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "by": {
+            "type": "string"
+          },
+          "verdict": {
+            "$ref": "#/components/schemas/PreviewVerdict"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "by",
+          "verdict"
+        ]
+      },
+      "PreviewFeedbackInput": {
+        "description": "A change request needs a note so the developer knows what to change.",
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "verdict": {
+                "type": "string",
+                "const": "looks_good"
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 1000
+              }
+            },
+            "required": [
+              "verdict"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "verdict": {
+                "type": "string",
+                "const": "needs_change"
+              },
+              "note": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000
+              }
+            },
+            "required": [
+              "verdict",
+              "note"
+            ]
+          }
+        ]
+      },
+      "PreviewVerdict": {
+        "type": "string",
+        "enum": [
+          "looks_good",
+          "needs_change"
+        ]
+      },
       "Project": {
         "type": "object",
         "properties": {
@@ -4598,6 +4752,52 @@
           "finished"
         ]
       },
+      "WorkPreview": {
+        "description": "What the requester can look at before the merge. Filled by CI or the coding agent; costs no AI.",
+        "type": "object",
+        "properties": {
+          "url": {
+            "description": "A running build of the change, e.g. a preview deployment",
+            "type": "string",
+            "format": "uri"
+          },
+          "screenshots": {
+            "maxItems": 6,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string",
+                  "description": "Image URL (data: URLs allowed)"
+                },
+                "alt": {
+                  "type": "string"
+                },
+                "caption": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "url",
+                "alt"
+              ]
+            }
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "screenshots"
+        ]
+      },
       "WorkRequest": {
         "type": "object",
         "properties": {
@@ -4972,6 +5172,13 @@
           },
           "summary": {
             "type": "string"
+          },
+          "preview": {
+            "$ref": "#/components/schemas/WorkPreview"
+          },
+          "previewFeedback": {
+            "description": "Reset with every new run",
+            "$ref": "#/components/schemas/PreviewFeedback"
           },
           "costKrw": {
             "type": "number",

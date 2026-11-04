@@ -41,6 +41,9 @@ const COPY = {
     done: (n: number) => `완료 기준 ${n}개를 반영했습니다.`,
     followedMemo: (memo: string) => `담당자 메모(“${memo}”)를 따랐습니다.`,
     testFailed: '기존 테스트 1개가 실패해 확인이 필요합니다.',
+    previewAlt: (title: string) => `바뀐 화면 미리보기(가상 이미지): ${title}`,
+    previewCaption: '미리보기 배포에서 찍은 화면',
+    previewBadge: '미리보기',
     noWikiAssumption: (name: string) =>
       `‘${name}’은 위키 문서가 없어, 화면 이름으로 관련 코드를 찾았다고 가정했습니다.`,
     unverifiedAssumption: (titles: string) =>
@@ -68,6 +71,9 @@ const COPY = {
     done: (n: number) => `Implemented the ${n} acceptance criteria.`,
     followedMemo: (memo: string) => `Followed the developer's note (“${memo}”).`,
     testFailed: 'One existing test fails and needs a look.',
+    previewAlt: (title: string) => `Preview of the changed screen (illustration): ${title}`,
+    previewCaption: 'Captured on the preview deployment',
+    previewBadge: 'Preview',
     noWikiAssumption: (name: string) =>
       `“${name}” has no wiki doc, so the related code was found by the screen name alone.`,
     unverifiedAssumption: (titles: string) =>
@@ -304,6 +310,34 @@ export function phaseAt(progress: number): WorkPhase {
   return 'finished'
 }
 
+const xml = (s: string) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+/** A fictional screen with the request's title and criteria, so the demo has something to look at. */
+function previewImage(title: string, criteria: string[], badge: string): string {
+  const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
+  const rows = criteria
+    .slice(0, 4)
+    .map(
+      (c, i) =>
+        `<rect x="24" y="${96 + i * 40}" width="312" height="30" rx="8" fill="#eef2f7"/>` +
+        `<circle cx="42" cy="${111 + i * 40}" r="6" fill="#2f6fde"/>` +
+        `<text x="56" y="${116 + i * 40}" font-size="13" fill="#1f2937">${xml(clip(c, 30))}</text>`,
+    )
+    .join('')
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="360" height="270" viewBox="0 0 360 270" font-family="sans-serif">` +
+    `<rect width="360" height="270" rx="16" fill="#ffffff"/>` +
+    `<rect width="360" height="48" rx="16" fill="#1f3b70"/><rect y="32" width="360" height="16" fill="#1f3b70"/>` +
+    `<text x="24" y="31" font-size="15" font-weight="700" fill="#ffffff">${xml(clip(title, 26))}</text>` +
+    `<rect x="276" y="14" width="64" height="20" rx="10" fill="#ffd166"/>` +
+    `<text x="308" y="28" font-size="11" text-anchor="middle" fill="#1f2937">${xml(badge)}</text>` +
+    `<rect x="24" y="64" width="160" height="12" rx="6" fill="#d7dee8"/>` +
+    rows +
+    `</svg>`
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
 export function finishWork(
   req: WorkRequest,
   project: Project,
@@ -348,6 +382,27 @@ export function finishWork(
     },
     wikiChanges: { docs: wikiDocs.slice(0, 1), pendingReview: true },
     summary: summaryParts.join(' '),
+    // A real pipeline deploys the branch and captures the changed screens; no AI involved.
+    ...(failed
+      ? {}
+      : {
+          preview: {
+            url: `https://preview.example.com/ax-request-${req.id}/`,
+            screenshots: [
+              {
+                id: `shot-${req.id}-${prev.attempt}`,
+                url: previewImage(
+                  req.title,
+                  req.acceptanceCriteria.map((a) => a.text),
+                  c.previewBadge,
+                ),
+                alt: c.previewAlt(req.title),
+                caption: c.previewCaption,
+              },
+            ],
+            expiresAt: new Date(now.getTime() + 7 * 86_400_000).toISOString(),
+          },
+        }),
   }
 
   const sources = req.report?.evidence.wikiDocs ?? []

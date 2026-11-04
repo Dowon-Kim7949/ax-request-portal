@@ -258,6 +258,57 @@ describe('request lifecycle through the API', () => {
     expect(req.scope).toBeUndefined()
   })
 
+  it('lets the requester react to a preview before the merge, without moving the request', async () => {
+    await loginAs('planner@example.com')
+    const { id } = await call(api.createRequest, { body: draft })
+    t.advance(6)
+    await confirmScope(id)
+    await loginAs('dev1@example.com')
+    await call(api.transitionRequest, { params: { id }, body: { event: 'runWork' } })
+    t.advance(20)
+
+    await loginAs('planner@example.com')
+    const inReview = await call(api.getRequest, { params: { id } })
+    expect(inReview.status).toBe('code_review')
+    expect(inReview.work?.preview?.screenshots[0]?.alt).toContain(draft.title)
+    expect((await call(api.listNotifications)).map((n) => n.title)).toContain(
+      `[#${id}] 바뀐 화면을 미리 볼 수 있습니다`,
+    )
+
+    // A change request needs a note.
+    await expectApiError(
+      call(api.sendPreviewFeedback, { params: { id }, body: { verdict: 'needs_change', note: ' ' } }),
+      400,
+    )
+    const sent = await call(api.sendPreviewFeedback, {
+      params: { id },
+      body: { verdict: 'needs_change', note: '검색창을 목록 위로 올려 주세요' },
+    })
+    expect(sent.status).toBe('code_review')
+    expect(sent.work?.previewFeedback).toMatchObject({ by: 'u-kim', verdict: 'needs_change' })
+
+    // Only the requester reacts.
+    await loginAs('dev1@example.com')
+    await expectApiError(
+      call(api.sendPreviewFeedback, { params: { id }, body: { verdict: 'looks_good' } }),
+      403,
+    )
+    expect((await call(api.listNotifications)).map((n) => n.title)).toContain(
+      `[#${id}] 요청자가 미리보기에서 수정을 요청했습니다`,
+    )
+    // A new run starts without the old reaction.
+    const revised = await call(api.transitionRequest, {
+      params: { id },
+      body: { event: 'requestRevision', note: '검색창 위치 변경' },
+    })
+    expect(revised.work?.previewFeedback).toBeUndefined()
+    await loginAs('planner@example.com')
+    await expectApiError(
+      call(api.sendPreviewFeedback, { params: { id }, body: { verdict: 'looks_good' } }),
+      409,
+    )
+  })
+
   it('refuses transitions that do not fit the current status', async () => {
     await loginAs('dev1@example.com')
     await expectApiError(

@@ -75,6 +75,9 @@ describe('seed data', () => {
     expect(r.report?.wikiTrust).toBe('high')
     expect(r.regression.map((g) => g.label)).toEqual(['자동 로그인', '비밀번호 재설정', '관리자 잠금 해제'])
     expect(r.infoRequest?.answer).toBeTruthy()
+    // The requester can look at the change before it goes in.
+    expect(r.work?.preview?.url).toMatch(/^https:\/\/preview\.example\.com\//)
+    expect(r.work?.preview?.screenshots[0]?.url).toMatch(/^data:image\/svg\+xml/)
   })
 
   it('flags #1017 as delayed and schedules two releases this week', () => {

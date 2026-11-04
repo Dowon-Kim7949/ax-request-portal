@@ -37,6 +37,7 @@ import { cn } from '@/lib/cn'
 import { formatDateTime, formatKrw, toLocalDate } from '@/lib/format'
 import { uncheckedAssumptions } from '@/domain/lifecycle'
 import { useAiRunLimit } from './ai-limit'
+import { FeedbackBadge, PreviewImages } from './preview-panels'
 import { AiRunLimitReason } from './ai-usage-card'
 
 const errorText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback)
@@ -589,9 +590,30 @@ export function WorkPanel({
   const limit = useAiRunLimit(request)
   const limitId = useId()
   const [reviseOpen, setReviseOpen] = useState(false)
+  const [approveAnyway, setApproveAnyway] = useState(false)
   const [note, setNote] = useState('')
   const work = request.work
   if (!work) return null
+  const feedback = work.previewFeedback
+  const changeAsked = feedback?.verdict === 'needs_change'
+
+  const approve = () =>
+    transition.mutate(
+      { event: 'approveMerge' },
+      {
+        onSuccess: () => {
+          setApproveAnyway(false)
+          toast.success(t('workRun.approved'))
+        },
+        onError: (e) => toast.error(errorText(e, t('errors.generic'))),
+      },
+    )
+  const openRevise = () => {
+    // Start from what the requester asked for in the preview.
+    if (!note && changeAsked && feedback.note) setNote(t('workRun.fromRequester', { note: feedback.note }))
+    setApproveAnyway(false)
+    setReviseOpen(true)
+  }
 
   const term = reviewTerm(project)
   const live = request.status === 'in_progress'
@@ -720,6 +742,36 @@ export function WorkPanel({
           {work.wikiChanges?.pendingReview ? (
             <p className="mt-2 text-xs text-ink-400">{t('workRun.wikiNote')}</p>
           ) : null}
+          {work.preview ? (
+            <div className="mt-3 rounded-2xl p-3.5 ring-1 ring-line">
+              <p className="mb-2 text-[13px] font-bold text-ink-600">{t('workRun.preview')}</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+                <PreviewImages preview={work.preview} compact />
+                <div className="flex min-w-0 flex-col gap-2 text-sm">
+                  {work.preview.url ? (
+                    <a
+                      href={work.preview.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex min-h-11 items-center gap-1.5 font-semibold text-accent hover:underline"
+                    >
+                      <ExternalLink className="size-4" aria-hidden />
+                      {t('workRun.openPreview')}
+                    </a>
+                  ) : null}
+                  <div aria-live="polite">
+                    <p className="flex flex-wrap items-center gap-2 font-semibold text-ink-700">
+                      {t('workRun.requesterFeedback')}
+                      {feedback ? <FeedbackBadge feedback={feedback} /> : null}
+                    </p>
+                    <p className="mt-0.5 text-ink-600">
+                      {feedback ? (feedback.note ?? '') : t('workRun.feedbackWaiting')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
         </>
       )}
 
@@ -729,12 +781,7 @@ export function WorkPanel({
             size="lg"
             className="sm:flex-1"
             loading={transition.isPending && transition.variables?.event === 'approveMerge'}
-            onClick={() =>
-              transition.mutate(
-                { event: 'approveMerge' },
-                { onSuccess: () => toast.success(t('workRun.approved')), onError: fail },
-              )
-            }
+            onClick={() => (changeAsked ? setApproveAnyway(true) : approve())}
           >
             {t('workRun.approve')}
           </Button>
@@ -752,12 +799,34 @@ export function WorkPanel({
             className="sm:flex-1"
             disabled={limit.reached}
             aria-describedby={limit.reached ? limitId : undefined}
-            onClick={() => setReviseOpen(true)}
+            onClick={openRevise}
           >
             {t('workRun.revise')}
           </Button>
         </div>
       ) : null}
+
+      <Sheet
+        open={approveAnyway}
+        onOpenChange={setApproveAnyway}
+        title={t('workRun.approveAnywayTitle')}
+        description={t('workRun.approveAnywayBody')}
+        closeLabel={t('common.close')}
+        footer={
+          <>
+            <Button variant="secondary" size="lg" className="flex-1" onClick={openRevise}>
+              {t('workRun.revise')}
+            </Button>
+            <Button size="lg" className="flex-1" loading={transition.isPending} onClick={approve}>
+              {t('workRun.approveAnyway')}
+            </Button>
+          </>
+        }
+      >
+        {feedback?.note ? (
+          <p className="rounded-xl bg-warning-50 px-3.5 py-2.5 text-[15px] text-ink-700">{feedback.note}</p>
+        ) : null}
+      </Sheet>
       {canReview && request.status === 'code_review' && limit.reached ? (
         <div className="mt-2">
           <AiRunLimitReason id={limitId} reason={limit.reason} />

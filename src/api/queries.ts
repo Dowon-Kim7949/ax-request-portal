@@ -225,6 +225,15 @@ export function useSaveVerification(id: number) {
   })
 }
 
+export function usePreviewFeedback(id: number) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: BodyOf<typeof api.sendPreviewFeedback>) =>
+      call(api.sendPreviewFeedback, { params: { id }, body }),
+    onSuccess: (req) => onRequestChanged(qc, req),
+  })
+}
+
 export function useUpdateRegression(id: number) {
   const qc = useQueryClient()
   return useMutation({

@@ -7,7 +7,13 @@
  * are stored as keys and rendered when read; AI text is written in the
  * language of the call that makes the AI finish (like a model would).
  */
-import type { AiSettingsInput, ProjectInput, RegressionQueue, RequestScope } from '../api/contract'
+import type {
+  AiSettingsInput,
+  PreviewFeedbackInput,
+  ProjectInput,
+  RegressionQueue,
+  RequestScope,
+} from '../api/contract'
 import {
   addUsage,
   AI_PROVIDERS,
@@ -364,6 +370,8 @@ export class MockEngine {
         break
       case 'code_review':
         send(devs, 'workFinished', {}, true)
+        // Optional for the requester, so not "your turn".
+        if (req.work?.preview) send(requester, 'previewReady', { title: req.title }, false)
         break
       case 'verification':
         send(requester, 'pleaseCheck', { count: req.acceptanceCriteria.length }, true)
@@ -660,6 +668,45 @@ export class MockEngine {
         (c) => byId.get(c.id) ?? { criterionId: c.id, result: 'pending' },
       ),
     })
+  }
+
+  /** Advisory: recorded on the run and sent to the developers; the status does not change. */
+  previewFeedback(user: User, id: number, input: PreviewFeedbackInput, now: Date): WorkRequest {
+    const req = this.getRequest(user, id)
+    if (req.requesterId !== user.id) throw new HttpError(403, 'forbidden', 'requesterOnlyPreview')
+    if (req.status !== 'code_review' || !req.work?.preview) {
+      throw new HttpError(409, 'invalid_transition', 'noPreviewNow')
+    }
+    const at = now.toISOString()
+    const note = input.note?.trim()
+    const next = this.replace({
+      ...req,
+      updatedAt: at,
+      work: {
+        ...req.work,
+        previewFeedback: { at, by: user.id, verdict: input.verdict, ...(note ? { note } : {}) },
+      },
+      timeline: [
+        ...req.timeline,
+        {
+          id: this.newId('tl'),
+          at,
+          actor: { type: 'user', userId: user.id },
+          event: `preview_${input.verdict}`,
+          ...(note ? { note } : {}),
+        },
+      ],
+    })
+    this.notify(
+      this.responsibleDevelopers(req),
+      input.verdict === 'needs_change' ? 'previewChange' : 'previewGood',
+      { title: req.title, note: note ?? '' },
+      req.id,
+      input.verdict === 'needs_change',
+      now,
+      user.id,
+    )
+    return next
   }
 
   updateRegression(

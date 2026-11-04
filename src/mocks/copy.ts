@@ -46,6 +46,8 @@ const ERRORS = {
       `${providerName(p.provider)}를 쓰는 작업이나 프로젝트가 있어 연결을 끊을 수 없습니다. 먼저 다른 모델로 바꿔 주세요.`,
     modelInUse: (p) => `지금 쓰고 있는 모델(${p.model})은 단가표에서 뺄 수 없습니다.`,
     requesterOnlyVerify: '요청자만 결과를 확인할 수 있습니다.',
+    requesterOnlyPreview: '요청자만 미리보기에 의견을 남길 수 있습니다.',
+    noPreviewNow: '지금은 미리보기에 의견을 남길 수 없습니다.',
     notInVerification: '지금은 결과 확인 단계가 아닙니다.',
     developerOnlyRegression: '담당 개발자만 기록할 수 있습니다.',
     developerOnlySchedule: '담당 개발자만 일정을 정할 수 있습니다.',
@@ -86,6 +88,8 @@ const ERRORS = {
       `A task or project still uses ${providerName(p.provider)}, so it cannot be disconnected. Switch them to another model first.`,
     modelInUse: (p) => `A model in use (${p.model}) cannot be removed from the price table.`,
     requesterOnlyVerify: 'Only the requester can check the result.',
+    requesterOnlyPreview: 'Only the requester can comment on the preview.',
+    noPreviewNow: 'There is no preview to comment on right now.',
     notInVerification: 'The request is not waiting for a result check.',
     developerOnlyRegression: 'Only the responsible developer can record this.',
     developerOnlySchedule: 'Only the responsible developer can set the release date.',
@@ -127,6 +131,12 @@ const NOTIFICATIONS = {
     rejected: { title: '진행하지 않기로 했습니다', body: (p) => String(p.reason) },
     workStarted: { title: '작업을 시작했습니다', body: (p) => String(p.title) },
     workFinished: { title: 'AI 작업이 끝났습니다', body: '변경 내용과 테스트 결과를 검토해 주세요.' },
+    previewReady: {
+      title: '바뀐 화면을 미리 볼 수 있습니다',
+      body: (p) => `${p.title} — 반영 전에 보고 의견을 주시면 먼저 고칠 수 있습니다.`,
+    },
+    previewGood: { title: '요청자가 미리보기를 좋다고 했습니다', body: (p) => String(p.title) },
+    previewChange: { title: '요청자가 미리보기에서 수정을 요청했습니다', body: (p) => String(p.note) },
     pleaseCheck: {
       title: '결과를 확인해 주세요',
       body: (p) => `완료 기준 ${p.count}개를 하나씩 확인해 주시면 됩니다.`,
@@ -146,6 +156,12 @@ const NOTIFICATIONS = {
     rejected: { title: 'This request will not go ahead', body: (p) => String(p.reason) },
     workStarted: { title: 'Work has started', body: (p) => String(p.title) },
     workFinished: { title: 'AI work is done', body: 'Review the changes and test results.' },
+    previewReady: {
+      title: 'You can preview the change',
+      body: (p) => `${p.title} — tell us what you think before it goes in, and it can be fixed first.`,
+    },
+    previewGood: { title: 'The requester likes the preview', body: (p) => String(p.title) },
+    previewChange: { title: 'The requester asked for a change in the preview', body: (p) => String(p.note) },
     pleaseCheck: {
       title: 'Please check the result',
       body: (p) => `Check the ${p.count} acceptance criteria one by one.`,

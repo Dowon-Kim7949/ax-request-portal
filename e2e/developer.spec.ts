@@ -63,6 +63,9 @@ test('developer sends the AI back with a revision note', async ({ page }) => {
   await page.goto('/requests/1024')
   await expect(page.getByText('MR !57')).toBeVisible()
   await expect(page.getByText('기존 테스트 128/128 통과')).toBeVisible()
+  // The preview the requester sees, and whether they have reacted yet
+  await expect(page.getByRole('link', { name: '미리보기 열기' })).toBeVisible()
+  await expect(page.getByText('요청자가 아직 의견을 남기지 않았어요(선택 사항).')).toBeVisible()
   await page.getByRole('button', { name: '수정 요청' }).click()
   const sheet = page.getByRole('dialog', { name: 'AI에게 무엇을 고치라고 할까요?' })
   await sheet.getByLabel('수정할 내용').fill('잠금 해제 버튼에 확인 대화상자를 추가해 주세요.')
