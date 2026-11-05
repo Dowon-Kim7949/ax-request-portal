@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import * as z from 'zod'
 import { ApiError } from '@/api/client'
+import type { Session } from '@/api/contract'
 import { useLogin } from '@/api/queries'
 import { useBrand } from '@/app/brand'
 import { loadDemoAccounts } from '@/app/demo'
@@ -15,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Field, Input } from '@/components/ui/field'
 import type { Role, User } from '@/domain/model'
 import { useSession } from '@/stores/session'
+import { resolvePostLoginPath } from './post-login'
 
 const LoginForm = z.object({ email: z.email(), password: z.string().min(1) })
 type LoginForm = z.infer<typeof LoginForm>
@@ -27,19 +29,18 @@ const ROLE_ICON: Record<Role, typeof Send> = {
   operator: Bot,
 }
 
-/** Only allow in-app paths as the post-login destination. */
-function safeNext(next: string | null): string {
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/'
-}
-
 export default function LoginPage() {
   const { t, i18n } = useTranslation()
   usePageTitle(t('auth.title'))
   const brand = useBrand()
   const token = useSession((s) => s.token)
+  const user = useSession((s) => s.user)
+  // How the previous session in this tab ended. Read once: signing in resets it in the store, and the
+  // redirect that follows must still see it.
+  const [ended] = useState(() => useSession.getState().ended)
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const next = safeNext(params.get('next'))
+  const next = params.get('next')
   const login = useLogin()
   const [demo, setDemo] = useState<{ accounts: User[]; password: string } | null>(null)
 
@@ -53,10 +54,14 @@ export default function LoginPage() {
     defaultValues: { email: '', password: '' },
   })
 
-  const submit = (values: LoginForm) =>
-    login.mutate(values, { onSuccess: () => navigate(next, { replace: true }) })
+  // Every way out of this screen goes through resolvePostLoginPath: `next` only if the new user may open
+  // it. After a session ended in this tab, `next` is the page that person had open: only they return to it.
+  const destination = (signedIn: User | null) =>
+    resolvePostLoginPath(ended?.userId && ended.userId !== signedIn?.id ? null : next, signedIn)
+  const goOn = (session: Session) => navigate(destination(session.user), { replace: true })
+  const submit = (values: LoginForm) => login.mutate(values, { onSuccess: goOn })
 
-  if (token && !login.isPending) return <Navigate to={next} replace />
+  if (token && !login.isPending) return <Navigate to={destination(user)} replace />
 
   const errorMessage =
     login.error instanceof ApiError ? login.error.message : login.error ? t('errors.generic') : undefined
@@ -74,6 +79,15 @@ export default function LoginPage() {
           <h1 className="text-[28px] leading-tight font-bold tracking-tight">{brand.name}</h1>
           <p className="text-[15px] text-ink-500">{brand.tagline}</p>
         </div>
+
+        {ended?.reason === 'expired' ? (
+          <p
+            role="status"
+            className="rounded-(--radius-card) bg-warning-50 px-4 py-3 text-sm font-medium text-warning-fg"
+          >
+            {t('auth.sessionExpired')}
+          </p>
+        ) : null}
 
         <form
           noValidate
@@ -126,10 +140,7 @@ export default function LoginPage() {
                       type="button"
                       disabled={login.isPending}
                       onClick={() =>
-                        login.mutate(
-                          { email: u.email, password: demo.password },
-                          { onSuccess: () => navigate(next, { replace: true }) },
-                        )
+                        login.mutate({ email: u.email, password: demo.password }, { onSuccess: goOn })
                       }
                       className="flex w-full items-center gap-3 rounded-2xl bg-surface p-3.5 text-left ring-1 ring-line transition hover:ring-brand-500 disabled:opacity-50"
                     >

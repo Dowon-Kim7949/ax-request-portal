@@ -7,6 +7,7 @@ import { configureClient, type ClientHooks } from './api/client'
 import { createQueryClient } from './api/query-client'
 import App from './App.tsx'
 import { BootError } from './app/boot'
+import { expireSession } from './app/session-sync'
 import { startThemeSync } from './app/theme'
 import { env } from './config/env'
 import './index.css'
@@ -56,10 +57,12 @@ async function bootstrap() {
   if (!container) throw new Error('#root element is missing from index.html')
   const root = createRoot(container)
   startThemeSync()
+  const queryClient = createQueryClient()
 
   const clientHooks: ClientHooks = {
     getToken: () => useSession.getState().token,
-    onUnauthorized: () => useSession.getState().clear(),
+    // The server refused the token: drop the session and the cached data; the login screen keeps `next`.
+    onUnauthorized: () => expireSession(queryClient),
     getLanguage: currentLocale,
     messages: {
       network: () => i18n.t('errors.network'),
@@ -82,7 +85,7 @@ async function bootstrap() {
 
   root.render(
     <StrictMode>
-      <QueryClientProvider client={createQueryClient()}>
+      <QueryClientProvider client={queryClient}>
         <App />
       </QueryClientProvider>
     </StrictMode>,
