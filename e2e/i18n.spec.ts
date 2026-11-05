@@ -5,7 +5,12 @@
  * (the "한국어" option in the language switch) and are excluded.
  */
 import { expect, test, type Page } from '@playwright/test'
-import { expectNoHorizontalScroll, loginAsEnglish as signIn } from './helpers.ts'
+import {
+  COLD_START_TIMEOUT,
+  expectNoHorizontalScroll,
+  loginAsEnglish as signIn,
+  openInApp,
+} from './helpers.ts'
 
 /** Hangul anywhere on screen, except inside elements marked as another language. */
 async function koreanOnScreen(page: Page): Promise<string[]> {
@@ -26,7 +31,9 @@ test.describe('English browser', () => {
 
   test('login screen is in English', async ({ page }) => {
     await page.goto('/login')
-    await expect(page.getByRole('heading', { level: 1, name: 'AX Request Portal' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'AX Request Portal' })).toBeVisible({
+      timeout: COLD_START_TIMEOUT,
+    })
     await expect(page.locator('html')).toHaveAttribute('lang', 'en')
     await expect(page.getByRole('button', { name: /Sign in as Requester/ })).toBeVisible()
     expect(await koreanOnScreen(page)).toEqual([])
@@ -54,7 +61,7 @@ test.describe('English browser', () => {
     for (const [role, routes] of Object.entries(plan)) {
       await signIn(page, role as keyof typeof plan)
       for (const route of routes) {
-        await page.goto(route)
+        await openInApp(page, route)
         await settle(page)
         expect(await koreanOnScreen(page), `${role} ${route}`).toEqual([])
         await expectNoHorizontalScroll(page)

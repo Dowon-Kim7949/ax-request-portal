@@ -6,7 +6,7 @@
  * visible feature (a blocked font, image or inline style).
  */
 import { expect, test, type Page } from '@playwright/test'
-import { loginAs } from './helpers.ts'
+import { COLD_START_TIMEOUT, loginAs } from './helpers.ts'
 
 declare global {
   interface Window {
@@ -45,7 +45,9 @@ const violations = (page: Page) => page.evaluate(() => window.__cspViolations ??
 async function visit(page: Page, path: string, heading: string | RegExp) {
   await page.goto(path)
   // A cold start of the app and its mock API: allow for a slow, busy machine.
-  await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible({ timeout: 10_000 })
+  await expect(page.getByRole('heading', { level: 1, name: heading })).toBeVisible({
+    timeout: COLD_START_TIMEOUT,
+  })
   expect(await violations(page), path).toEqual([])
 }
 
@@ -54,7 +56,7 @@ test('the policy is sent, and the requester screens keep to it', async ({ page }
   expect(response?.headers()['content-security-policy']).toMatch(/script-src 'self' 'sha256-/)
   // Let the app finish starting (the mock's first service worker install) before leaving the page.
   await expect(page.getByRole('heading', { level: 1, name: 'AX 업무 요청' })).toBeVisible({
-    timeout: 10_000,
+    timeout: COLD_START_TIMEOUT,
   })
   expect(await violations(page)).toEqual([])
 

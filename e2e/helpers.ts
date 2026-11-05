@@ -7,6 +7,14 @@ export function viewportOf(info: TestInfo): Viewport {
 }
 
 /**
+ * How long a full page load may take to show its first screen. In a new
+ * browser context it includes installing the mock's service worker, and the
+ * app itself gives its mock 8 s to start before it reloads
+ * (MOCK_START_TIMEOUT_MS in src/main.tsx): a test should not give up sooner.
+ */
+export const COLD_START_TIMEOUT = 10_000
+
+/**
  * Opens the login screen, signed out. The session is dropped from a static
  * file of the same origin, where the app is not running: inside the app a
  * /me response still in flight would save the session again.
@@ -15,7 +23,9 @@ async function openLoginScreen(page: Page, brandName: string) {
   await page.goto('/favicon.svg')
   await page.evaluate(() => localStorage.removeItem('ax-request-portal:session'))
   await page.goto('/login')
-  await expect(page.getByRole('heading', { level: 1, name: brandName })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: brandName })).toBeVisible({
+    timeout: COLD_START_TIMEOUT,
+  })
 }
 
 /** Signs in through the demo buttons on the login screen (mock mode). */
@@ -33,6 +43,39 @@ export async function loginAsEnglish(
   await openLoginScreen(page, 'AX Request Portal')
   await page.getByRole('button', { name: new RegExp(`Sign in as ${role}`) }).click()
   await expect(page).not.toHaveURL(/\/login/)
+}
+
+/**
+ * Opens `path` inside the running app, as a link would: no page load.
+ *
+ * page.goto loads the page again, which starts the app and its mock API from
+ * scratch (the mock's code, its data from storage, the service worker
+ * handshake, then the session and the screen's data). In WebKit under a
+ * parallel run that start alone takes 2–4 s before a screen shows its
+ * heading, so a walk through many screens with page.goto spent its 5 s
+ * expectations on start-ups and failed now and then. Keep page.goto where the
+ * start itself is under test.
+ *
+ * The router is moved the way the browser's back and forward buttons move it
+ * (a history entry plus `popstate`, with the state shape React Router writes).
+ * It keeps the old screen up while the new one's code loads, so this returns
+ * once the old screen's main heading has gone: what the caller checks next is
+ * the new screen. For that the old screen must have its heading first (it
+ * could otherwise appear after the move). Two visits in a row to the same
+ * screen with its data cached would keep the heading and time out here, loudly.
+ */
+export async function openInApp(page: Page, path: string) {
+  const target = new URL(path, page.url())
+  const here = new URL(page.url())
+  if (target.pathname === here.pathname && target.search === here.search) return
+  await expect(page.locator('h1').first()).toBeVisible()
+  await page.evaluate((to) => {
+    document.querySelector('h1')?.setAttribute('data-e2e-leaving', '')
+    const idx = ((window.history.state as { idx?: number } | null)?.idx ?? 0) + 1
+    window.history.pushState({ usr: null, key: Math.random().toString(36).slice(2, 10), idx }, '', to)
+    window.dispatchEvent(new PopStateEvent('popstate', { state: window.history.state }))
+  }, path)
+  await expect(page.locator('h1[data-e2e-leaving]')).toHaveCount(0)
 }
 
 /** Local YYYY-MM-DD `days` from today (what <input type="date"> expects). */

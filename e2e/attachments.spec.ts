@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { expectNoHorizontalScroll, loginAs } from './helpers.ts'
+import { expectNoHorizontalScroll, loginAs, openInApp } from './helpers.ts'
 
 /** A 1×1 PNG: small enough for the demo to keep it inline as a data: URL. */
 const PNG = Buffer.from(
@@ -10,7 +10,7 @@ const PNG = Buffer.from(
 // Browsers refuse to open a data: URL in a tab; the link opens the file through a blob: URL instead.
 test('an attached screenshot opens in a new tab', async ({ page, context }) => {
   await loginAs(page, '요청자')
-  await page.goto('/requests/new?project=p-portal')
+  await openInApp(page, '/requests/new?project=p-portal')
   await page.getByRole('radio', { name: /기존 기능 변경/ }).click() // auto-advances
   await page.getByRole('button', { name: '공지사항' }).click()
   await page.getByRole('button', { name: '다음' }).click()

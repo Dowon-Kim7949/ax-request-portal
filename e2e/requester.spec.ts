@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { expectNoHorizontalScroll, loginAs } from './helpers.ts'
+import { expectNoHorizontalScroll, loginAs, openInApp } from './helpers.ts'
 
 test('requester files a request through the wizard', async ({ page }) => {
   await loginAs(page, '요청자')
@@ -49,7 +49,7 @@ test('requester files a request through the wizard', async ({ page }) => {
 
 test('wizard draft survives a reload', async ({ page }) => {
   await loginAs(page, '요청자')
-  await page.goto('/requests/new?project=p-field')
+  await openInApp(page, '/requests/new?project=p-field')
   await page.getByRole('radio', { name: /버그/ }).click()
   await page.getByRole('button', { name: '다음' }).click()
   await page.getByLabel('요청 제목').fill('사진이 가끔 안 올라감')
@@ -61,7 +61,7 @@ test('wizard draft survives a reload', async ({ page }) => {
 
 test('requester checks the result against the acceptance criteria', async ({ page }) => {
   await loginAs(page, '요청자')
-  await page.goto('/requests/1021')
+  await openInApp(page, '/requests/1021')
   await expect(page.getByRole('heading', { name: '완료 기준대로 됐는지 확인해 주세요' })).toBeVisible()
 
   const confirm = page.getByRole('button', { name: '모두 확인했어요' })
@@ -83,7 +83,7 @@ test('requester answers the developer’s questions', async ({ page }) => {
   await page.getByLabel('비밀번호').fill('demo')
   await page.getByRole('button', { name: '로그인', exact: true }).click()
   await expect(page).not.toHaveURL(/\/login/)
-  await page.goto('/requests/1022')
+  await openInApp(page, '/requests/1022')
   await expect(page.getByRole('heading', { name: '담당자가 물어본 것' })).toBeVisible()
   await page.getByLabel('답변').fill('월간 매출 리포트입니다. 3초 안에 열리면 충분합니다.')
   await page.getByRole('button', { name: '답변 보내기' }).click()
@@ -92,7 +92,7 @@ test('requester answers the developer’s questions', async ({ page }) => {
 
 test('requester reacts to the preview before the change goes in', async ({ page }) => {
   await loginAs(page, '요청자')
-  await page.goto('/requests/1024')
+  await openInApp(page, '/requests/1024')
   await expect(page.getByRole('heading', { name: '바뀐 화면 미리 보기' })).toBeVisible()
   await expect(page.getByRole('img', { name: /바뀐 화면 미리보기/ })).toBeVisible()
   await expect(page.getByRole('link', { name: '미리보기 열기' })).toHaveAttribute(
@@ -112,7 +112,7 @@ test('requester reacts to the preview before the change goes in', async ({ page 
 
 test('requester confirms how the AI read the request', async ({ page }) => {
   await loginAs(page, '요청자')
-  await page.goto('/requests/1028')
+  await openInApp(page, '/requests/1028')
   await expect(page.getByRole('heading', { name: '이렇게 진행해도 될까요?' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '이번에 바꾸지 않는 것' })).toBeVisible()
   await expectNoHorizontalScroll(page)
@@ -135,7 +135,7 @@ test('requester confirms how the AI read the request', async ({ page }) => {
 
 test('requester sends the AI’s reading back with a note', async ({ page }) => {
   await loginAs(page, '요청자')
-  await page.goto('/requests/1028')
+  await openInApp(page, '/requests/1028')
   await page.getByRole('button', { name: '다르게 해 주세요' }).click()
   await page.getByLabel('어떻게 다른지 알려 주세요').fill('메인 배너는 빼고 공지 목록만 바꿔 주세요.')
   await page.getByRole('button', { name: '다시 정리해 주세요' }).click()
@@ -146,7 +146,7 @@ test('requester sends the AI’s reading back with a note', async ({ page }) => 
 
 test('requester files audit findings pasted from a table', async ({ page }) => {
   await loginAs(page, '요청자')
-  await page.goto('/requests/new?project=p-portal')
+  await openInApp(page, '/requests/new?project=p-portal')
   await page.getByRole('radio', { name: /외부 요건 대응/ }).click() // auto-advances
   await page.getByRole('button', { name: '로그인', exact: true }).click()
   await page.getByRole('button', { name: '다음' }).click()

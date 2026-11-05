@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test'
-import { loginAs } from './helpers.ts'
+import { COLD_START_TIMEOUT, loginAs } from './helpers.ts'
 
 test('the in-browser mock API answers contract calls', async ({ page }) => {
   await page.goto('/login')
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: COLD_START_TIMEOUT })
 
   const result = await page.evaluate(async () => {
     const login = await fetch('/api/auth/login', {

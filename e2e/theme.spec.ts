@@ -3,7 +3,7 @@
  * flashes white before the app starts.
  */
 import { expect, test, type Page } from '@playwright/test'
-import { expectNoHorizontalScroll, loginAs } from './helpers.ts'
+import { COLD_START_TIMEOUT, expectNoHorizontalScroll, loginAs, openInApp } from './helpers.ts'
 
 const DARK_CANVAS = 'rgb(13, 18, 29)'
 const LIGHT_CANVAS = 'rgb(243, 245, 248)'
@@ -27,7 +27,7 @@ test.describe('system dark mode', () => {
 
   test('the app keeps it dark once running', async ({ page }) => {
     await page.goto('/login')
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: COLD_START_TIMEOUT })
     expect(await bodyBackground(page)).toBe(DARK_CANVAS)
   })
 
@@ -50,7 +50,8 @@ test.describe('system dark mode', () => {
     for (const [role, routes] of Object.entries(plan)) {
       await loginAs(page, role as keyof typeof plan)
       for (const route of routes) {
-        await page.goto(route)
+        // In the running app: a page load per screen spent the time on start-ups (see openInApp).
+        await openInApp(page, route)
         await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible()
         expect(await bodyBackground(page), route).toBe(DARK_CANVAS)
         await expectNoHorizontalScroll(page)
@@ -64,7 +65,9 @@ test.describe('system dark mode', () => {
     await page.getByRole('radio', { name: '밝게' }).click()
     expect(await bodyBackground(page)).toBe(LIGHT_CANVAS)
     await page.reload()
-    await expect(page.getByRole('heading', { level: 1, name: '설정' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: '설정' })).toBeVisible({
+      timeout: COLD_START_TIMEOUT,
+    })
     expect(await page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(false)
     await expect(page.locator('meta[name="theme-color"]')).toHaveAttribute('content', '#f3f5f8')
   })

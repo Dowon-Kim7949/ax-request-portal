@@ -4,7 +4,7 @@
  * here, so these run once, in the desktop (Chromium) project.
  */
 import { expect, test, type Page } from '@playwright/test'
-import { expectNoHorizontalScroll, loginAs, loginAsEnglish } from './helpers.ts'
+import { expectNoHorizontalScroll, loginAs, loginAsEnglish, openInApp } from './helpers.ts'
 
 const VIEWPORTS = [
   { name: 'small phone', width: 320, height: 568, nav: 'tabs' },
@@ -44,7 +44,7 @@ for (const vp of VIEWPORTS) {
       test(`${role} screens fit ${vp.width}px`, async ({ page }) => {
         await loginAs(page, role as keyof typeof ROUTES)
         for (const route of routes) {
-          await page.goto(route)
+          await openInApp(page, route)
           await settle(page)
           await expectNoHorizontalScroll(page)
           if (vp.nav === 'tabs' && route !== '/requests/new?project=p-portal&step=1') {
@@ -84,7 +84,7 @@ test.describe('small phone in English', () => {
     test(`${role} screens fit 320px in English`, async ({ page }) => {
       await loginAsEnglish(page, role as keyof typeof EN_ROUTES)
       for (const route of routes) {
-        await page.goto(route)
+        await openInApp(page, route)
         await settle(page)
         await expectNoHorizontalScroll(page)
       }
