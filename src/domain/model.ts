@@ -1,6 +1,7 @@
 import * as z from 'zod'
 import { AiProvider, AiRuntime, AiSelection, AiTask, AiUsageEntry, TokenUsage } from './ai'
 import { named } from './registry'
+import { FileUrl, ImageUrl, LinkUrl, WebUrl } from './url'
 
 /* ------------------------------------------------------------------ */
 /* Primitives                                                          */
@@ -8,6 +9,8 @@ import { named } from './registry'
 
 export const Timestamp = z.iso.datetime()
 export const CalendarDate = z.iso.date()
+/** A calendar month, YYYY-MM with the month 01–12. */
+export const YearMonth = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/)
 
 /* ------------------------------------------------------------------ */
 /* Users and roles                                                     */
@@ -83,7 +86,7 @@ export const Project = named(
     name: z.string(),
     description: z.string(),
     icon: ProjectIcon,
-    repository: z.object({ provider: VcsProvider, url: z.url() }),
+    repository: z.object({ provider: VcsProvider, url: WebUrl.describe('Absolute http(s) URL') }),
     /** Path of the project wiki inside the repository, e.g. docs/llm-wiki */
     wikiPath: z.string(),
     wikiStats: z.object({
@@ -126,7 +129,9 @@ export const Attachment = named(
     name: z.string(),
     size: z.int().nonnegative(),
     mimeType: z.string(),
-    url: z.string(),
+    url: FileUrl.describe(
+      'http(s) URL or a path on this site; data: (image/* or application/pdf) and blob: for files the browser keeps',
+    ),
   }),
 )
 export type Attachment = z.infer<typeof Attachment>
@@ -371,12 +376,14 @@ export type WorkPhase = z.infer<typeof WorkPhase>
 export const WorkPreview = named(
   'WorkPreview',
   z.object({
-    url: z.url().optional().describe('A running build of the change, e.g. a preview deployment'),
+    url: LinkUrl.optional().describe(
+      'A running build of the change, e.g. a preview deployment (http(s) URL or a path on this site)',
+    ),
     screenshots: z
       .array(
         z.object({
           id: z.string(),
-          url: z.string().describe('Image URL (data: URLs allowed)'),
+          url: ImageUrl.describe('Image URL: http(s), a path on this site, data:image/* or blob:'),
           alt: z.string(),
           caption: z.string().optional(),
         }),
@@ -420,7 +427,7 @@ export const WorkRun = named(
     mergeRequest: z
       .object({
         number: z.int().positive(),
-        url: z.url(),
+        url: LinkUrl.describe('http(s) URL of the merge request'),
         filesChanged: z.int().nonnegative(),
         additions: z.int().nonnegative(),
         deletions: z.int().nonnegative(),
@@ -623,13 +630,47 @@ export type NotificationSettings = z.infer<typeof NotificationSettings>
 /* Budget, dashboard, schedule                                         */
 /* ------------------------------------------------------------------ */
 
+/** Highest AI cost limit accepted, in won (ten billion): far above any real monthly bill, well inside safe integers. */
+export const BUDGET_LIMIT_MAX_KRW = 10_000_000_000
+
+const LimitKrw = z.int().nonnegative().max(BUDGET_LIMIT_MAX_KRW)
+
+/** The limits an operator sets. 0 means no limit. */
+export const BudgetLimits = z.object({
+  monthlyLimitKrw: LimitKrw.describe('Whole won; 0 = no limit'),
+  perRequestLimitKrw: LimitKrw.describe(
+    'Whole won; 0 = no limit. Not above monthlyLimitKrw while both are set',
+  ),
+  alertThresholdPct: z.int().min(1).max(100),
+})
+export type BudgetLimits = z.infer<typeof BudgetLimits>
+
+/** A per-request limit above the monthly one could never be reached. 0 on either side means no limit. */
+export function perRequestLimitFits(
+  l: Pick<BudgetLimits, 'monthlyLimitKrw' | 'perRequestLimitKrw'>,
+): boolean {
+  return !l.monthlyLimitKrw || !l.perRequestLimitKrw || l.perRequestLimitKrw <= l.monthlyLimitKrw
+}
+
+/** Cross-field rule for every budget form and the API body (`superRefine`). */
+export function checkBudgetLimits(
+  l: Pick<BudgetLimits, 'monthlyLimitKrw' | 'perRequestLimitKrw'>,
+  ctx: z.RefinementCtx,
+): void {
+  if (!perRequestLimitFits(l)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['perRequestLimitKrw'],
+      message: 'The per-request limit cannot be higher than the monthly limit',
+    })
+  }
+}
+
 export const Budget = named(
   'Budget',
   z.object({
-    month: z.string().regex(/^\d{4}-\d{2}$/),
-    monthlyLimitKrw: z.number().nonnegative(),
-    perRequestLimitKrw: z.number().nonnegative(),
-    alertThresholdPct: z.int().min(1).max(100),
+    month: YearMonth,
+    ...BudgetLimits.shape,
     spentKrw: z.number().nonnegative(),
     byModel: z.array(
       z.object({ provider: AiProvider, model: z.string(), spentKrw: z.number().nonnegative() }),
@@ -641,7 +682,7 @@ export type Budget = z.infer<typeof Budget>
 export const DashboardSummary = named(
   'DashboardSummary',
   z.object({
-    month: z.string().regex(/^\d{4}-\d{2}$/),
+    month: YearMonth,
     received: z.int().nonnegative(),
     receivedPrevMonth: z
       .int()
@@ -684,7 +725,7 @@ const Calls = z.int().nonnegative()
 export const AiUsageReport = named(
   'AiUsageReport',
   z.object({
-    month: z.string().regex(/^\d{4}-\d{2}$/),
+    month: YearMonth,
     totalKrw: Krw,
     totalUsd: z.number().nonnegative(),
     calls: Calls.describe('Model API calls and coding-agent runs booked in `month`'),

@@ -74,7 +74,10 @@ import { renderNotification, type ErrorKey, type NotificationKey, type ServerLan
 /* ------------------------------------------------------------------ */
 
 /** Bump when the stored shape changes: older demo data is discarded and reseeded. */
-export const STATE_VERSION = 4
+export const STATE_VERSION = 5
+
+/** Notifications kept per person; older ones are dropped as new ones arrive. */
+export const NOTIFICATIONS_PER_USER_MAX = 200
 
 /** What the operator configures. Keys are never stored, only their last four characters. */
 export interface AiOperations {
@@ -94,8 +97,20 @@ export interface StoredNotification {
   readAt?: string
 }
 
+/** An upload as the mock keeps it: the API never returns who uploaded it. */
+export interface StoredAttachment extends Attachment {
+  /** Only the uploader can attach it to a request */
+  ownerId: string
+}
+
+function publicAttachment({ ownerId: _owner, ...attachment }: StoredAttachment): Attachment {
+  return attachment
+}
+
 export interface MockState {
   version: typeof STATE_VERSION
+  /** Counts saves, so a tab can tell that another tab has saved since it last read (see store.ts) */
+  revision: number
   seededAt: string
   /** Language the demo data was written in */
   language: ServerLanguage
@@ -112,7 +127,7 @@ export interface MockState {
   ai: AiOperations
   /** Usage ledger: one entry per model call or agent run, priced when booked */
   aiUsage: AiUsageEntry[]
-  attachments: Attachment[]
+  attachments: StoredAttachment[]
 }
 
 export interface EngineOptions {
@@ -159,6 +174,7 @@ const GUARD_ERRORS: Record<GuardName, ErrorKey> = {
   assumptionsUnchecked: 'assumptionsUnchecked',
   scopeUnanswered: 'scopeUnanswered',
   scopeRevisionsUsed: 'scopeRevisionsUsed',
+  releaseUnscheduled: 'releaseUnscheduled',
 }
 
 export function toDate(iso: string): string {
@@ -329,7 +345,18 @@ export class MockEngine {
         params,
         createdAt: now.toISOString(),
       })
+      this.trimNotifications(userId)
     }
+  }
+
+  /** Keeps a person's newest notifications, so the stored demo data stops growing. */
+  private trimNotifications(userId: string): void {
+    const mine = this.state.notifications.map((n, i) => ({ n, i })).filter(({ n }) => n.userId === userId)
+    if (mine.length <= NOTIFICATIONS_PER_USER_MAX) return
+    // Newest first; of two at the same moment, the one added later.
+    mine.sort((a, b) => b.n.createdAt.localeCompare(a.n.createdAt) || b.i - a.i)
+    const drop = new Set(mine.slice(NOTIFICATIONS_PER_USER_MAX).map(({ n }) => n))
+    this.state.notifications = this.state.notifications.filter((n) => !drop.has(n))
   }
 
   private notifyStatus(req: WorkRequest, now: Date, actorId?: string): void {
@@ -526,11 +553,14 @@ export class MockEngine {
     const unknownTarget = draft.targetIds.find((t) => !project.targets.some((pt) => pt.id === t))
     if (unknownTarget) throw new HttpError(400, 'bad_request', 'unknownTarget', { target: unknownTarget })
 
+    // Ids are easy to guess: someone else's upload is treated as missing.
+    const attachments = [...new Set(draft.attachmentIds)].map((aid) => {
+      const stored = this.state.attachments.find((a) => a.id === aid)
+      if (!stored || stored.ownerId !== user.id) throw new HttpError(400, 'bad_request', 'attachmentNotFound')
+      return publicAttachment(stored)
+    })
     const at = now.toISOString()
     const id = this.state.nextRequestId++
-    const attachments = draft.attachmentIds
-      .map((aid) => this.state.attachments.find((a) => a.id === aid))
-      .filter((a): a is Attachment => Boolean(a))
 
     // A checklist request is checked item by item: every finding becomes an acceptance criterion.
     const checklist =
@@ -738,6 +768,7 @@ export class MockEngine {
   ): WorkRequest {
     const req = this.getRequest(user, id)
     if (!this.isResponsible(user, req)) throw new HttpError(403, 'forbidden', 'developerOnlyRegression')
+    if (isTerminal(req.status)) throw new HttpError(409, 'invalid_transition', 'requestClosed')
     const byId = new Map(checks.map((c) => [c.id, c.result]))
     return this.replace({
       ...req,
@@ -803,15 +834,16 @@ export class MockEngine {
 
   addAttachment(user: User, file: { name: string; size: number; type: string; url: string }): Attachment {
     this.require(user, 'request:create')
-    const attachment: Attachment = {
+    const stored: StoredAttachment = {
       id: this.newId('att'),
       name: file.name,
       size: file.size,
       mimeType: file.type || 'application/octet-stream',
       url: file.url,
+      ownerId: user.id,
     }
-    this.state.attachments.push(attachment)
-    return attachment
+    this.state.attachments.push(stored)
+    return publicAttachment(stored)
   }
 
   /* ---------- users & projects ---------- */
@@ -868,6 +900,11 @@ export class MockEngine {
   }
 
   /* ---------- notifications ---------- */
+
+  /** A person who never saved settings (e.g. invited later) gets the defaults. */
+  notificationSettings(user: User): NotificationSettings {
+    return this.state.notificationSettings[user.id] ?? { ...DEFAULT_NOTIFICATION_SETTINGS }
+  }
 
   notificationsFor(user: User, lang: ServerLanguage): Notification[] {
     return this.state.notifications

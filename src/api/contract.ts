@@ -12,7 +12,10 @@ import {
   AiUsageReport,
   Attachment,
   Budget,
+  BUDGET_LIMIT_MAX_KRW,
+  BudgetLimits,
   CalendarDate,
+  checkBudgetLimits,
   DashboardSummary,
   Notification,
   NotificationSettings,
@@ -31,8 +34,10 @@ import {
   VcsProvider,
   WorkRequest,
   WorkRequestSummary,
+  YearMonth,
 } from '../domain/model'
 import { named } from '../domain/registry'
+import { WebUrl } from '../domain/url'
 
 /* ------------------------------------------------------------------ */
 /* Endpoint definition                                                 */
@@ -124,7 +129,7 @@ export const ProjectInput = named(
     name: z.string().trim().min(1).max(60),
     description: z.string().max(300),
     icon: ProjectIcon,
-    repository: z.object({ provider: VcsProvider, url: z.url() }),
+    repository: z.object({ provider: VcsProvider, url: WebUrl.describe('Absolute http(s) URL') }),
     wikiPath: z.string().trim().min(1),
     ownerIds: z.array(z.string()).min(1),
     targets: z.array(ProjectTarget.extend({ id: z.string().optional() })),
@@ -198,7 +203,8 @@ export const NotificationList = named('NotificationList', z.array(Notification))
 export const ReleaseScheduleList = named('ReleaseScheduleList', z.array(ReleaseScheduleItem))
 export const BudgetInput = named(
   'BudgetInput',
-  Budget.pick({ monthlyLimitKrw: true, perRequestLimitKrw: true, alertThresholdPct: true }),
+  BudgetLimits.superRefine(checkBudgetLimits),
+  `Whole won up to ${BUDGET_LIMIT_MAX_KRW.toLocaleString('en-US')}; 0 = no limit. A per-request limit may not exceed a set monthly limit.`,
 )
 
 export const AiSettingsInput = named(
@@ -217,11 +223,7 @@ export const ProviderKeyInput = named(
 const ProviderParam = z.object({ provider: AiProvider })
 
 const MonthQuery = z.object({
-  month: z
-    .string()
-    .regex(/^\d{4}-\d{2}$/)
-    .optional()
-    .describe('YYYY-MM, defaults to the current month'),
+  month: YearMonth.optional().describe('YYYY-MM (month 01–12), defaults to the current month'),
 })
 const IdParam = z.object({ id: z.int().positive() })
 const StringIdParam = z.object({ id: z.string() })
@@ -375,7 +377,8 @@ export const api = {
     method: 'PUT',
     path: '/requests/{id}/regression',
     tag: 'requests',
-    summary: 'Record regression check results (responsible developer)',
+    summary:
+      'Record regression check results (responsible developer; 409 once the request is done, rejected or cancelled)',
     params: IdParam,
     body: RegressionUpdate,
     response: WorkRequest,

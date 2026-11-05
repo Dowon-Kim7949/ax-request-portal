@@ -349,6 +349,11 @@ const ko = {
     expected: '해결 기준',
     outOfScope: '건드리면 안 되는 것',
     attachments: '첨부',
+    attachment: {
+      newTab: '새 탭에서 열림',
+      download: '내려받기',
+      blocked: '열 수 없는 주소',
+    },
     desiredDate: '희망 일정',
     timeline: '진행 기록',
     progress: '진행 단계',
@@ -563,6 +568,7 @@ const ko = {
     releasedTitle: '실제 서비스에 반영됐나요?',
     releasedBody: '완료로 바꾸면 요청자에게 반영 알림이 가요.',
     released: '배포 완료로 기록했어요.',
+    needDate: '배포 예정일을 저장해야 배포 완료로 바꿀 수 있어요.',
   },
   dashboard: {
     title: '전체 현황',
@@ -651,6 +657,17 @@ const ko = {
     alertHint: '사용액이 한도의 이 비율을 넘으면 경고로 표시해요.',
     saved: '한도를 저장했어요.',
     over: '알림 기준을 넘었어요',
+    noLimitHint: '0이면 한도 없이 써요.',
+    error: {
+      amount: '0 이상의 정수(원)로 입력해 주세요.',
+      tooLarge: '{{max}} 이하로 입력해 주세요.',
+      overMonthly: '요청 1건 한도는 월 한도보다 클 수 없어요.',
+    },
+  },
+  demoStorage: {
+    full: '데모 데이터 저장 공간이 부족해요',
+    fullHint:
+      '방금 바꾼 내용은 새로고침하면 사라질 수 있어요. 계정 메뉴(휴대폰은 더보기)의 ‘{{action}}’로 공간을 비울 수 있어요.',
   },
   ai: {
     provider: { anthropic: 'Claude', openai: 'GPT' },

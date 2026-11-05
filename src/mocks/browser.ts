@@ -5,7 +5,8 @@ import type { User } from '../domain/model'
 import type { ServerLanguage } from './copy'
 import { createHandlers, MOCK_RESPONSE_HEADER } from './handlers'
 import { DEMO_ACCOUNT_IDS } from './seed'
-import { createMockStore, type MockStore } from './store'
+import { MOCK_STORAGE_FULL_EVENT } from './signals'
+import { createMockStore, REVISION_KEY, type MockStore } from './store'
 
 /** How long a re-attach waits for the worker to confirm before the request fails as it would have */
 export const REATTACH_TIMEOUT_MS = 3_000
@@ -14,15 +15,31 @@ let store: MockStore | undefined
 let registration: ServiceWorkerRegistration | undefined
 let reattaching: Promise<boolean> | undefined
 
+/** localStorage, or null where the browser blocks it (reading the property itself can throw). */
+function browserStorage(): Storage | null {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage
+  } catch {
+    return null
+  }
+}
+
 /** Starts the in-browser mock API. Only imported when VITE_API_MOCK is not "false". */
 export async function startMockApi(language: ServerLanguage): Promise<MockStore> {
+  const storage = browserStorage()
   store = createMockStore({
     reportSeconds: appConfig.mock.reportSeconds,
     workSeconds: appConfig.mock.workSeconds,
     rolePermissions: appConfig.rolePermissions,
     scopeCheck: appConfig.workflow.scopeCheck,
-    storage: typeof localStorage === 'undefined' ? null : localStorage,
+    storage,
     language,
+    onSaveError: () => window.dispatchEvent(new Event(MOCK_STORAGE_FULL_EVENT)),
+  })
+  // Every tab keeps a copy of the demo data in memory; take up another tab's save right away
+  // (requests also check before they change anything, see `sync`).
+  window.addEventListener('storage', (event) => {
+    if (event.storageArea === storage && event.key === REVISION_KEY) store?.sync()
   })
   const worker = setupWorker(...createHandlers(store))
   registration = await worker.start({

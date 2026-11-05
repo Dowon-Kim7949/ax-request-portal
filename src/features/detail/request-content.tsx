@@ -1,10 +1,11 @@
-import { CalendarCheck, CalendarClock, FileText, Rocket } from 'lucide-react'
+import { CalendarCheck, CalendarClock, Rocket } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDirectory } from '@/app/hooks'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import type { WorkRequest } from '@/domain/model'
-import { formatBytes, formatDate } from '@/lib/format'
+import { formatDate } from '@/lib/format'
+import { AttachmentLink } from './attachment-link'
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -74,21 +75,8 @@ export function RequestContent({ request }: { request: WorkRequest }) {
           <Row label={t('detail.attachments')}>
             <ul className="flex flex-wrap gap-2">
               {request.attachments.map((a) => (
-                <li key={a.id}>
-                  <a
-                    href={a.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-2 rounded-xl bg-muted px-3 py-2 text-sm ring-1 ring-line hover:ring-brand-500"
-                  >
-                    {a.mimeType.startsWith('image/') ? (
-                      <img src={a.url} alt="" className="size-8 rounded object-cover" />
-                    ) : (
-                      <FileText className="size-4 text-ink-400" aria-hidden />
-                    )}
-                    <span className="max-w-40 truncate">{a.name}</span>
-                    <span className="text-xs text-ink-400">{formatBytes(a.size)}</span>
-                  </a>
+                <li key={a.id} className="min-w-0">
+                  <AttachmentLink attachment={a} />
                 </li>
               ))}
             </ul>

@@ -1079,6 +1079,7 @@ function emptyState(now: Date, lang: ServerLanguage): MockState {
   for (const u of users) settings[u.id] = { ...DEFAULT_NOTIFICATION_SETTINGS }
   return {
     version: STATE_VERSION,
+    revision: 0,
     seededAt: now.toISOString(),
     language: lang,
     dirty: false,
