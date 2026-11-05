@@ -1,12 +1,13 @@
 /// <reference types="vitest/config" />
 import { execSync } from 'node:child_process'
-import { rmSync } from 'node:fs'
+import { readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
 import { checkEnv, type EnvReport } from './src/config/env-check.ts'
+import { hasPagePolicy, pagePolicyOf } from './src/config/nginx-csp.ts'
 
 /**
  * Identifies a build: VITE_BUILD_ID if set, else the commit (rebuilding the
@@ -50,6 +51,25 @@ function dropMockWorker(): Plugin {
 }
 
 /**
+ * `vite preview`, which the E2E tests run against, sends the Content-Security-
+ * Policy of deploy/nginx.conf, read from that file, to the same paths nginx
+ * does: a change that only works without it fails there, not in production.
+ * The dev server sends none (its hot reload needs inline scripts).
+ */
+function previewCsp(): Plugin {
+  return {
+    name: 'ax:preview-csp',
+    configurePreviewServer(server) {
+      const policy = pagePolicyOf(readFileSync(new URL('./deploy/nginx.conf', import.meta.url), 'utf8'))
+      server.middlewares.use((req, res, next) => {
+        if (hasPagePolicy(req.url ?? '/')) res.setHeader('Content-Security-Policy', policy)
+        next()
+      })
+    },
+  }
+}
+
+/**
  * `vite build` stops on a setting that would ship a broken or silently mocked
  * app. The dev server only warns: it never reaches users, and with a malformed
  * VITE_API_MOCK it falls back to the mock, which the demo banner shows.
@@ -86,7 +106,13 @@ export default defineConfig(({ command, mode, isPreview }) => {
       // and ships none of its code: scripts/check-real-build.mjs checks the output.
       __API_MOCK__: JSON.stringify(envReport.apiMock),
     },
-    plugins: [react(), tailwindcss(), versionFile(buildId), envReport.apiMock ? null : dropMockWorker()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      versionFile(buildId),
+      envReport.apiMock ? null : dropMockWorker(),
+      previewCsp(),
+    ],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),

@@ -161,7 +161,7 @@ nginx -t && nginx -s reload
 - answers a missing asset with `404` instead of HTML, and doesn't let that `404` be cached;
 - sends security headers on every response: a Content-Security-Policy, `Permissions-Policy`, `Cross-Origin-Opener-Policy: same-origin`, `X-Content-Type-Options`, `X-Frame-Options` and `Referrer-Policy`.
 
-The Content-Security-Policy allows the app's own files, the Pretendard web font from `cdn.jsdelivr.net`, and the one inline script in `index.html` (it applies the saved theme before the first paint) by its SHA-256 hash. Three things to keep in step with it:
+The Content-Security-Policy allows the app's own files, the Pretendard web font from `cdn.jsdelivr.net`, and the one inline script in `index.html` (it applies the saved theme before the first paint) by its SHA-256 hash. `npm run preview` sends the same policy, read from this file, so every E2E test runs under it and `e2e/csp.spec.ts` fails on any violation. Three things to keep in step with it:
 
 - **Changing that inline script** changes its hash. Print the new one with `node deploy/csp-hashes.mjs index.html` and replace it in `script-src`. The unit tests and the nginx check fail until you do.
 - **A backend on another origin** goes into `connect-src`, e.g. `connect-src 'self' https://api.your-company.com`.

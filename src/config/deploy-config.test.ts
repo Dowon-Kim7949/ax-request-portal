@@ -7,17 +7,16 @@ import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { hasPagePolicy, pagePolicyOf } from './nginx-csp'
 
 const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8')
 const html = read('index.html')
 const nginx = read('deploy/nginx.conf')
 
-/** The page policy: the default value of the $ax_csp map. */
+/** The page policy: the default value of the $ax_csp map, by directive. */
 function pagePolicy(): Map<string, string[]> {
-  const policy = /^\s*default\s+"(default-src [^"]+)";/m.exec(nginx)?.[1]
-  if (!policy) throw new Error('no default Content-Security-Policy in deploy/nginx.conf')
   return new Map(
-    policy
+    pagePolicyOf(nginx)
       .split(';')
       .map((d) => d.trim().split(/\s+/))
       .filter((parts) => parts[0])
@@ -58,6 +57,18 @@ describe('Content-Security-Policy in deploy/nginx.conf', () => {
   it('shows the images the demo keeps in the browser (attachments, preview screenshots)', () => {
     // A backend or file store on another origin is added here too (see the comment in deploy/nginx.conf).
     expect(csp.get('img-src')).toEqual(expect.arrayContaining(["'self'", 'data:', 'blob:']))
+  })
+
+  it('is what vite preview sends, to the same paths as nginx', () => {
+    // The E2E tests run against vite preview, under this policy (see previewCsp in vite.config.ts).
+    expect(pagePolicyOf(nginx)).toMatch(/^default-src 'self'; script-src 'self' 'sha256-/)
+    for (const path of ['/', '/requests/1024?tab=x', '/assets/index-abc.js', '/version.json']) {
+      expect(hasPagePolicy(path), path).toBe(true)
+    }
+    // As in nginx: the mock service worker fetches the web font for the page under its own policy.
+    expect(hasPagePolicy('/mockServiceWorker.js')).toBe(false)
+    expect(hasPagePolicy('/ax/mockServiceWorker.js?v=1')).toBe(false)
+    expect(nginx).toContain('~/mockServiceWorker\\.js$  "";')
   })
 
   it('stays strict where it matters', () => {
