@@ -199,14 +199,15 @@ export function useLogin() {
   })
 }
 
+/** Signing out on purpose: the login screen then starts fresh, without `next` (see RequireAuth). */
 export function useLogout() {
   const clear = useSession((s) => s.clear)
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => call(api.logout),
     onSettled: () => {
-      clear()
       qc.clear()
+      clear('signedOut')
     },
   })
 }

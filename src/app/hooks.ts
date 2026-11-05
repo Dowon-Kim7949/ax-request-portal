@@ -13,9 +13,17 @@ export function useCurrentUser(): User {
   return user
 }
 
+/**
+ * What a user may do under the configured role table (`appConfig.rolePermissions`).
+ * The one rule behind `useCan` and the post-login redirect.
+ */
+export function userCan(user: Pick<User, 'role'> | null | undefined, permission: Permission): boolean {
+  return hasPermission(user, permission, appConfig.rolePermissions)
+}
+
 export function useCan(): (permission: Permission) => boolean {
   const user = useSession((s) => s.user)
-  return useCallback((p: Permission) => hasPermission(user, p, appConfig.rolePermissions), [user])
+  return useCallback((p: Permission) => userCan(user, p), [user])
 }
 
 /**
