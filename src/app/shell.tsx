@@ -443,7 +443,24 @@ export function AppShell() {
       <Sidebar items={items} />
       <div className="md:pl-[76px] xl:pl-64">
         <DemoBanner />
-        <header className="sticky top-0 z-20 border-b border-line/70 bg-canvas/90 pt-safe backdrop-blur">
+        {/*
+          The notch inset (an iOS home-screen app draws under the status bar) is padded once: by the
+          demo banner when there is one, otherwise by the header. With the banner, the header sticks
+          just below the inset once the banner has scrolled away, and this strip keeps the page from
+          showing through under the status bar.
+        */}
+        {env.apiMock ? (
+          <div
+            aria-hidden
+            className="pointer-events-none fixed inset-x-0 top-0 z-30 h-[env(safe-area-inset-top)] bg-canvas/90 backdrop-blur md:left-[76px] xl:left-64"
+          />
+        ) : null}
+        <header
+          className={cn(
+            'sticky z-20 border-b border-line/70 bg-canvas/90 backdrop-blur',
+            env.apiMock ? 'top-[env(safe-area-inset-top)]' : 'top-0 pt-safe',
+          )}
+        >
           <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-4 sm:px-6 md:h-16">
             <div className="md:invisible">
               <BrandMark />

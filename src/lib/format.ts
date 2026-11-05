@@ -141,9 +141,11 @@ export function formatRelative(iso: string, now = Date.now()): string {
   return formatDate(iso, { weekday: false })
 }
 
-/** Korean won: "18.4만 원" / "9,800원" in Korean, "₩184K" / "₩9,800" in English */
+/** Korean won: "1.5억 원" / "18.4만 원" / "9,800원" in Korean, "₩184K" / "₩9,800" in English */
 export function formatKrw(value: number): string {
   if (currentLocale() === 'ko') {
+    // Korean groups by 10⁴ (만) and 10⁸ (억): "100억 원", not "1,000,000만 원".
+    if (value >= 100_000_000) return `${(Math.round(value / 10_000_000) / 10).toLocaleString('ko-KR')}억 원`
     if (value >= 10_000) return `${(Math.round(value / 1_000) / 10).toLocaleString('ko-KR')}만 원`
     return `${Math.round(value).toLocaleString('ko-KR')}원`
   }

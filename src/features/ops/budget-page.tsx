@@ -48,6 +48,8 @@ function Limits({ budget }: { budget: Budget }) {
     },
   })
   const err = form.formState.errors
+  // The two limits are checked against each other (checkBudgetLimits): changing either one checks
+  // both again (`deps` below), so an error never outlives the value that caused it.
   /** Error types are Zod issue codes (custom = the cross-field rule). */
   const amountError = (e: { type?: string } | undefined) =>
     !e
@@ -83,7 +85,7 @@ function Limits({ budget }: { budget: Budget }) {
                 max={BUDGET_LIMIT_MAX_KRW}
                 step={10000}
                 {...p}
-                {...form.register('monthlyLimitKrw')}
+                {...form.register('monthlyLimitKrw', { deps: 'perRequestLimitKrw' })}
               />
             )}
           </Field>
@@ -100,7 +102,7 @@ function Limits({ budget }: { budget: Budget }) {
                 max={BUDGET_LIMIT_MAX_KRW}
                 step={1000}
                 {...p}
-                {...form.register('perRequestLimitKrw')}
+                {...form.register('perRequestLimitKrw', { deps: 'monthlyLimitKrw' })}
               />
             )}
           </Field>

@@ -10,8 +10,9 @@ import { env } from '@/config/env'
  *
  * - `bar`: a slim strip at the top of the signed-in shell. It sits above the
  *   sticky header and scrolls away with the page, so the header (and the
- *   wizard's step bar pinned under it) keep their height. It is its own
- *   landmark because it sits outside `header` and `main`.
+ *   wizard's step bar pinned under it) keep their height. It takes the notch
+ *   inset at the top of the screen instead of the header (see AppShell). It
+ *   is its own landmark because it sits outside `header` and `main`.
  * - `inline`: a small note inside a page's own layout (the login screen).
  */
 export function DemoBanner({ variant = 'bar' }: { variant?: 'bar' | 'inline' }) {

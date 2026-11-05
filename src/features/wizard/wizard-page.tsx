@@ -310,7 +310,8 @@ function WizardForm() {
     <FormProvider {...form}>
       <div className="mx-auto flex max-w-2xl flex-col">
         {/* progress */}
-        <div className="sticky top-14 z-10 -mx-4 flex items-center gap-3 bg-canvas/95 px-2 py-2 backdrop-blur sm:-mx-6 sm:px-4 md:top-16">
+        {/* Pinned under the header: its height plus the notch inset it sits below (AppShell). */}
+        <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 -mx-4 flex items-center gap-3 bg-canvas/95 px-2 py-2 backdrop-blur sm:-mx-6 sm:px-4 md:top-[calc(4rem+env(safe-area-inset-top))]">
           <Button
             variant="ghost"
             size="icon"
