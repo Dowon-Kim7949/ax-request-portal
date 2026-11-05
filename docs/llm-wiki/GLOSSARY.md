@@ -2,11 +2,11 @@
 title: Glossary
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: glossary
 project: ax-request-portal
-last_updated: 2026-11-04
+last_updated: 2026-11-05
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -14,6 +14,7 @@ source_files:
   - src/domain/model.ts
   - src/domain/lifecycle.ts
   - src/domain/roles.ts
+  - src/lib/time-zone.ts
 evidence:
   - src/domain/model.ts#symbol:RequestStatus
   - src/domain/model.ts#symbol:FeasibilityReport
@@ -27,6 +28,14 @@ evidence:
   - src/domain/lifecycle.ts#symbol:RequesterStatus
   - src/domain/roles.ts#symbol:PERMISSIONS
   - src/mocks/engine.ts#symbol:MockState
+  - src/config/app.config.ts#symbol:appConfig
+  - src/lib/time-zone.ts#symbol:hqToday
+  - src/lib/time-zone.ts#symbol:resolveViewTimeZone
+  - src/lib/format.ts#symbol:describeDateTime
+  - src/config/env-check.ts#symbol:isApiMock
+  - src/app/demo-banner.tsx#symbol:DemoBanner
+  - src/stores/session.ts#symbol:SessionEndReason
+  - src/domain/url.ts#symbol:UrlKind
 related:
   - docs/llm-wiki/domains/00_overview.md
   - docs/llm-wiki/DOMAIN_FEATURES.md
@@ -60,7 +69,7 @@ Terms as the code uses them. Identifiers are kept in English in both UI language
 | Stage (`STAGES`) | Seven progress stages shown in the stepper; several statuses share a stage. | `src/domain/lifecycle.ts` |
 | Requester status (`RequesterStatus`) | Plain-language status shown to people without `report:read`. | `src/domain/lifecycle.ts` |
 | Responsible developer | Holds `request:review` and is an admin, the assignee or a project owner (`isResponsibleDeveloper`). | `src/domain/lifecycle.ts` |
-| Role | `requester`, `executive`, `developer`, `admin`. | `src/domain/model.ts` |
+| Role | `requester`, `executive`, `developer`, `admin`, `operator`. | `src/domain/model.ts` |
 | Permission | One of thirteen capability strings such as `request:create` or `dashboard:view`; roles map to sets of them. | `src/domain/roles.ts` |
 | Executive | A requester who may also read all requests and the dashboard. | `src/domain/roles.ts` |
 | Operator | The person running the service's AI side: providers and keys, model per task, prices, AI budget and usage. Provisioned by the service, not by an admin. | `src/domain/roles.ts` |
@@ -75,17 +84,27 @@ Terms as the code uses them. Identifiers are kept in English in both UI language
 | Merge request / MR | The AI's change for review; called PR when the project's provider is GitHub. | `src/features/detail/developer-panels.tsx` |
 | Criterion check (`CriterionCheck`) | The requester's pass/fail per acceptance criterion during verification. | `src/domain/model.ts` |
 | Regression check (`RegressionCheck`) | An existing feature to re-check after a change, from the report's impact. | `src/domain/model.ts` |
-| Mock mode | Running against the in-browser MSW server instead of a backend (`VITE_API_MOCK`). | `src/config/env.ts` |
+| Mock mode / demo mode | A build whose `VITE_API_MOCK` is not `false` (`isApiMock`): the in-browser MSW server answers every call and the data stays in each browser's `localStorage`. Every screen says so with the demo banner (`DemoBanner`). | `src/config/env-check.ts` |
 | Mock state (`MockState`) | The mock server's persisted data, versioned by `STATE_VERSION`. | `src/mocks/engine.ts` |
-| Dirty | Mock data a person has edited; it no longer follows language changes. | `src/mocks/engine.ts` |
+| Dirty | Mock data a person has edited (uploads and read notifications included); it no longer follows language changes. | `src/mocks/engine.ts` |
 | Contract | The endpoint table in `src/api/contract.ts` and the generated `docs/openapi.json`. | `src/api/contract.ts` |
+| Head office / head-office time zone | The organization's home time zone, `appConfig.organization.timeZone` (`Asia/Seoul` in the template), named per language by `timeZoneLabel` ("한국" / "Korea"). | `src/config/app.config.ts` |
+| Business calendar | The head office's calendar. "Today" (`hqToday`) for date limits and grouping, and every day or month total (dashboard, AI usage, budget), follow it in the UI and the API, wherever the viewer is. | `src/lib/time-zone.ts` |
+| Viewing time zone | The time zone timestamps are shown in on this device: the one chosen in Settings, else the device's (`resolveViewTimeZone`). Never derived from the IP address. | `src/lib/time-zone.ts` |
+| Head-office time (shown beside local time) | On detail screens, "local time (zone) · Korea time", added only when the viewing time zone reads a different clock from the head office at that instant and the viewer keeps "show head-office time" on (`describeDateTime`). | `src/lib/format.ts` |
+| Date-only value | A `YYYY-MM-DD` calendar date (desired date, scheduled release date). Shown as written in every time zone; never converted. | `src/lib/format.ts` |
+| Session end reason (`SessionEndReason`) | Why a session ended in this tab: `signedOut` (on purpose: the next sign-in starts at home, the draft is deleted) or `expired` (a 401: the login screen keeps `next` and says so). | `src/stores/session.ts` |
+| Load failure / refresh failure | Nothing could be loaded (`LoadFailed`) versus a refresh failed while earlier data stays on screen (`RefreshFailed`). | `src/components/ui/load-failed.tsx` |
+| Safe URL (`UrlKind`) | A URL the API may hand to the browser for its kind: `web`, `link`, `file` or `image` (`isSafeUrl`). | `src/domain/url.ts` |
 
 ## Evidence
 
 - `src/domain/model.ts#symbol:RequestStatus`, `src/domain/model.ts#symbol:FeasibilityReport`, `src/domain/model.ts#symbol:WikiTrust`, `src/domain/model.ts#symbol:PrecheckIssue`, `src/domain/model.ts#symbol:CriterionCheck`, `src/domain/model.ts#symbol:RegressionCheck`, `src/domain/model.ts#symbol:WorkRun` — model terms.
 - `src/domain/lifecycle.ts#symbol:TRANSITIONS`, `src/domain/lifecycle.ts#symbol:TransitionCommand`, `src/domain/lifecycle.ts#symbol:RequesterStatus` — lifecycle terms.
 - `src/domain/roles.ts#symbol:PERMISSIONS` — permissions.
-- `src/mocks/engine.ts#symbol:MockState` — mock terms.
+- `src/mocks/engine.ts#symbol:MockState`, `src/config/env-check.ts#symbol:isApiMock`, `src/app/demo-banner.tsx#symbol:DemoBanner` — mock and demo terms.
+- `src/config/app.config.ts#symbol:appConfig`, `src/lib/time-zone.ts#symbol:hqToday`, `src/lib/time-zone.ts#symbol:resolveViewTimeZone`, `src/lib/format.ts#symbol:describeDateTime` — time terms.
+- `src/stores/session.ts#symbol:SessionEndReason`, `src/domain/url.ts#symbol:UrlKind` — session and URL terms.
 
 ## Open Questions
 

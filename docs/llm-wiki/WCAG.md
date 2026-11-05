@@ -2,11 +2,11 @@
 title: Accessibility (WCAG)
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: wcag
 project: ax-request-portal
-last_updated: 2026-11-03
+last_updated: 2026-11-05
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -20,6 +20,7 @@ source_files:
   - e2e/layout.spec.ts
   - e2e/theme.spec.ts
   - e2e/a11y.spec.ts
+  - e2e/axe.spec.ts
 evidence:
   - src/app/update-notice.tsx#symbol:UpdateNotice
   - src/theme.test.ts#symbol:PAIRS
@@ -34,6 +35,16 @@ evidence:
   - src/components/ui/button.tsx#L66-L67
   - src/components/request/status.tsx#symbol:Stepper
   - src/features/wizard/steps.tsx#symbol:StepTitle
+  - src/features/wizard/steps.tsx#symbol:ReviewStep
+  - src/app/shell.tsx#symbol:Glyph
+  - src/app/demo-banner.tsx#symbol:DemoBanner
+  - src/components/ui/load-failed.tsx#symbol:LoadFailed
+  - src/components/ui/load-failed.tsx#symbol:RefreshFailed
+  - src/features/auth/login-page.tsx#symbol:ANNOUNCE_DELAY_MS
+  - src/features/settings/time-zone-section.tsx#symbol:TimeZonePicker
+  - src/features/schedule/schedule-page.tsx#symbol:DateGroup
+  - src/features/admin/projects-page.tsx#symbol:ProjectsPage
+  - playwright.config.ts#L14-L15
 related:
   - docs/llm-wiki/COMPONENT_INVENTORY.md
   - docs/llm-wiki/E2E_WORKFLOWS.md
@@ -48,7 +59,7 @@ reviewed_at: 2026-11-04
 
 ## Summary
 
-The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enforced by a unit test; the cursor contract, 320 px reflow, the skip link and reduced motion by E2E tests; the rest (semantics, focus, live regions) by convention in the components.
+The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enforced by a unit test; the cursor contract, 320 px reflow, the skip link and reduced motion by E2E tests; an axe-core scan covers every main screen in both themes; the rest (semantics, focus, live regions) by convention in the components.
 
 ## Colour and contrast
 
@@ -56,6 +67,7 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 - `src/theme.test.ts` checks 43 foreground/background pairs in both themes: text pairs at 4.5:1 (`TEXT`) and non-text marks (control borders, chart marks, focus colours) at 3:1 (`UI`, SC 1.4.11). It also asserts that every token it checks is defined in each theme.
 - The test reads `src/index.css` with regular expressions: it expects `#rrggbb` values and the `.dark { … }` block closed by a two-space-indented brace. Writing tokens as `oklch()`, short hex, or reformatting that block makes the test report missing tokens rather than check contrast.
 - Adding a token that carries text or a control boundary means adding its pair to `PAIRS`.
+- Never dim text with `opacity` to mark something as past or secondary: the blended colour is no longer a checked pair and usually fails 4.5:1. Use a role tint and a checked text colour instead (past dates on the schedule sit on `bg-muted` with an `ink-400` date).
 
 ## Dark mode
 
@@ -74,15 +86,27 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 ## Semantics and focus management
 
 - Skip link: `SkipLink` is the first tab stop on every signed-in screen; it is visually hidden until focused and moves focus to `<main id="main" tabIndex={-1}>` in code, so the URL hash and the router are not touched. The login screen has no navigation to skip. `e2e/a11y.spec.ts` checks it on the desktop project only: WebKit (phone and tablet projects) does not tab to links by default.
-- Landmarks come from the shell: `header`, `main`, a labelled `nav` for the sidebar/rail and a separately labelled `nav` for the phone tab bar. Icon-only links carry `aria-label` (the notifications link includes the unread count).
+- Landmarks come from the shell: `header`, `main`, a labelled `nav` for the sidebar/rail and a separately labelled `nav` for the phone tab bar. In a mock build the demo banner above the header is a labelled `aside` ("Demo mode"), because it sits outside `header` and `main`; it has nothing focusable, so the skip link stays the first tab stop. On the login screen the demo note is a plain paragraph inside `main`. Icon-only links carry `aria-label` (the notifications link includes the unread count, "알림 (N)").
+- Label in Name (2.5.3): the visible text of a control must be part of its accessible name. Decorative text inside a control whose name already says it — the brand initials, the unread counter on the bell, the account initial — is drawn by CSS with the shell's `Glyph` (`content: attr(data-glyph)`, `aria-hidden`), not as DOM text. The account button is named by a visually hidden "My account" plus the user's name, visible from `lg`.
+- A `<dl>` group holds only `<dt>` and `<dd>`: the wizard's review rows keep their edit button inside the `<dd>`, and a project card's target and rule counts sit outside its `<dl>`.
 - `aria-current="step"` marks the current phase in `Stepper` and in the AI work panel; toggle groups use `aria-pressed` or `role="radio"` + `aria-checked`; switches use `role="switch"`.
-- Live regions: `aria-live="polite"` for precheck results in the wizard and the status explainer on the detail page; `role="status"` for spinners and the boot screen; `role="alert"` for `ErrorState`, field errors and login errors.
+- Live regions: `aria-live="polite"` for precheck results in the wizard, the status explainer on the detail page and the number of time-zone search matches; `role="status"` for spinners and the boot screen; `role="alert"` for `ErrorState` (and so the full `LoadFailed`), field errors, login errors and the wizard's missing-attachment notice.
+- A compact `LoadFailed` is a polite `role="status"` (a screen can hold several; a run of alerts helps nobody), with a visually hidden full stop between its title and its message so they are read as two sentences. `RefreshFailed` is always in the DOM as an `sr-only` polite status and gets its text when a refresh fails, so the line is announced when it appears.
+- A screen reader ignores a live region that arrives with its text already in it. The login screen's session-expiry notice is therefore injected 100 ms after mounting into an empty `sr-only` `role="status"`; the visible copy is `aria-hidden` and is the e-mail field's description, so it is heard once.
+- The time-zone preview in Settings is not a live region (each arrow key on the select would be read out); the select points to it with `aria-describedby`.
 - Wizard steps move focus to the step heading (`StepTitle`, `tabIndex=-1`) in a layout effect, before paint. A passive effect stole focus after the user had started typing and dropped the input.
 - `Sheet` (Radix Dialog) traps focus and closes on Escape.
 
 ## Reflow
 
 - `e2e/layout.spec.ts` visits every route for every role at 320×568 and on a landscape tablet and asserts no horizontal scroll, including the English UI. A CSS grid without `grid-cols-1` let `nowrap` children overflow at phone width; keep that class on single-column grids.
+- At 320 px it also opens the notices and error states that only appear in some conditions — the demo banner (login and signed in), the time-zone settings and a detail screen with both clocks far from the head office, the session-expired notice, and a compact and a full `LoadFailed` — and checks that each one lies inside the viewport and that its own text is not clipped.
+
+## Automated scan
+
+- `e2e/axe.spec.ts` runs `@axe-core/playwright` on the login screen and every main screen of every role, in the light and the dark theme, with reduced motion so no scan catches a half-faded colour. Tags: `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` and `best-practice`. Findings of impact `serious` or `critical` fail the test (soft assertions, so one run lists every screen).
+- It runs in the phone and desktop projects; the tablet project skips it (`NOT_ON_TABLET` in `playwright.config.ts`): same engine and components as the phone, no findings of its own.
+- `EXCLUDED_RULES` is empty: everything the first scan found was fixed. A rule added there needs its reason next to it.
 
 ## Evidence
 
@@ -94,7 +118,10 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 - `src/components/ui/button.tsx#L66-L67` — `disabled` and `aria-busy` while loading.
 - `src/components/request/status.tsx#symbol:Stepper` — `aria-current="step"`.
 - `src/features/wizard/steps.tsx#symbol:StepTitle` — focus target for step changes.
-- `e2e/cursor.spec.ts`, `e2e/layout.spec.ts`, `e2e/theme.spec.ts`, `e2e/a11y.spec.ts` — the automated checks.
+- `e2e/cursor.spec.ts`, `e2e/layout.spec.ts`, `e2e/theme.spec.ts`, `e2e/a11y.spec.ts`, `e2e/axe.spec.ts` — the automated checks; `playwright.config.ts#L14-L15` — which projects skip which specs.
+- `src/app/shell.tsx#symbol:Glyph`, `src/app/demo-banner.tsx#symbol:DemoBanner` — CSS-drawn glyphs and the banner landmark.
+- `src/components/ui/load-failed.tsx#symbol:LoadFailed`, `src/components/ui/load-failed.tsx#symbol:RefreshFailed`, `src/features/auth/login-page.tsx#symbol:ANNOUNCE_DELAY_MS`, `src/features/settings/time-zone-section.tsx#symbol:TimeZonePicker` — status semantics and the delayed announcement.
+- `src/features/wizard/steps.tsx#symbol:ReviewStep`, `src/features/admin/projects-page.tsx#symbol:ProjectsPage`, `src/features/schedule/schedule-page.tsx#symbol:DateGroup` — `<dl>` structure and the muted past dates.
 - `src/app/update-notice.tsx#symbol:UpdateNotice` — 44 px toast action.
 
 ## Open Questions

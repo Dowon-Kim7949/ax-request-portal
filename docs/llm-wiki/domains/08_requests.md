@@ -2,11 +2,11 @@
 title: My Requests
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-03
+last_updated: 2026-11-05
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -19,6 +19,8 @@ evidence:
   - src/api/queries.ts#symbol:onRequestChanged
   - src/domain/lifecycle.ts#symbol:isTerminal
   - src/components/request/request-card.tsx#symbol:RequestCard
+  - src/components/ui/load-failed.tsx#symbol:LoadFailed
+  - src/api/refresh.ts#symbol:refreshOf
 related:
   - docs/llm-wiki/domains/11_wizard.md
   - docs/llm-wiki/domains/04_detail.md
@@ -44,7 +46,7 @@ The requester's own list at `/requests` (`request:read:own`). The developer queu
 
 ## API Services
 
-- `useRequests({ scope: 'mine' })` → `GET /requests?scope=mine` → `WorkRequestSummary[]`. Keeps previous data while refetching and polls every 4 s while any request is live. A failed load shows `ErrorState` with retry; there is no toast.
+- `useRequests({ scope: 'mine' })` → `GET /requests?scope=mine` → `WorkRequestSummary[]`. Keeps previous data while refetching and polls every 4 s while any request is live. A failed first load shows `LoadFailed` (the API's message and a retry); a failed poll keeps the list on screen with a `RefreshFailed` line above it. There is no toast.
 - The list never changes itself: other domains' mutations call `onRequestChanged`, which invalidates every request list.
 
 ## Evidence
@@ -53,6 +55,7 @@ The requester's own list at `/requests` (`request:read:own`). The developer queu
 - `src/api/queries.ts#symbol:useRequests`, `src/api/queries.ts#symbol:onRequestChanged` — fetching, polling, invalidation.
 - `src/domain/lifecycle.ts#symbol:isTerminal` — closed statuses.
 - `src/components/request/request-card.tsx#symbol:RequestCard` — list item.
+- `src/components/ui/load-failed.tsx#symbol:LoadFailed`, `src/api/refresh.ts#symbol:refreshOf` — load and refresh failures.
 
 ## Open Questions
 

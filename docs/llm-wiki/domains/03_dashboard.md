@@ -2,11 +2,11 @@
 title: Executive Dashboard
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-03
+last_updated: 2026-11-05
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -19,6 +19,10 @@ evidence:
   - src/domain/model.ts#symbol:DashboardSummary
   - src/mocks/engine.ts#symbol:dashboard
   - src/mocks/engine.ts#symbol:isDelayed
+  - src/mocks/engine.ts#symbol:businessDate
+  - src/components/ui/month-stepper.tsx#symbol:MonthStepper
+  - src/lib/time-zone.ts#symbol:hqToday
+  - src/mocks/calendar.test.ts
 related:
   - docs/llm-wiki/domains/01_admin.md
   - docs/llm-wiki/WCAG.md
@@ -36,11 +40,13 @@ A monthly overview at `/dashboard` for whoever holds `dashboard:view` — by def
 
 ## Content
 
-- Month navigation; "next month" is disabled at the current month.
+- Month navigation (`MonthStepper`); "next month" is disabled at the current month. Months are head-office calendar months, and the current one is taken from `hqToday()`. A viewer on another clock sees `HqCalendarNote` next to the stepper.
 - Four tiles: received, in progress, done, AI cost.
 - Per-project bars of done and in-progress requests, releases scheduled this week, and an attention list (requests waiting for information, delayed requests with links).
 
 ## Metric definitions
+
+Every date in the totals is a day on the head-office business calendar ([Glossary](../GLOSSARY.md)): the mock files a request or a release under the day its timestamp falls on at the head office (`dateOf` / `businessDate`), so a request filed between 00:00 and 09:00 in Korea counts in that day and month, not the previous one by UTC.
 
 - **Received** compares like with like: for the current month it is compared with the same number of days of the previous month (up to today's day of month); for a past month, with the whole previous month. The tile shows the signed difference.
 - **In progress** and **delayed** are "now" values and do not depend on the selected month (`isDelayed` decides delay). **Done** counts releases in the month. Average lead time is omitted when nothing was done.
@@ -52,7 +58,8 @@ Bars are plain CSS, no chart library: done uses `brand-600`, in progress `ai-500
 
 ## API Services
 
-- `useDashboard(month)` → `GET /dashboard/summary?month=YYYY-MM` → `DashboardSummary`. Keeps the previous month visible while the next one loads (`opacity-60`, `aria-busy`). The server checks `dashboard:view`. Invalidated by every request change (`onRequestChanged`) and by budget updates.
+- `useDashboard(month)` → `GET /dashboard/summary?month=YYYY-MM` → `DashboardSummary`. Keeps the previous month visible while the next one loads (`opacity-60`, `aria-busy`). A month outside `01`–`12` is a 400 (`YearMonth`). The server checks `dashboard:view`. Invalidated by every request change (`onRequestChanged`) and by budget updates.
+- A failed first load shows `LoadFailed` with a retry; a failed refresh keeps the month on screen with a `RefreshFailed` line. Project names in the release list come from `useDirectory().projectName` (the id when the list is missing).
 
 ## Evidence
 
@@ -60,6 +67,7 @@ Bars are plain CSS, no chart library: done uses `brand-600`, in progress `ai-500
 - `src/api/queries.ts#symbol:useDashboard` — query.
 - `src/domain/model.ts#symbol:DashboardSummary` — field definitions.
 - `src/mocks/engine.ts#symbol:dashboard`, `src/mocks/engine.ts#symbol:isDelayed` — how the mock computes each metric.
+- `src/mocks/engine.ts#symbol:businessDate`, `src/components/ui/month-stepper.tsx#symbol:MonthStepper`, `src/lib/time-zone.ts#symbol:hqToday`, `src/mocks/calendar.test.ts` — the business calendar behind the months.
 
 ## Open Questions
 

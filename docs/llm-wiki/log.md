@@ -6,9 +6,9 @@ tags:
 status: needs_review
 doc_type: change_log
 project: ax-request-portal
-last_updated: 2026-11-04
+last_updated: 2026-11-05
 author: cli-generated
-last_edited_by: llm-wiki-cli
+last_edited_by: claude-code
 wiki_block_version: v1
 source_files:
   - llm-wiki.config.json
@@ -23,6 +23,37 @@ contains_sensitive_info: false
 # LLM-WIKI Change Log
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
+
+## 2026-11-05 - Fix and feature: sessions, load failures, domain guards, deployment hardening, time zones
+
+- status: needs_review
+- actor: claude-code
+- scope: code, docs
+- changed:
+  - Sessions: src/stores/session.ts (end reasons), src/stores/draft.ts, src/app/session-sync.ts, src/app/guards.tsx, src/app/hooks.ts (`userCan`), src/app/router.tsx (pathless root, `RouteHandle`), src/features/auth/ (`post-login.ts`, expiry notice)
+  - API and screens: src/api/ (client deadline, `timeoutOf`, `isRetryable`, `refresh.ts`, `error-text.ts`, mutation scopes, optimistic read), src/components/ui/load-failed.tsx, src/app/pages.tsx, every feature page, the wizard (debounced draft, leave confirmation, missing attachments)
+  - Domain and mock: src/domain/ (`releaseDateMissing`, `checkBudgetLimits`, `url.ts`), src/mocks/ (STATE_VERSION 5, revision, `signals.ts`, attachment ownership, notification cap, `readableDate`), src/app/demo-data-sync.tsx, src/app/demo-storage-notice.tsx, docs/openapi.json
+  - Deployment: src/config/env-check.ts, src/config/nginx-csp.ts, src/config/zod-jitless.ts, vite.config.ts (`__API_MOCK__`, `ax:drop-mock-worker`, `ax:preview-csp`), scripts/check-real-build.mjs, deploy/ (nginx.conf, check-nginx.sh, csp-hashes.mjs), src/app/demo-banner.tsx, .env.example, README.md
+  - Time: src/config/app.config.ts (`organization`), src/lib/time-zone.ts, src/lib/format.ts, src/app/time-zone.ts, src/components/ui/date-time.tsx, src/features/settings/time-zone-section.tsx, src/stores/preferences.ts, the mock engine's business calendar
+  - Tests: unit tests next to the code above; e2e/fixtures.ts and new specs auth, attachments, axe, csp, demo-banner, lifecycle, time-zone; layout.spec 320 px states; playwright.config.ts (time zone, `NOT_ON_TABLET`)
+  - docs/llm-wiki: every document except index.md, back to `needs_review` (domains/00–13, ARCHITECTURE_CONVENTIONS, COMPONENT_INVENTORY, DOMAIN_FEATURES, E2E_WORKFLOWS, GLOSSARY, README, WCAG, project-profile, profiles/frontend)
+- summary:
+  - Signing out on purpose leads to `/login` without `next` and deletes the person's draft; a 401 ends the session only for the token it refused and keeps `next` with a notice; `resolvePostLoginPath` is the one reader of `next` (in-app, existing, not `/login`, permitted by `handle.permission`); tabs follow each other's sign-ins and sign-outs.
+  - Every call has an endpoint time limit (30 s, uploads 120 s) and fails as an `ApiError`; only network, timeout and 5xx are retried; screens show `LoadFailed` when nothing loaded and keep data with `RefreshFailed` when a refresh fails; changes to one request run in order.
+  - `markReleased` needs a scheduled date; budget limits share one rule; every URL in the contract passes `isSafeUrl`; the mock keeps tabs consistent through a revision, refuses someone else's attachment and caps notifications at 200 per person.
+  - `vite build` refuses wrong build settings; a real-backend build carries no mock; nginx sends a strict CSP (inline script by hash), `Permissions-Policy` and COOP, and every E2E spec runs under that CSP; demo builds show a banner.
+  - Timestamps show in the viewing time zone with head-office time where the clocks differ; date-only values never shift; "today" and totals follow the head-office business calendar; Settings has a time-zone card.
+  - Accessibility: an axe-core scan of every main screen (phone and desktop, light and dark) with no excluded rules; decorative text in named controls is CSS-drawn (`Glyph`); `<dl>` groups hold only `<dt>`/`<dd>`; past schedule dates use a muted background instead of opacity.
+  - E2E: the tablet `theme.spec` and desktop `admin.spec` time-outs came from cold starts between screens (now `openInApp` and `COLD_START_TIMEOUT`); WebKit on Windows stops animation frames for idle pages, so `e2e/fixtures.ts` keeps a frame loop running there; `lifecycle.spec` follows one request through every step on three viewports.
+  - Corrected while re-reviewing: the contract has 36 endpoints (not 35); `operator` added to the glossary's roles; the feature list separates admin and operator features.
+- evidence:
+  - npm run verify (lint, format, typecheck, 44 unit test files / 437 tests, build, check:real-build) passes; full E2E 175 tests: 152 passed, 23 skipped by design (browser-specific or opt-in), 0 failed.
+  - npx llm-wiki validate --strict --agent claude and npx llm-wiki impact --since main --strict pass.
+- caveats:
+  - The session's end reason lives in memory only: after reloading the login screen, only the permission check applies to `next`.
+  - The nginx configuration is first run on a real nginx in the CI `nginx` job; the sub-path variant is a commented example.
+  - The frame-loop fixture is installed for WebKit on Windows only; WebKit on Linux was not measured.
+  - A viewer behind the head office's clock (e.g. North America) cannot pick their local "today" once the head office's date has moved on; the date inputs say so.
 
 ## 2026-11-04 - Feature: notice when a newer version is deployed
 

@@ -2,11 +2,11 @@
 title: Home
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-03
+last_updated: 2026-11-05
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -18,6 +18,10 @@ evidence:
   - src/features/home/home-page.tsx#symbol:DeveloperSection
   - src/domain/lifecycle.ts#symbol:turnOf
   - src/api/queries.ts#symbol:useRequests
+  - src/app/hooks.ts#symbol:useDirectory
+  - src/components/ui/load-failed.tsx#symbol:LoadFailed
+  - src/api/refresh.ts#symbol:refreshOf
+  - src/features/home/home-page.test.tsx
 related:
   - docs/llm-wiki/domains/08_requests.md
   - docs/llm-wiki/domains/12_work.md
@@ -50,17 +54,23 @@ Developers and admins therefore never see the requester section.
 
 - `useRequests({ scope: 'mine' })` and `useRequests({ scope: 'assigned' })` → `GET /requests?scope=…` → `WorkRequestSummary[]`. Lists poll every 4 s while any request is in a live status (`submitted`, `reporting`, `in_progress`).
 - `useDirectory` → `GET /users`, `GET /projects` for names and project icons.
-- No mutations and no error branch; loading shows skeletons.
+- No mutations; loading shows skeletons.
+
+## Load failures
+
+- A failed first load never reads as "nothing to do". The open-request count becomes a plain "My requests" link, and "your turn", the service list and the developer queue show a compact `LoadFailed` with a retry instead of "0 in progress" or an empty list. The AI cost summary is a link, so it shows only the failure line, without a button; the usage screen offers the retry.
+- A failed refresh (a poll, a return to the tab) keeps what was loaded and adds one `RefreshFailed` line per section (`refreshOf`; for the service list, `useDirectory().projectsStale`).
 
 ## Evidence
 
 - `src/features/home/home-page.tsx#symbol:HomePage`, `src/features/home/home-page.tsx#symbol:RequesterSection`, `src/features/home/home-page.tsx#symbol:DeveloperSection` — composition rules.
 - `src/domain/lifecycle.ts#symbol:turnOf` — whose turn a status is.
 - `src/api/queries.ts#symbol:useRequests` — scopes and live polling.
+- `src/app/hooks.ts#symbol:useDirectory`, `src/components/ui/load-failed.tsx#symbol:LoadFailed`, `src/api/refresh.ts#symbol:refreshOf`, `src/features/home/home-page.test.tsx` — load and refresh failures.
 
 ## Open Questions
 
-- A failed request list renders nothing rather than an error state.
+- None.
 
 ## Review Notes
 
