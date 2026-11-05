@@ -80,7 +80,12 @@ export default defineConfig(({ command, mode, isPreview }) => {
   return {
     // Sub-path deployments (e.g. https://host/ax/) set VITE_BASE=/ax/
     base: env.VITE_BASE || '/',
-    define: { __BUILD_ID__: JSON.stringify(buildId) },
+    define: {
+      __BUILD_ID__: JSON.stringify(buildId),
+      // A literal, so a real-backend build drops the mock's dynamic imports (main.tsx, src/app/demo.ts)
+      // and ships none of its code: scripts/check-real-build.mjs checks the output.
+      __API_MOCK__: JSON.stringify(envReport.apiMock),
+    },
     plugins: [react(), tailwindcss(), versionFile(buildId), envReport.apiMock ? null : dropMockWorker()],
     resolve: {
       alias: {

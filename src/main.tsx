@@ -11,7 +11,6 @@ import App from './App.tsx'
 import { BootError } from './app/boot'
 import { expireSession } from './app/session-sync'
 import { startThemeSync } from './app/theme'
-import { env } from './config/env'
 import './index.css'
 import { useSession } from './stores/session'
 
@@ -75,8 +74,8 @@ async function bootstrap() {
   }
   configureClient(clientHooks)
 
-  if (env.apiMock) {
-    // Loaded only in mock mode, so a production build against a real backend ships no mock code paths.
+  // `__API_MOCK__` is a literal: a real-backend build drops this branch and ships no mock code.
+  if (__API_MOCK__) {
     try {
       configureClient({ ...clientHooks, recover: await startMockOrRecover() })
     } catch (err) {
