@@ -10,15 +10,17 @@ import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, Textarea } from '@/components/ui/field'
 import type { PreviewFeedback, WorkPreview, WorkRequest } from '@/domain/model'
+import { isSafeUrl } from '@/domain/url'
 import { formatDateTime } from '@/lib/format'
 
 const errorText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback)
 
 export function PreviewImages({ preview, compact }: { preview: WorkPreview; compact?: boolean }) {
-  if (!preview.screenshots.length) return null
+  const shots = preview.screenshots.filter((s) => isSafeUrl(s.url, 'image'))
+  if (!shots.length) return null
   return (
     <div className={compact ? 'grid grid-cols-2 gap-2' : 'grid grid-cols-1 gap-3 sm:grid-cols-2'}>
-      {preview.screenshots.map((s) => (
+      {shots.map((s) => (
         <figure key={s.id} className="min-w-0">
           <img
             src={s.url}
@@ -36,6 +38,8 @@ export function PreviewImages({ preview, compact }: { preview: WorkPreview; comp
 }
 
 export function PreviewLink({ url, label }: { url: string; label: string }) {
+  // Defence in depth: the contract already refuses a URL that is not http(s) or on this site.
+  if (!isSafeUrl(url, 'link')) return null
   return (
     <Button asChild variant="secondary" size="lg" block>
       <a href={url} target="_blank" rel="noreferrer">

@@ -127,6 +127,7 @@ export type GuardName =
   | 'assumptionsUnchecked'
   | 'scopeUnanswered'
   | 'scopeRevisionsUsed'
+  | 'releaseUnscheduled'
 
 export class LifecycleError extends Error {
   readonly code: LifecycleErrorCode
@@ -315,6 +316,14 @@ export function unansweredScopeQuestions(
     .map((q) => q.id)
 }
 
+/**
+ * A request is marked released only on a planned date, so the schedule, the
+ * dashboard and the requester's notice all have the day it went out.
+ */
+export function releaseDateMissing(request: Pick<WorkRequest, 'release'>): boolean {
+  return !request.release?.scheduledDate
+}
+
 function assertGuards(request: WorkRequest, command: AnyCommand): void {
   if (command.event === 'confirmResult' || command.event === 'reportIssue') {
     const byId = new Map(command.checks.map((c) => [c.criterionId, c.result]))
@@ -349,6 +358,13 @@ function assertGuards(request: WorkRequest, command: AnyCommand): void {
       'guard_failed',
       'Confirm every assumption in the report before the AI starts work.',
       'assumptionsUnchecked',
+    )
+  }
+  if (command.event === 'markReleased' && releaseDateMissing(request)) {
+    throw new LifecycleError(
+      'guard_failed',
+      'Set the planned release date before marking the request released.',
+      'releaseUnscheduled',
     )
   }
 }

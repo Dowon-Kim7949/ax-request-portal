@@ -348,6 +348,11 @@ const en: Messages = {
     expected: 'Fixed when',
     outOfScope: 'Must not change',
     attachments: 'Attachments',
+    attachment: {
+      newTab: 'opens in a new tab',
+      download: 'downloads',
+      blocked: 'Cannot be opened',
+    },
     desiredDate: 'Wanted by',
     timeline: 'Activity',
     progress: 'Progress',
@@ -562,6 +567,7 @@ const en: Messages = {
     releasedTitle: 'Is it live?',
     releasedBody: 'The requester will be told that it is live.',
     released: 'Marked as released.',
+    needDate: 'Save a release date before marking it as released.',
   },
   dashboard: {
     title: 'Overview',
@@ -651,6 +657,17 @@ const en: Messages = {
     alertHint: 'Spending past this share of the limit is flagged.',
     saved: 'Limits saved.',
     over: 'Past the alert threshold',
+    noLimitHint: '0 means no limit.',
+    error: {
+      amount: 'Enter a whole number of won, 0 or more.',
+      tooLarge: 'Enter {{max}} or less.',
+      overMonthly: 'The per-request limit cannot be higher than the monthly limit.',
+    },
+  },
+  demoStorage: {
+    full: 'Demo data storage is full',
+    fullHint:
+      'Your latest changes may be lost when the page reloads. Make room with “{{action}}” in the account menu (More on a phone).',
   },
   ai: {
     provider: { anthropic: 'Claude', openai: 'GPT' },

@@ -14,14 +14,23 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Meter } from '@/components/ui/controls'
 import { ErrorState, Skeleton } from '@/components/ui/feedback'
 import { Field, Input } from '@/components/ui/field'
-import type { Budget } from '@/domain/model'
+import { BUDGET_LIMIT_MAX_KRW, checkBudgetLimits, type Budget } from '@/domain/model'
 import { formatKrw, formatMonth } from '@/lib/format'
 
-const LimitsForm = z.object({
-  monthlyLimitKrw: z.coerce.number().int().min(0),
-  perRequestLimitKrw: z.coerce.number().int().min(0),
-  alertThresholdPct: z.coerce.number().int().min(1).max(100),
-})
+/** Whole won. An emptied field is an error, not 0 — 0 would lift the limit. */
+const amount = z.preprocess(
+  (v) => (v === '' ? undefined : v),
+  z.coerce.number().int().min(0).max(BUDGET_LIMIT_MAX_KRW),
+)
+
+/** Same rules as the API body (BudgetInput), on what the inputs hold. */
+const LimitsForm = z
+  .object({
+    monthlyLimitKrw: amount,
+    perRequestLimitKrw: amount,
+    alertThresholdPct: z.coerce.number().int().min(1).max(100),
+  })
+  .superRefine(checkBudgetLimits)
 type LimitsIn = z.input<typeof LimitsForm>
 type LimitsOut = z.output<typeof LimitsForm>
 
@@ -37,6 +46,15 @@ function Limits({ budget }: { budget: Budget }) {
     },
   })
   const err = form.formState.errors
+  /** Error types are Zod issue codes (custom = the cross-field rule). */
+  const amountError = (e: { type?: string } | undefined) =>
+    !e
+      ? undefined
+      : e.type === 'custom'
+        ? t('budget.error.overMonthly')
+        : e.type === 'too_big'
+          ? t('budget.error.tooLarge', { max: formatKrw(BUDGET_LIMIT_MAX_KRW) })
+          : t('budget.error.amount')
   return (
     <Card>
       <form
@@ -52,13 +70,15 @@ function Limits({ budget }: { budget: Budget }) {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field
             label={t('budget.monthly')}
-            error={err.monthlyLimitKrw ? t('common.requiredField') : undefined}
+            hint={t('budget.noLimitHint')}
+            error={amountError(err.monthlyLimitKrw)}
           >
             {(p) => (
               <Input
                 type="number"
                 inputMode="numeric"
                 min={0}
+                max={BUDGET_LIMIT_MAX_KRW}
                 step={10000}
                 {...p}
                 {...form.register('monthlyLimitKrw')}
@@ -67,13 +87,15 @@ function Limits({ budget }: { budget: Budget }) {
           </Field>
           <Field
             label={t('budget.perRequest')}
-            error={err.perRequestLimitKrw ? t('common.requiredField') : undefined}
+            hint={t('budget.noLimitHint')}
+            error={amountError(err.perRequestLimitKrw)}
           >
             {(p) => (
               <Input
                 type="number"
                 inputMode="numeric"
                 min={0}
+                max={BUDGET_LIMIT_MAX_KRW}
                 step={1000}
                 {...p}
                 {...form.register('perRequestLimitKrw')}

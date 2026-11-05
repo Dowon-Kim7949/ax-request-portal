@@ -581,3 +581,100 @@ describe('AI operations', () => {
     await expectApiError(call(api.listRequests, { query: { scope: 'all' } }), 403)
   })
 })
+
+describe('release, regression and settings rules', () => {
+  /** A new request taken to "release scheduled" without a release date. */
+  async function confirmedWithoutDate() {
+    await loginAs('planner@example.com')
+    const { id } = await call(api.createRequest, { body: draft })
+    t.advance(6)
+    await confirmScope(id)
+    await loginAs('dev1@example.com')
+    await call(api.transitionRequest, { params: { id }, body: { event: 'runWork' } })
+    t.advance(20)
+    await call(api.transitionRequest, { params: { id }, body: { event: 'approveMerge' } })
+    await loginAs('planner@example.com')
+    await call(api.transitionRequest, {
+      params: { id },
+      body: { event: 'confirmResult', checks: [{ criterionId: 'c1', result: 'passed' }] },
+    })
+    return id
+  }
+
+  it('marks a request released only once a release date is set', async () => {
+    const id = await confirmedWithoutDate()
+    await loginAs('dev1@example.com')
+    const refused = await call(api.transitionRequest, {
+      params: { id },
+      body: { event: 'markReleased' },
+    }).catch((e: unknown) => e)
+    expect(refused).toBeInstanceOf(ApiError)
+    expect(refused).toMatchObject({ status: 409, code: 'guard_failed' })
+    expect((refused as ApiError).message).toBe('배포 예정일을 먼저 정해야 배포 완료로 바꿀 수 있습니다.')
+
+    await call(api.updateRelease, { params: { id }, body: { scheduledDate: '2026-11-03' } })
+    const done = await call(api.transitionRequest, { params: { id }, body: { event: 'markReleased' } })
+    expect(done.status).toBe('done')
+    expect(done.release?.scheduledDate).toBe('2026-11-03')
+  })
+
+  it('keeps the regression checks of a closed request as they were', async () => {
+    await loginAs('dev1@example.com')
+    const shipped = await call(api.getRequest, { params: { id: 1012 } })
+    expect(shipped.status).toBe('done')
+    const before = shipped.regression
+    await expectApiError(
+      call(api.updateRegression, {
+        params: { id: 1012 },
+        body: { checks: before.map((c) => ({ id: c.id, result: 'failed' as const })) },
+      }),
+      409,
+      'invalid_transition',
+    )
+    expect((await call(api.getRequest, { params: { id: 1012 } })).regression).toEqual(before)
+  })
+
+  it('gives a person without saved notification settings the defaults', async () => {
+    await loginAs('admin@example.com')
+    const invited = await call(api.createUser, {
+      body: { name: '설정없음', email: 'no-settings@example.com', role: 'requester' },
+    })
+    await loginAs(invited.email)
+    expect(await call(api.getNotificationSettings)).toEqual({
+      inApp: true,
+      email: true,
+      messenger: false,
+      onlyActionRequired: false,
+    })
+  })
+
+  it('validates budget limits and months like the screens do', async () => {
+    await loginAs('operator@example.com')
+    await expectApiError(
+      call(api.updateBudget, {
+        body: { monthlyLimitKrw: 100_000, perRequestLimitKrw: 200_000, alertThresholdPct: 80 },
+      }),
+      400,
+      'bad_request',
+    )
+    await expectApiError(
+      call(api.updateBudget, {
+        body: { monthlyLimitKrw: 1e13, perRequestLimitKrw: 0, alertThresholdPct: 80 },
+      }),
+      400,
+      'bad_request',
+    )
+    await expectApiError(call(api.aiUsage, { query: { month: '2026-13' } }), 400, 'bad_request')
+    expect((await call(api.aiUsage, { query: { month: '2026-10' } })).month).toBe('2026-10')
+  })
+})
+
+describe('demo data language', () => {
+  it('keeps read marks when the language changes', async () => {
+    await loginAs('planner@example.com')
+    t.store.engine.state.dirty = false
+    await call(api.markAllNotificationsRead)
+    // Marked as a person's change, so a language switch no longer rebuilds the demo data.
+    expect(t.store.engine.state.dirty).toBe(true)
+  })
+})
