@@ -10,7 +10,7 @@ import {
   type QueryClient,
 } from '@tanstack/react-query'
 import type { TransitionCommand } from '../domain/lifecycle'
-import type { RequestStatus, WorkRequest } from '../domain/model'
+import type { Notification, RequestStatus, WorkRequest } from '../domain/model'
 import { useSession } from '../stores/session'
 import { call } from './client'
 import { api, type BodyOf, type ParamsOf, type QueryOf } from './contract'
@@ -160,9 +160,26 @@ export function useAiUsage(month?: string) {
 /* Mutations                                                           */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Stores a copy of a request unless the cache already holds a newer one:
+ * answers can arrive out of order (a slow save after a quick decision, or a
+ * poll that overtook the answer).
+ */
+function storeRequest(qc: QueryClient, req: WorkRequest) {
+  qc.setQueryData<WorkRequest>(keys.request(req.id), (cached) =>
+    cached && Date.parse(cached.updatedAt) > Date.parse(req.updatedAt) ? cached : req,
+  )
+}
+
+/**
+ * Changes to one request run one after another (TanStack mutation scope), so
+ * the server applies them in the order the person made them.
+ */
+const requestScope = (id: number) => ({ id: `request:${id}` })
+
 /** After any change to a request: store the fresh copy, refresh lists and notifications. */
 function onRequestChanged(qc: QueryClient, req: WorkRequest) {
-  qc.setQueryData(keys.request(req.id), req)
+  storeRequest(qc, req)
   void qc.invalidateQueries({ queryKey: [...keys.requests(), 'list'] })
   void qc.invalidateQueries({ queryKey: keys.regression() })
   void qc.invalidateQueries({ queryKey: keys.notifications() })
@@ -200,11 +217,23 @@ export function usePrecheck() {
   })
 }
 
-export function useCreateRequest() {
+/**
+ * `onCreated` / `onFailed` run with the hook's own handling, so they run even
+ * when the screen that submitted has been left meanwhile (per-call `mutate`
+ * callbacks are dropped on unmount). The wizard deletes its draft there.
+ */
+export function useCreateRequest(
+  options: { onCreated?: (req: WorkRequest) => void; onFailed?: (error: Error) => void } = {},
+) {
   const qc = useQueryClient()
+  const { onCreated, onFailed } = options
   return useMutation({
     mutationFn: (body: BodyOf<typeof api.createRequest>) => call(api.createRequest, { body }),
-    onSuccess: (req) => onRequestChanged(qc, req),
+    onSuccess: (req) => {
+      onRequestChanged(qc, req)
+      onCreated?.(req)
+    },
+    onError: onFailed,
   })
 }
 
@@ -212,16 +241,41 @@ export function useTransition(id: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: TransitionCommand) => call(api.transitionRequest, { params: { id }, body }),
+    scope: requestScope(id),
     onSuccess: (req) => onRequestChanged(qc, req),
   })
 }
 
+/** The checklist save each request's most recent call got, so earlier answers do not overwrite it */
+let verificationSaves = 0
+const latestVerificationSave = new Map<number, number>()
+
+/**
+ * Saves checklist progress on every tap. Saves run one at a time (shared
+ * request scope) and only the answer to the most recent one is stored, so a
+ * late answer cannot bring back an earlier state of the checklist.
+ */
 export function useSaveVerification(id: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: BodyOf<typeof api.saveVerification>) =>
       call(api.saveVerification, { params: { id }, body }),
-    onSuccess: (req) => qc.setQueryData(keys.request(req.id), req),
+    scope: requestScope(id),
+    onMutate: () => {
+      const seq = ++verificationSaves
+      latestVerificationSave.set(id, seq)
+      return { seq }
+    },
+    onSuccess: (req, _body, ctx) => {
+      if (ctx.seq === latestVerificationSave.get(id)) storeRequest(qc, req)
+    },
+    onSettled: (_req, error, _body, ctx) => {
+      if (ctx?.seq !== latestVerificationSave.get(id)) return
+      latestVerificationSave.delete(id)
+      // Earlier answers were skipped: after a failed last save, read the request again.
+      if (error) void qc.invalidateQueries({ queryKey: keys.request(id) })
+      void qc.invalidateQueries({ queryKey: [...keys.requests(), 'list'] })
+    },
   })
 }
 
@@ -230,6 +284,7 @@ export function usePreviewFeedback(id: number) {
   return useMutation({
     mutationFn: (body: BodyOf<typeof api.sendPreviewFeedback>) =>
       call(api.sendPreviewFeedback, { params: { id }, body }),
+    scope: requestScope(id),
     onSuccess: (req) => onRequestChanged(qc, req),
   })
 }
@@ -239,6 +294,7 @@ export function useUpdateRegression(id: number) {
   return useMutation({
     mutationFn: (body: BodyOf<typeof api.updateRegression>) =>
       call(api.updateRegression, { params: { id }, body }),
+    scope: requestScope(id),
     onSuccess: (req) => onRequestChanged(qc, req),
   })
 }
@@ -247,6 +303,7 @@ export function useUpdateRelease(id: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: BodyOf<typeof api.updateRelease>) => call(api.updateRelease, { params: { id }, body }),
+    scope: requestScope(id),
     onSuccess: (req) => onRequestChanged(qc, req),
   })
 }
@@ -277,18 +334,54 @@ export function useUpdateUser() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: BodyOf<typeof api.updateUser> }) =>
       call(api.updateUser, { params: { id }, body }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.users() }),
+    onSuccess: (_user, { id }) => {
+      void qc.invalidateQueries({ queryKey: keys.users() })
+      // Changing yourself (e.g. a template that lets admins edit their own team): refresh the session's copy.
+      if (id === useSession.getState().user?.id) void qc.invalidateQueries({ queryKey: keys.me() })
+    },
   })
 }
 
-export function useMarkNotificationRead() {
+/**
+ * Marks one notification (or all) as read at once — list and bell badge — and
+ * puts back exactly those it marked if the server refuses. `onError` runs even
+ * after the screen is left (opening a notification navigates away).
+ */
+export function useMarkNotificationRead(options: { onError?: (error: Error) => void } = {}) {
   const qc = useQueryClient()
+  const { onError } = options
   return useMutation({
     mutationFn: async (id: string | 'all'): Promise<void> => {
       if (id === 'all') await call(api.markAllNotificationsRead)
       else await call(api.markNotificationRead, { params: { id } })
     },
-    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.notifications() }),
+    onMutate: async (id) => {
+      // A poll in flight would answer with the old read state.
+      await qc.cancelQueries({ queryKey: keys.notifications() })
+      const marked = new Set<string>()
+      const readAt = new Date().toISOString()
+      qc.setQueryData<Notification[]>(keys.notifications(), (list) =>
+        list?.map((n) => {
+          if (n.readAt || (id !== 'all' && n.id !== id)) return n
+          marked.add(n.id)
+          return { ...n, readAt }
+        }),
+      )
+      return { marked }
+    },
+    onError: (error, _id, ctx) => {
+      if (ctx?.marked.size) {
+        qc.setQueryData<Notification[]>(keys.notifications(), (list) =>
+          list?.map((n) => {
+            if (!ctx.marked.has(n.id)) return n
+            const { readAt: _readAt, ...unread } = n
+            return unread
+          }),
+        )
+      }
+      onError?.(error)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.notifications() }),
   })
 }
 

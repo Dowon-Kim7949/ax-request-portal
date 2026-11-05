@@ -36,6 +36,10 @@ const ko = {
     unknownUser: '알 수 없는 사용자',
     justNow: '방금 전',
   },
+  loadError: {
+    title: '불러오지 못했어요',
+    body: '잠시 후 다시 시도해 주세요.',
+  },
   boot: {
     loading: '불러오는 중',
     title: '화면을 준비하지 못했어요',
@@ -46,6 +50,13 @@ const ko = {
     title: '새 버전이 나왔어요',
     body: '새로고침하면 바로 적용돼요.',
     reload: '새로고침',
+  },
+  routeError: {
+    chunkTitle: '새 버전이 배포됐어요',
+    chunkBody: '새 버전이 배포되어 화면을 다시 불러와야 해요.',
+    body: '화면을 다시 불러오거나 처음 화면으로 돌아가 주세요. 계속되면 관리자에게 알려 주세요.',
+    reload: '다시 불러오기',
+    detail: '개발자용 상세 정보',
   },
   nav: {
     skipToContent: '본문으로 건너뛰기',
@@ -216,6 +227,16 @@ const ko = {
     step: '{{current}}/{{total}}',
     draftRestored: '작성 중이던 요청서를 불러왔어요.',
     discard: '처음부터 다시 쓰기',
+    draftNotSaved:
+      '저장 공간이 부족해 이 기기에 초안을 저장하지 못했어요. 제출할 때까지 이 화면을 닫지 말아 주세요.',
+    draftWithoutAttachments: '저장 공간이 부족해 첨부 파일은 빼고 초안을 저장했어요.',
+    leave: {
+      title: '작성을 멈추고 나갈까요?',
+      saved: '지금까지 쓴 내용은 초안으로 저장돼 있어요. 새 요청을 다시 열면 이어서 쓸 수 있어요.',
+      unsaved: '초안을 저장하지 못해서, 나가면 지금까지 쓴 내용이 사라져요.',
+      stay: '계속 쓰기',
+      go: '나가기',
+    },
     project: {
       title: '어느 서비스에 대한 요청인가요?',
       hint: '고르면 담당자와 참고할 위키가 자동으로 정해져요.',
@@ -291,7 +312,8 @@ const ko = {
       clean: '빠진 내용이 없어 보여요.',
       issues: '확인해 보면 좋은 점 {{count}}개',
       issuesHint: '고치지 않아도 제출할 수 있어요.',
-      checkFailed: '점검을 하지 못했어요. 그대로 제출해도 괜찮아요.',
+      checkFailed: '점검을 하지 못했어요. 다시 점검하거나 그대로 제출해도 괜찮아요.',
+      recheck: '다시 점검하기',
       submit: '요청 제출',
       submitting: '제출 중…',
       submitted: '요청이 접수됐어요. AI가 구현 확인 보고서를 쓰고 있어요.',
@@ -777,6 +799,7 @@ const ko = {
     markAll: '모두 읽음',
     empty: '새 알림이 없어요.',
     unread: '읽지 않음',
+    markFailed: '읽음으로 표시하지 못했어요.',
   },
   settings: {
     title: '설정',
@@ -803,6 +826,7 @@ const ko = {
   },
   errors: {
     network: '서버에 연결할 수 없어요. 네트워크를 확인해 주세요.',
+    timeout: '서버 응답이 늦어지고 있어요. 잠시 후 다시 시도해 주세요.',
     forbidden: '이 작업을 할 권한이 없어요.',
     generic: '요청을 처리하지 못했어요. 잠시 후 다시 시도해 주세요.',
     http: '요청을 처리하지 못했어요. (HTTP {{status}})',

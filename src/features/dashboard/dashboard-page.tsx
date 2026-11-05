@@ -197,8 +197,7 @@ export default function DashboardPage() {
                         <CalendarDays className="size-4 shrink-0 text-ink-400" aria-hidden />
                         <span className="font-semibold">{formatDate(r.date)}</span>
                         <span className="min-w-0 truncate text-ink-600">
-                          {dir.project(r.projectId)?.name} ·{' '}
-                          {t('common.count', { count: r.requestIds.length })}
+                          {dir.projectName(r.projectId)} · {t('common.count', { count: r.requestIds.length })}
                         </span>
                       </li>
                     ))}

@@ -35,6 +35,10 @@ const en: Messages = {
     unknownUser: 'Unknown user',
     justNow: 'just now',
   },
+  loadError: {
+    title: 'Could not load this',
+    body: 'Please try again in a moment.',
+  },
   boot: {
     loading: 'Loading',
     title: 'The app could not start',
@@ -45,6 +49,13 @@ const en: Messages = {
     title: 'A new version is available',
     body: 'Reload to start using it.',
     reload: 'Reload',
+  },
+  routeError: {
+    chunkTitle: 'A new version has been deployed',
+    chunkBody: 'This screen needs to be loaded again to use the new version.',
+    body: 'Load the screen again, or go back to the home screen. If it keeps happening, let your administrator know.',
+    reload: 'Load again',
+    detail: 'Details for developers',
   },
   nav: {
     skipToContent: 'Skip to main content',
@@ -214,6 +225,18 @@ const en: Messages = {
     step: '{{current}}/{{total}}',
     draftRestored: 'We restored the request you were writing.',
     discard: 'Start over',
+    draftNotSaved:
+      'There is not enough storage to keep a draft on this device. Please keep this screen open until you submit.',
+    draftWithoutAttachments:
+      'There is not enough storage on this device, so the draft was saved without its attachments.',
+    leave: {
+      title: 'Leave this request for now?',
+      saved:
+        'What you have written is saved as a draft. Open a new request again to pick up where you left off.',
+      unsaved: 'The draft could not be saved, so leaving will lose what you have written.',
+      stay: 'Keep writing',
+      go: 'Leave',
+    },
     project: {
       title: 'Which service is this about?',
       hint: 'This sets the developer in charge and the wiki to use.',
@@ -290,7 +313,8 @@ const en: Messages = {
       clean: 'Nothing seems to be missing.',
       issues: 'Worth a look: {{count}}',
       issuesHint: 'You can submit without changing anything.',
-      checkFailed: 'The check could not run. You can still submit.',
+      checkFailed: 'The check could not run. Run it again, or submit as is.',
+      recheck: 'Check again',
       submit: 'Submit request',
       submitting: 'Submitting…',
       submitted: 'Request received. The AI is writing a feasibility report.',
@@ -779,6 +803,7 @@ const en: Messages = {
     markAll: 'Mark all as read',
     empty: 'No new notifications.',
     unread: 'unread',
+    markFailed: 'Could not mark as read.',
   },
   settings: {
     title: 'Settings',
@@ -805,6 +830,7 @@ const en: Messages = {
   },
   errors: {
     network: 'Cannot reach the server. Check your connection.',
+    timeout: 'The server is taking too long to answer. Please try again in a moment.',
     forbidden: 'You do not have permission to do this.',
     generic: 'Something went wrong. Please try again shortly.',
     http: 'The request could not be completed. (HTTP {{status}})',

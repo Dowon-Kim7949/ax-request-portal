@@ -3,7 +3,7 @@ import { ExternalLink } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { ApiError } from '@/api/client'
+import { errorText } from '@/api/error-text'
 import { usePreviewFeedback } from '@/api/queries'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -11,8 +11,6 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Field, Textarea } from '@/components/ui/field'
 import type { PreviewFeedback, WorkPreview, WorkRequest } from '@/domain/model'
 import { formatDateTime } from '@/lib/format'
-
-const errorText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback)
 
 export function PreviewImages({ preview, compact }: { preview: WorkPreview; compact?: boolean }) {
   if (!preview.screenshots.length) return null

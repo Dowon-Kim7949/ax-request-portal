@@ -1,6 +1,8 @@
 import { BellOff, CheckCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
+import { toast } from 'sonner'
+import { errorText } from '@/api/error-text'
 import { useMarkNotificationRead, useNotifications } from '@/api/queries'
 import { PageHeader } from '@/app/page'
 import { usePageTitle } from '@/app/title'
@@ -15,7 +17,11 @@ export default function NotificationsPage() {
   usePageTitle(t('notifications.title'))
   const navigate = useNavigate()
   const list = useNotifications()
-  const mark = useMarkNotificationRead()
+  // Marked as read at once; if the server refuses, the dot comes back and this says why.
+  const mark = useMarkNotificationRead({
+    onError: (e) =>
+      toast.error(t('notifications.markFailed'), { description: errorText(e, t('errors.generic')) }),
+  })
   const unread = list.data?.filter((n) => !n.readAt).length ?? 0
 
   const open = (n: Notification) => {

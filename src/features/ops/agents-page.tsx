@@ -6,8 +6,8 @@ import { Plus, Trash2 } from 'lucide-react'
 import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { ApiError } from '@/api/client'
 import type { AiSettingsInput } from '@/api/contract'
+import { errorText } from '@/api/error-text'
 import {
   useAiPricing,
   useAiSettings,
@@ -38,8 +38,6 @@ import {
   type AiTask,
 } from '@/domain/ai'
 import { formatDateTime, formatUsd } from '@/lib/format'
-
-const errorText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback)
 
 const keyOf = (sel: AiSelection) => `${sel.provider}/${sel.model}`
 

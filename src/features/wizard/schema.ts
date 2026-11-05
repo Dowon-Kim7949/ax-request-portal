@@ -225,12 +225,30 @@ export function loadDraft(userId: string): WizardValues | null {
   }
 }
 
-export function saveDraft(userId: string, values: WizardValues): void {
+/** How long typing pauses before the draft is written (every keystroke would re-serialise attachments). */
+export const DRAFT_SAVE_DELAY_MS = 300
+
+/** What became of a draft save: kept whole, kept without its attachments, or not kept at all. */
+export type DraftSaveResult = 'saved' | 'withoutAttachments' | 'failed'
+
+export function saveDraft(userId: string, values: WizardValues): DraftSaveResult {
+  const key = draftKey(userId)
   try {
-    localStorage.setItem(draftKey(userId), JSON.stringify(values))
+    localStorage.setItem(key, JSON.stringify(values))
+    return 'saved'
   } catch {
-    // Quota exceeded (large inline attachments): keep going without persistence.
+    // Quota exceeded, or storage blocked. Fall through.
   }
+  // Inline attachments (data URLs in the demo) fill the quota first: keep the words at least.
+  if (values.attachments.length) {
+    try {
+      localStorage.setItem(key, JSON.stringify({ ...values, attachments: [] }))
+      return 'withoutAttachments'
+    } catch {
+      // Still too large: the previous draft, if any, stays as it was.
+    }
+  }
+  return 'failed'
 }
 
 export function clearDraft(userId: string): void {
@@ -243,4 +261,24 @@ export function clearDraft(userId: string): void {
 
 export function isEmptyDraft(v: WizardValues): boolean {
   return !v.projectId && !v.title && !v.desiredBehavior
+}
+
+/**
+ * Something the person wrote or attached — worth a "leave anyway?" question.
+ * Picking the service, type or screens is not: each takes one tap to redo.
+ */
+export function hasWrittenContent(v: WizardValues): boolean {
+  return Boolean(
+    v.title.trim() ||
+    v.currentBehavior.trim() ||
+    v.desiredBehavior.trim() ||
+    v.targetOther.trim() ||
+    v.acceptanceCriteria.some((c) => c.text.trim()) ||
+    v.checklistSource.trim() ||
+    v.checklist.some(filled) ||
+    v.outOfScope.trim() ||
+    v.attachments.length ||
+    v.desiredDate ||
+    v.desiredDateReason.trim(),
+  )
 }

@@ -1,8 +1,60 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createUpdateCheck, fetchDeployedBuildId } from './update-check'
+import { createUpdateCheck, FETCH_TIMEOUT_MS, fetchDeployedBuildId, isChunkLoadError } from './update-check'
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.useRealTimers()
+})
+
+/** A version.json request that never answers until its signal aborts. */
+const hangingFetch = (_url: RequestInfo | URL, init?: RequestInit) =>
+  new Promise<Response>((_resolve, reject) => {
+    init?.signal?.addEventListener('abort', () => reject(init.signal?.reason as Error))
+  })
+
+describe('a check that gets no answer', () => {
+  it('gives up after FETCH_TIMEOUT_MS, so the next check can run', async () => {
+    vi.useFakeTimers()
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockImplementationOnce(hangingFetch)
+      .mockResolvedValueOnce(Response.json({ buildId: 'build-b' }))
+    vi.stubGlobal('fetch', fetchMock)
+    const onUpdate = vi.fn()
+    const check = createUpdateCheck('build-a', onUpdate)
+
+    const first = check()
+    await vi.advanceTimersByTimeAsync(FETCH_TIMEOUT_MS)
+    await first
+    expect(onUpdate).not.toHaveBeenCalled()
+
+    await check()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(onUpdate).toHaveBeenCalledWith('build-b')
+  })
+})
+
+describe('isChunkLoadError', () => {
+  it('recognises a page chunk that is gone, in each browser’s words', () => {
+    // Chrome / Edge
+    expect(
+      isChunkLoadError(new TypeError('Failed to fetch dynamically imported module: https://x/assets/a-1.js')),
+    ).toBe(true)
+    // Firefox
+    expect(isChunkLoadError(new TypeError('error loading dynamically imported module: https://x/a.js'))).toBe(
+      true,
+    )
+    // Safari
+    expect(isChunkLoadError(new TypeError('Importing a module script failed.'))).toBe(true)
+    // Vite's CSS preload
+    expect(isChunkLoadError(new Error('Unable to preload CSS for /assets/a-1.css'))).toBe(true)
+  })
+
+  it('leaves other errors alone', () => {
+    expect(isChunkLoadError(new TypeError("Cannot read properties of undefined (reading 'id')"))).toBe(false)
+    expect(isChunkLoadError('Failed to fetch dynamically imported module')).toBe(false)
+    expect(isChunkLoadError(undefined)).toBe(false)
+  })
 })
 
 describe('createUpdateCheck', () => {
