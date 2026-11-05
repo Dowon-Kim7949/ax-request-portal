@@ -115,6 +115,22 @@ Open the printed URL and pick a demo account. Node 22.22.2+, 24.15+ or 26+ is re
 
 The mock backend's own texts (errors, notifications, simulated AI reports, demo data, the submission check) exist in English and Korean only, and fall back to Korean for other languages. A real backend replaces all of them.
 
+## Environment variables
+
+Set at build time, in the environment or in `.env.local` (copy [`.env.example`](.env.example)).
+
+| Variable            | Default    | Meaning                                                                                                 |
+| ------------------- | ---------- | ------------------------------------------------------------------------------------------------------- |
+| `VITE_BASE`         | `/`        | Public path the app is served from, e.g. `/ax/` for `https://host/ax/`                                  |
+| `VITE_API_MOCK`     | `true`     | `true` or unset: demo mode on the in-browser mock API. `false`: call the backend at `VITE_API_BASE_URL` |
+| `VITE_API_BASE_URL` | none       | Required when `VITE_API_MOCK=false`: a same-origin path such as `/api`, or a full `https://` URL        |
+| `VITE_BUILD_ID`     | the commit | Written to `version.json`; open tabs offer a reload when the deployed id changes                        |
+
+- **Demo mode is visible.** With the mock API, whatever people enter stays in their own browser. The login screen and every signed-in screen show a small "Demo mode · Data stays in this browser only" banner that cannot be closed, so a demo build deployed by mistake is obvious. A real-backend build never shows it.
+- **Bad settings fail the build.** `vite build` stops with a message when `VITE_API_MOCK` is anything but `true`, `false` or unset, or when `VITE_API_MOCK=false` comes without a usable `VITE_API_BASE_URL` (missing, not a URL or path, credentials, a query string, or the `.env.example` placeholder). A fresh clone still builds as is, in demo mode. The dev server prints the same findings as warnings. The rules live in [`src/config/env-check.ts`](src/config/env-check.ts).
+- **A real-backend build ships no mock service worker:** `mockServiceWorker.js` is left out of `dist/`.
+- **A backend on another origin** (`VITE_API_BASE_URL=https://api.your-company.com`) must also be allowed by the page: add its origin to `connect-src` in the Content-Security-Policy in [`deploy/nginx.conf`](deploy/nginx.conf), and allow the app's origin in the backend's CORS settings. The build prints this reminder. A same-origin `/api` needs neither.
+
 ## Connect a real backend
 
 1. Implement the endpoints in [`docs/openapi.json`](docs/openapi.json). Requests carry `Authorization: Bearer <token>` from `POST /auth/login`. Errors use the `ApiError` body (`code`, `message`, optional `issues`). A transition that doesn't fit the current status is a `409`. Requests also carry `Accept-Language`: write error messages, notifications and AI text in that language.
@@ -126,7 +142,7 @@ The mock backend's own texts (errors, notifications, simulated AI reports, demo 
    VITE_API_MOCK=false VITE_API_BASE_URL=/api npm run build
    ```
 
-With `VITE_API_MOCK=false` the mock code is never loaded. See [`.env.example`](.env.example).
+With `VITE_API_MOCK=false` the mock code is never loaded and the demo banner is gone. See [Environment variables](#environment-variables).
 
 ## Deploy with nginx
 
@@ -137,14 +153,20 @@ cp deploy/nginx.conf /etc/nginx/conf.d/ax-request-portal.conf   # set server_nam
 nginx -t && nginx -s reload
 ```
 
-[`deploy/nginx.conf`](deploy/nginx.conf) does four things:
+[`deploy/nginx.conf`](deploy/nginx.conf):
 
 - sends unknown paths to `index.html` so deep links work;
 - caches `/assets/*` for a year (file names are content-hashed);
-- never caches `index.html` or the service worker;
-- answers a missing asset with `404` instead of HTML.
+- never caches `index.html`, `version.json` or the service worker;
+- answers a missing asset with `404` instead of HTML, and doesn't let that `404` be cached;
+- sends security headers on every response: a Content-Security-Policy, `Permissions-Policy`, `Cross-Origin-Opener-Policy: same-origin`, `X-Content-Type-Options`, `X-Frame-Options` and `Referrer-Policy`.
 
-It also has a commented `/api` reverse proxy and a sub-path variant (build with `VITE_BASE=/ax/`). The CI `nginx` job serves the build with this exact file in `nginx:stable-alpine` and checks all of the above with [`deploy/check-nginx.sh`](deploy/check-nginx.sh).
+The Content-Security-Policy allows the app's own files, the Pretendard web font from `cdn.jsdelivr.net`, and the one inline script in `index.html` (it applies the saved theme before the first paint) by its SHA-256 hash. Two things to keep in step with it:
+
+- **Changing that inline script** changes its hash. Print the new one with `node deploy/csp-hashes.mjs index.html` and replace it in `script-src`. The unit tests and the nginx check fail until you do.
+- **A backend on another origin** goes into `connect-src`, e.g. `connect-src 'self' https://api.your-company.com`.
+
+`Strict-Transport-Security` is left as a commented example: set it where TLS terminates (nginx itself or the load balancer in front of it). The file also has a commented `/api` reverse proxy and a complete sub-path variant (build with `VITE_BASE=/ax/`). The CI `nginx` job serves a demo build and then a real-backend build with this exact file in `nginx:stable-alpine` and checks all of the above with [`deploy/check-nginx.sh`](deploy/check-nginx.sh); run the same script against your own deployment, sub-path included (`bash deploy/check-nginx.sh https://host/ax`). CI does not exercise the sub-path variant itself.
 
 Vendor code is split into stable chunks (`vendor-react`, `vendor-router`, …), so an app-only release changes about 15 KB gzip and browsers keep the rest cached. UI copy for both languages has its own `messages` chunk (12 KB gzip), so a wording change doesn't invalidate app code either.
 

@@ -81,6 +81,11 @@ const en: Messages = {
     admin: 'Admin',
     operator: 'Operator',
   },
+  /** Mock-mode notice on every screen (src/app/demo-banner.tsx) */
+  demoBanner: {
+    label: 'Demo mode',
+    detail: 'Data stays in this browser only',
+  },
   auth: {
     title: 'Sign in',
     subtitle: 'Sign in with your work account.',

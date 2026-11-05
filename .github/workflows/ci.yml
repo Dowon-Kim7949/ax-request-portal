@@ -74,7 +74,22 @@ jobs:
             nginx:stable-alpine
           docker exec web nginx -t
           for i in $(seq 1 20); do curl -fsS -o /dev/null http://localhost:8080/ && break; sleep 0.5; done
-      - name: Check SPA fallback and cache headers
+      - name: Check SPA fallback, cache and security headers (mock build)
         run: bash deploy/check-nginx.sh http://localhost:8080
+      # nginx keeps serving dist/, so a rebuild is picked up without a restart.
+      - name: Check a real-backend build (no mock service worker)
+        run: |
+          npx vite build
+          bash deploy/check-nginx.sh http://localhost:8080
+        env:
+          VITE_API_MOCK: 'false'
+          VITE_API_BASE_URL: /api
+          API_MOCK: 'false'
+      - name: A real-backend build without an API URL fails
+        run: |
+          if VITE_API_MOCK=false npx vite build --outDir "$RUNNER_TEMP/should-not-build"; then
+            echo "::error::vite build accepted VITE_API_MOCK=false without VITE_API_BASE_URL"
+            exit 1
+          fi
       - if: failure()
         run: docker logs web

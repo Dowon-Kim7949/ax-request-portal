@@ -82,6 +82,11 @@ const ko = {
     admin: '관리자',
     operator: '운영자',
   },
+  /** Mock-mode notice on every screen (src/app/demo-banner.tsx) */
+  demoBanner: {
+    label: '데모 모드',
+    detail: '데이터는 이 브라우저에만 저장돼요',
+  },
   auth: {
     title: '로그인',
     subtitle: '회사 계정으로 로그인하세요.',

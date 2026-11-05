@@ -20,6 +20,7 @@ import { currentLocale } from '@/i18n'
 import { cn } from '@/lib/cn'
 import { useBrand } from './brand'
 import { resetDemoData } from './demo'
+import { DemoBanner } from './demo-banner'
 import { useCan, useCurrentUser } from './hooks'
 import { phoneTabs, visibleNav, type NavItem } from './nav'
 import type { RouteHandle } from './router'
@@ -441,6 +442,7 @@ export function AppShell() {
       <SkipLink />
       <Sidebar items={items} />
       <div className="md:pl-[76px] xl:pl-64">
+        <DemoBanner />
         <header className="sticky top-0 z-20 border-b border-line/70 bg-canvas/90 pt-safe backdrop-blur">
           <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-4 sm:px-6 md:h-16">
             <div className="md:invisible">

@@ -1,7 +1,16 @@
-/** Build-time environment. See .env.example. */
+import { isApiMock } from './env-check'
+
+/**
+ * Build-time environment. See .env.example; vite.config.ts validates these
+ * values (src/config/env-check.ts) and refuses to build with a bad one.
+ */
 export const env = {
-  /** Serve every API call from the in-browser mock (MSW). Defaults to true until a backend exists. */
-  apiMock: (import.meta.env.VITE_API_MOCK ?? 'true') !== 'false',
+  /**
+   * Serve every API call from the in-browser mock (MSW). True unless
+   * VITE_API_MOCK is exactly "false", so a fresh clone runs without a backend.
+   * The UI says so on every screen (src/app/demo-banner.tsx).
+   */
+  apiMock: isApiMock(import.meta.env.VITE_API_MOCK),
   /** Backend base URL (ignored in mock mode) */
   apiBaseUrl: (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, ''),
   /** Public path the app is served from, always ending with "/" */

@@ -31,6 +31,7 @@ jobs:
         env:
           # Project pages live under /<repository>/. Use "/" for a user site or a custom domain.
           VITE_BASE: /${{ github.event.repository.name }}/
+          # The demo runs on the in-browser mock: every screen shows a "demo mode" banner.
           VITE_API_MOCK: 'true'
       # GitHub Pages has no SPA fallback: serve the app for unknown paths so deep links work.
       - run: cp dist/index.html dist/404.html
