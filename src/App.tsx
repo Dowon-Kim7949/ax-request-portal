@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { RouterProvider } from 'react-router/dom'
 import { Toaster } from 'sonner'
+import { DemoDataSync } from './app/demo-data-sync'
 import { DemoStorageNotice } from './app/demo-storage-notice'
 import { createRouter } from './app/router'
 import { UpdateNotice } from './app/update-notice'
@@ -22,6 +23,7 @@ export default function App() {
       />
       <UpdateNotice />
       <DemoStorageNotice />
+      <DemoDataSync />
     </>
   )
 }

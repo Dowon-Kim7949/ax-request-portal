@@ -5,7 +5,7 @@ import type { User } from '../domain/model'
 import type { ServerLanguage } from './copy'
 import { createHandlers, MOCK_RESPONSE_HEADER } from './handlers'
 import { DEMO_ACCOUNT_IDS } from './seed'
-import { MOCK_STORAGE_FULL_EVENT } from './signals'
+import { MOCK_DATA_CHANGED_EVENT, reportMockStorageFull } from './signals'
 import { createMockStore, REVISION_KEY, type MockStore } from './store'
 
 /** How long a re-attach waits for the worker to confirm before the request fails as it would have */
@@ -34,12 +34,16 @@ export async function startMockApi(language: ServerLanguage): Promise<MockStore>
     scopeCheck: appConfig.workflow.scopeCheck,
     storage,
     language,
-    onSaveError: () => window.dispatchEvent(new Event(MOCK_STORAGE_FULL_EVENT)),
+    onSaveError: reportMockStorageFull,
   })
   // Every tab keeps a copy of the demo data in memory; take up another tab's save right away
-  // (requests also check before they change anything, see `sync`).
+  // (requests also check before they change anything, see `sync`), and tell the app, whose
+  // cached answers now lag behind. A request may already have taken the save up: the cache is
+  // out of date all the same.
   window.addEventListener('storage', (event) => {
-    if (event.storageArea === storage && event.key === REVISION_KEY) store?.sync()
+    if (event.storageArea !== storage || event.key !== REVISION_KEY) return
+    store?.sync()
+    window.dispatchEvent(new Event(MOCK_DATA_CHANGED_EVENT))
   })
   const worker = setupWorker(...createHandlers(store))
   registration = await worker.start({

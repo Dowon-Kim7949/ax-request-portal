@@ -8,7 +8,7 @@ import { api } from '../api/contract'
 import type { WorkRequest } from '../domain/model'
 import { DEFAULT_ROLE_PERMISSIONS } from '../domain/roles'
 import { createTestApi } from '../test/mock-api'
-import { errorText } from './copy'
+import { errorText, readableDate, renderNotification } from './copy'
 import { businessDate, HttpError, MockEngine, type MockState } from './engine'
 import { buildSeedState, DEMO_PASSWORD } from './seed'
 
@@ -142,11 +142,26 @@ describe('release dates', () => {
     expect(() => engine.updateRelease(dev, r.id, { scheduledDate: '2026-11-04' }, later)).toThrow(HttpError)
   })
 
-  it('explains the refusal in both languages', () => {
-    expect(errorText('ko', 'releaseDateInPast', { today: '2026-11-02' })).toContain('2026-11-02')
-    expect(errorText('en', 'releaseDateInPast', { today: '2026-11-02' })).toBe(
-      'The release date cannot be in the past. Today is 2026-11-02 at the head office.',
+  it('explains the refusal in both languages, with the date as people read it', () => {
+    expect(errorText('ko', 'releaseDateInPast', { today: '2026-11-02' })).toBe(
+      '배포 예정일은 오늘(본사 기준 11월 2일 (월)) 이후로 정해 주세요.',
     )
+    expect(errorText('en', 'releaseDateInPast', { today: '2026-11-02' })).toBe(
+      'The release date cannot be in the past. Today is Mon, Nov 2 at the head office.',
+    )
+  })
+
+  it('tells the requester the planned date as people read it', () => {
+    expect(renderNotification('ko', 'releaseDateSet', { date: '2026-11-05' }, 1024)).toEqual({
+      title: '[#1024] 배포 예정일이 정해졌습니다',
+      body: '11월 5일 (목)에 반영할 예정입니다.',
+    })
+    expect(renderNotification('en', 'releaseDateSet', { date: '2026-11-05' }).body).toBe(
+      'Planned to go live on Thu, Nov 5.',
+    )
+    // A calendar date: the same day wherever the server runs.
+    expect(readableDate('en', '2026-12-31')).toBe('Thu, Dec 31')
+    expect(readableDate('ko', 'soon')).toBe('soon')
   })
 })
 
@@ -169,6 +184,6 @@ describe('release dates through the API', () => {
     expect(err).toBeInstanceOf(ApiError)
     expect((err as ApiError).status).toBe(400)
     expect((err as ApiError).code).toBe('bad_request')
-    expect((err as ApiError).message).toContain('2026-11-02')
+    expect((err as ApiError).message).toContain('11월 2일 (월)')
   })
 })
