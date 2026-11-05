@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as z from 'zod'
 import { ApiError, call, configureClient, DEFAULT_TIMEOUT_MS, UPLOAD_TIMEOUT_MS } from './client'
-import type { EndpointSpec } from './contract'
+import { api, timeoutOf, type EndpointSpec } from './contract'
 
 const ping = {
   method: 'POST',
@@ -123,9 +123,10 @@ describe('time limit', () => {
     expect(err).toMatchObject({ status: 0, code: 'timeout', message: '응답이 늦어요' })
   })
 
-  it('takes a time limit per call, and gives uploads longer by default', async () => {
+  it("takes the endpoint's own time limit, and gives uploads longer by default", async () => {
     fetchMock.mockImplementation(hang)
-    const quick = call(ping, { body: { n: 1 }, timeoutMs: 1_000 }).catch((e: unknown) => e)
+    const quickPing = { ...ping, timeoutMs: 1_000 } as const satisfies EndpointSpec
+    const quick = call(quickPing, { body: { n: 1 } }).catch((e: unknown) => e)
     await vi.advanceTimersByTimeAsync(1_000)
     expect(await quick).toMatchObject({ code: 'timeout' })
 
@@ -138,6 +139,15 @@ describe('time limit', () => {
     expect(settled).toBe(false)
     await vi.advanceTimersByTimeAsync(UPLOAD_TIMEOUT_MS - DEFAULT_TIMEOUT_MS)
     expect(await slow).toMatchObject({ code: 'timeout' })
+  })
+
+  it('keeps every time limit in the contract, one per endpoint', () => {
+    expect(timeoutOf(api.uploadAttachment)).toBe(UPLOAD_TIMEOUT_MS)
+    expect(timeoutOf(api.listRequests)).toBe(DEFAULT_TIMEOUT_MS)
+    for (const [name, spec] of Object.entries(api) as Array<[string, EndpointSpec]>) {
+      const ms = timeoutOf(spec)
+      expect(Number.isFinite(ms) && ms >= 0, name).toBe(true)
+    }
   })
 
   it('also covers reading a body that stops half-way', async () => {

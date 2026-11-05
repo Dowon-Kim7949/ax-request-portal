@@ -63,6 +63,22 @@ export interface EndpointSpec {
   status?: 200 | 201
   /** Registered schema of the success body. `null` = 204 No Content. */
   response: z.ZodType | null
+  /**
+   * How long the client waits for the whole call, sending and reading the
+   * answer, before it fails as `timeout` (ms; see `timeoutOf`). Set it on
+   * an endpoint that is slow by nature; 0 = no limit.
+   */
+  timeoutMs?: number
+}
+
+/** Time limit of a call that sets none. */
+export const DEFAULT_TIMEOUT_MS = 30_000
+/** Uploads (multipart) carry up to 10 MB, possibly over a slow phone connection. */
+export const UPLOAD_TIMEOUT_MS = 120_000
+
+/** The time limit of a call to `spec`: its own, or the default for its kind. */
+export function timeoutOf(spec: EndpointSpec): number {
+  return spec.timeoutMs ?? (spec.multipart ? UPLOAD_TIMEOUT_MS : DEFAULT_TIMEOUT_MS)
 }
 
 function endpoint<const E extends EndpointSpec>(spec: E): E {
@@ -400,6 +416,7 @@ export const api = {
     tag: 'requests',
     summary: 'Upload a screenshot or file (multipart field "file", max 10 MB)',
     multipart: true,
+    timeoutMs: UPLOAD_TIMEOUT_MS,
     status: 201,
     response: Attachment,
   }),

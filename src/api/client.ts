@@ -3,12 +3,15 @@ import { apiRoot } from '../config/env'
 import { anySignal, timeoutSignal } from '../lib/abort'
 import {
   ApiErrorBody,
+  timeoutOf,
   type BodyOf,
   type EndpointSpec,
   type ParamsOf,
   type QueryOf,
   type ResponseOf,
 } from './contract'
+
+export { DEFAULT_TIMEOUT_MS, UPLOAD_TIMEOUT_MS } from './contract'
 
 /**
  * The server's own codes, plus three the client raises itself: `network` (no
@@ -65,15 +68,6 @@ const FALLBACK_MESSAGES: ClientMessages = {
   contract: () => 'The server response does not match the API contract.',
 }
 
-/**
- * How long one call may take before it fails as `timeout`: sending, the mock's
- * re-send and reading the answer together. A call can set its own (`timeoutMs`),
- * so each endpoint's hook in queries.ts can adjust it.
- */
-export const DEFAULT_TIMEOUT_MS = 30_000
-/** Uploads (multipart) carry up to 10 MB, possibly over a slow phone connection. */
-export const UPLOAD_TIMEOUT_MS = 120_000
-
 let hooks: ClientHooks = { getToken: () => null, onUnauthorized: () => {} }
 const message = <K extends keyof ClientMessages>(key: K): ClientMessages[K] =>
   hooks.messages?.[key] ?? FALLBACK_MESSAGES[key]
@@ -87,8 +81,6 @@ type Args<E extends EndpointSpec> = ([ParamsOf<E>] extends [never] ? object : { 
   ([QueryOf<E>] extends [never] ? object : { query?: QueryOf<E> }) &
   (E extends { multipart: true } ? { file: File } : object) & {
     signal?: AbortSignal
-    /** Time limit of this call in ms (default DEFAULT_TIMEOUT_MS, uploads UPLOAD_TIMEOUT_MS; 0 = none) */
-    timeoutMs?: number
   }
 
 export function buildUrl(
@@ -126,7 +118,6 @@ export async function call<E extends EndpointSpec>(spec: E, ...rest: [Args<E>] |
     body?: unknown
     file?: File
     signal?: AbortSignal
-    timeoutMs?: number
   }
 
   const headers = new Headers({ Accept: 'application/json' })
@@ -147,7 +138,8 @@ export async function call<E extends EndpointSpec>(spec: E, ...rest: [Args<E>] |
 
   const url = buildUrl(spec.path, args.params, args.query)
   // One deadline for the whole call, the mock's re-send included (its re-attach waits 3 s at most).
-  const deadline = timeoutSignal(args.timeoutMs ?? (spec.multipart ? UPLOAD_TIMEOUT_MS : DEFAULT_TIMEOUT_MS))
+  // The limit belongs to the endpoint (contract.ts `timeoutMs`), the same for every caller.
+  const deadline = timeoutSignal(timeoutOf(spec))
   const signal = args.signal ? anySignal([args.signal, deadline.signal]) : deadline.signal
 
   /** What a rejected fetch or body read becomes. */
