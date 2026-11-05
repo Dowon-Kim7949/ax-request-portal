@@ -54,6 +54,21 @@ describe('DateTimeText', () => {
     const { container } = render(<DateTimeText iso={AT} variant="date" weekday />)
     expect(container.textContent).toBe('11월 4일 (수)')
   })
+
+  it('reads a business day from the head-office calendar, with both clocks in the tooltip', () => {
+    at('America/Los_Angeles', false)
+    render(<DateTimeText iso={AT} variant="date" calendar="hq" weekday />)
+    const time = screen.getByText('11월 5일 (목)')
+    expect(time).toHaveAttribute('dateTime', AT)
+    // Even with head-office time turned off: the date is the head office's, so say when that was there.
+    expect(time).toHaveAttribute('title', '11월 4일 오후 6:00 (PST) · 한국 11월 5일 오전 11:00')
+  })
+
+  it('reads the same business day for a viewer in Korea', () => {
+    at('Asia/Seoul')
+    render(<DateTimeText iso="2026-11-30T15:30:00.000Z" variant="date" calendar="hq" />)
+    expect(screen.getByText('12월 1일')).toHaveAttribute('title', '12월 1일 오전 12:30')
+  })
 })
 
 describe('HqCalendarNote', () => {

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useHqCalendarNote, useTimeView } from '@/app/time-zone'
 import { cn } from '@/lib/cn'
 import { describeDateTime, formatDate } from '@/lib/format'
+import { dateInTimeZone, hqTimeZone } from '@/lib/time-zone'
 
 // Placeholders put into a translated sentence, then swapped for elements.
 const SLOT = String.fromCharCode(0xe000)
@@ -24,9 +25,17 @@ interface DateTimeTextProps {
    * - `compact` (lists, cards): local time only; the full form is in the tooltip.
    * - `full` (detail screens, timelines): adds the zone name and head-office time
    *   when the viewer's clock differs from the head office's.
-   * - `date`: the date it falls on in the viewer's time zone; the full form is in the tooltip.
+   * - `date`: the date it falls on (see `calendar`); the full form is in the tooltip.
    */
   variant?: 'compact' | 'full' | 'date'
+  /**
+   * `date` only: whose calendar the date is read from.
+   * - `viewer` (default): the viewer's time zone, for when something happened to them.
+   * - `hq`: the head office's business calendar, for business days such as a
+   *   release day, so the date matches the schedule, the dashboard and the
+   *   planned date. The tooltip then always adds head-office time.
+   */
+  calendar?: 'viewer' | 'hq'
   /** `date` only: add the weekday ("11월 5일 (목)") */
   weekday?: boolean
   /** Sentence around the time, e.g. `(time) => t('report.generatedAt', { time })` */
@@ -39,12 +48,14 @@ export function DateTimeText({
   iso,
   variant = 'compact',
   weekday = false,
+  calendar = 'viewer',
   sentence,
   className,
 }: DateTimeTextProps) {
   const { t } = useTranslation()
   const view = useTimeView()
-  const d = describeDateTime(iso, view)
+  const hqDate = variant === 'date' && calendar === 'hq'
+  const d = describeDateTime(iso, hqDate ? { ...view, showHq: true } : view)
 
   let body: ReactNode
   if (variant === 'full') {
@@ -66,7 +77,11 @@ export function DateTimeText({
         })
       : local
   } else {
-    const text = variant === 'date' ? formatDate(iso, { weekday, timeZone: view.timeZone }) : d.local
+    const text = hqDate
+      ? formatDate(dateInTimeZone(iso, hqTimeZone()), { weekday })
+      : variant === 'date'
+        ? formatDate(iso, { weekday, timeZone: view.timeZone })
+        : d.local
     body = (
       <time dateTime={iso} title={d.text !== text ? d.text : undefined}>
         {text}

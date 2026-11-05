@@ -182,6 +182,43 @@ const COMMON_TIME_ZONES = [
 ]
 
 /**
+ * Current names of zones that browsers may still list under a former one: V8
+ * (Chrome, Edge, Node) lists Asia/Calcutta, not Asia/Kolkata. People search
+ * for the city as it is called now. Search only: the zone stays the browser's.
+ */
+const CURRENT_ZONE_NAMES: Readonly<Record<string, string>> = {
+  'Africa/Asmera': 'Africa/Asmara',
+  'America/Buenos_Aires': 'America/Argentina/Buenos_Aires',
+  'America/Catamarca': 'America/Argentina/Catamarca',
+  'America/Coral_Harbour': 'America/Atikokan',
+  'America/Cordoba': 'America/Argentina/Cordoba',
+  'America/Godthab': 'America/Nuuk',
+  'America/Indianapolis': 'America/Indiana/Indianapolis',
+  'America/Jujuy': 'America/Argentina/Jujuy',
+  'America/Louisville': 'America/Kentucky/Louisville',
+  'America/Mendoza': 'America/Argentina/Mendoza',
+  'Asia/Calcutta': 'Asia/Kolkata',
+  'Asia/Dacca': 'Asia/Dhaka',
+  'Asia/Katmandu': 'Asia/Kathmandu',
+  'Asia/Macao': 'Asia/Macau',
+  'Asia/Rangoon': 'Asia/Yangon',
+  'Asia/Saigon': 'Asia/Ho_Chi_Minh',
+  'Asia/Thimbu': 'Asia/Thimphu',
+  'Asia/Ujung_Pandang': 'Asia/Makassar',
+  'Asia/Ulan_Bator': 'Asia/Ulaanbaatar',
+  'Atlantic/Faeroe': 'Atlantic/Faroe',
+  'Europe/Kiev': 'Europe/Kyiv',
+  'Pacific/Enderbury': 'Pacific/Kanton',
+  'Pacific/Ponape': 'Pacific/Pohnpei',
+  'Pacific/Truk': 'Pacific/Chuuk',
+}
+
+/** The zone's current IANA name ("Asia/Calcutta" → "Asia/Kolkata"); the id itself when it is current. */
+export function currentZoneName(id: string): string {
+  return CURRENT_ZONE_NAMES[id] ?? id
+}
+
+/**
  * Every time zone the browser knows (or a short list of common ones), plus
  * UTC, the head office's and `extra` (the device's, the saved choice), once each.
  */

@@ -43,6 +43,37 @@ describe('time zone settings', () => {
     expect(screen.getByText(/본사와 시각이 같아서/)).toBeInTheDocument()
   })
 
+  it('finds a zone by its current city name even where the browser lists a former one', () => {
+    usePreferences.setState({ timeZone: 'America/Los_Angeles' })
+    render(<TimeZoneSection />)
+    const search = screen.getByLabelText('시간대 찾기')
+    const select = screen.getByLabelText('시간대', { selector: 'select' })
+    const values = () => [...select.querySelectorAll('option')].map((o) => o.value)
+    // V8 lists Asia/Calcutta, Europe/Kiev and Asia/Saigon; other engines may list the current names.
+    for (const [query, ids] of [
+      ['kolkata', ['Asia/Calcutta', 'Asia/Kolkata']],
+      ['kyiv', ['Europe/Kiev', 'Europe/Kyiv']],
+      ['ho chi minh', ['Asia/Saigon', 'Asia/Ho_Chi_Minh']],
+    ] as const) {
+      fireEvent.change(search, { target: { value: query } })
+      expect(
+        values().some((v) => (ids as readonly string[]).includes(v)),
+        query,
+      ).toBe(true)
+      expect(screen.queryByText('맞는 시간대가 없어요. 다른 이름으로 찾아보세요.')).toBeNull()
+    }
+  })
+
+  it('does not read the preview out on every change, but describes the zone select with it', () => {
+    usePreferences.setState({ timeZone: 'America/Los_Angeles' })
+    render(<TimeZoneSection />)
+    const preview = screen.getByText('미리보기').parentElement!
+    expect(preview).not.toHaveAttribute('aria-live')
+    expect(screen.getByLabelText('시간대', { selector: 'select' })).toHaveAccessibleDescription(
+      expect.stringContaining('미리보기'),
+    )
+  })
+
   it('goes back to the device time zone', () => {
     usePreferences.setState({ timeZone: 'America/New_York' })
     render(<TimeZoneSection />)

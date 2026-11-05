@@ -1,5 +1,5 @@
 import { Globe, Smartphone } from 'lucide-react'
-import { useDeferredValue, useMemo, useState } from 'react'
+import { useDeferredValue, useId, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useTimeView } from '@/app/time-zone'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,6 +9,7 @@ import { Field, Input } from '@/components/ui/field'
 import { cn } from '@/lib/cn'
 import { hqPlaceName } from '@/lib/format'
 import {
+  currentZoneName,
   deviceTimeZone,
   formatOffset,
   hqTimeZone,
@@ -24,7 +25,7 @@ interface ZoneOption {
   id: string
   offset: number
   label: string
-  /** Lower-cased text the search matches against */
+  /** Lower-cased text the search matches against: the label, and the zone's current name */
   haystack: string
 }
 
@@ -45,7 +46,9 @@ function zoneOption(id: string, locale: string, at: number): ZoneOption {
   const offset = offsetMinutes(id, at)
   const generic = genericName(id, locale, at)
   const label = `${formatOffset(offset)} · ${id.replaceAll('_', ' ')}${generic ? ` (${generic})` : ''}`
-  return { id, offset, label, haystack: `${label} ${id}`.toLowerCase() }
+  const current = currentZoneName(id)
+  const renamed = current === id ? '' : ` ${current} ${current.replaceAll('_', ' ')}`
+  return { id, offset, label, haystack: `${label} ${id}${renamed}`.toLowerCase() }
 }
 
 /** Every zone the browser knows, west to east. Built once per language: a few hundred formatters. */
@@ -56,7 +59,16 @@ function zoneOptions(locale: string, at: number): ZoneOption[] {
 }
 
 /** Searchable native select: the platform picker is the best one on phones. */
-function TimeZonePicker({ value, onChange }: { value: string; onChange: (timeZone: string) => void }) {
+function TimeZonePicker({
+  value,
+  onChange,
+  previewId,
+}: {
+  value: string
+  onChange: (timeZone: string) => void
+  /** The preview below, read with the select: picking a zone changes it */
+  previewId: string
+}) {
   const { t, i18n } = useTranslation()
   const [query, setQuery] = useState('')
   const deferred = useDeferredValue(query)
@@ -101,7 +113,12 @@ function TimeZonePicker({ value, onChange }: { value: string; onChange: (timeZon
       </p>
       <Field label={t('time.settings.zone')}>
         {(p) => (
-          <Select value={value} onChange={(e) => onChange(e.target.value)} {...p}>
+          <Select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            {...p}
+            aria-describedby={[p['aria-describedby'], previewId].filter(Boolean).join(' ')}
+          >
             {visible.list.map((o) => (
               <option key={o.id} value={o.id}>
                 {o.label}
@@ -124,6 +141,7 @@ export function TimeZoneSection() {
   const device = deviceTimeZone()
   const manual = preference !== 'auto' && isValidTimeZone(preference)
   const place = hqPlaceName()
+  const previewId = useId()
   // One instant for the preview, so it changes only when the settings do.
   const [sample] = useState(() => new Date().toISOString())
   const sameClock = sameOffset(view.timeZone, hqTimeZone(), sample)
@@ -188,7 +206,9 @@ export function TimeZoneSection() {
           ))}
         </div>
 
-        {manual ? <TimeZonePicker value={view.timeZone} onChange={setTimeZone} /> : null}
+        {manual ? (
+          <TimeZonePicker value={view.timeZone} onChange={setTimeZone} previewId={previewId} />
+        ) : null}
 
         <div className="border-t border-line">
           <SwitchRow
@@ -199,7 +219,9 @@ export function TimeZoneSection() {
           />
         </div>
 
-        <div className="rounded-2xl bg-muted px-4 py-3" aria-live="polite">
+        {/* Not a live region: each arrow key on the zone select changes it, and every change
+            would be read out. The select names it as its description instead. */}
+        <div id={previewId} className="rounded-2xl bg-muted px-4 py-3">
           <p className="text-xs font-semibold text-ink-500">{t('time.settings.preview')}</p>
           <dl className="mt-1.5 grid grid-cols-1 gap-x-3 gap-y-1 text-sm min-[420px]:grid-cols-[auto_minmax(0,1fr)]">
             <dt className="text-ink-500">{t('time.settings.previewList')}</dt>

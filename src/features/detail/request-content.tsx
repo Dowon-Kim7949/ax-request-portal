@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDirectory } from '@/app/hooks'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
-import { DateTimeText } from '@/components/ui/date-time'
+import { DateTimeText, HqCalendarNote } from '@/components/ui/date-time'
 import type { WorkRequest } from '@/domain/model'
 import { formatDate } from '@/lib/format'
 import { AttachmentLink } from './attachment-link'
@@ -113,9 +113,11 @@ export function ReleaseCard({ request }: { request: WorkRequest }) {
         />
         <span className={released || scheduled ? 'font-semibold' : 'text-ink-500'}>
           {released ? (
+            // A release day is a business day: the head office's, as on the schedule and the dashboard.
             <DateTimeText
               iso={released}
               variant="date"
+              calendar="hq"
               weekday
               sentence={(date) => t('detail.releasedOn', { date })}
             />
@@ -127,6 +129,7 @@ export function ReleaseCard({ request }: { request: WorkRequest }) {
         </span>
       </p>
       {request.release?.note ? <p className="mt-2 text-sm text-ink-500">{request.release.note}</p> : null}
+      {released || scheduled ? <HqCalendarNote className="mt-2" /> : null}
     </Card>
   )
 }

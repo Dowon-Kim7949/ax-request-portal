@@ -6,6 +6,7 @@ import {
   hqTimeZone,
   hqToday,
   isValidTimeZone,
+  currentZoneName,
   listTimeZones,
   offsetMinutes,
   resolveViewTimeZone,
@@ -91,6 +92,12 @@ describe('calendar dates', () => {
 })
 
 describe('choosing a time zone', () => {
+  it('knows the current name of a renamed zone', () => {
+    expect(currentZoneName('Asia/Calcutta')).toBe('Asia/Kolkata')
+    expect(currentZoneName('Europe/Kiev')).toBe('Europe/Kyiv')
+    expect(currentZoneName('Asia/Seoul')).toBe('Asia/Seoul')
+  })
+
   it('uses a valid saved choice, otherwise the device', () => {
     expect(resolveViewTimeZone('auto', SEOUL)).toBe(SEOUL)
     expect(resolveViewTimeZone(LA, SEOUL)).toBe(LA)
