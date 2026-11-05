@@ -39,6 +39,7 @@ const ko = {
   loadError: {
     title: '불러오지 못했어요',
     body: '잠시 후 다시 시도해 주세요.',
+    stale: '최신 정보를 불러오지 못했어요. 마지막으로 불러온 내용이에요.',
   },
   boot: {
     loading: '불러오는 중',

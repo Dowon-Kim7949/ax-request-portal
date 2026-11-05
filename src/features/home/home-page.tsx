@@ -12,6 +12,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { useAiUsage, useRequests } from '@/api/queries'
+import { refreshOf } from '@/api/refresh'
 import { useCan, useCurrentUser, useDirectory } from '@/app/hooks'
 import { usePageTitle } from '@/app/title'
 import { ProjectIcon } from '@/components/request/project-icon'
@@ -20,7 +21,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Meter } from '@/components/ui/controls'
 import { EmptyState, ListSkeleton, Skeleton } from '@/components/ui/feedback'
-import { LoadFailed } from '@/components/ui/load-failed'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { isTerminal, turnOf } from '@/domain/lifecycle'
 import { formatKrw, formatMonth } from '@/lib/format'
 
@@ -31,11 +32,21 @@ function RequesterSection() {
   const open = mine.data?.filter((r) => !isTerminal(r.status)) ?? []
   const myTurn = open.filter((r) => turnOf(r.status) === 'requester')
   const projects = dir.projects.filter((p) => p.active)
-  // Nothing loaded: say so. (A failed refresh keeps showing what was loaded before.)
+  // Nothing loaded: say so. (A failed refresh keeps showing what was loaded before, and says that.)
   const failed = mine.isError && !mine.data
+  const mineRefresh = refreshOf(mine)
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <RefreshFailed
+        failed={mineRefresh.failed || dir.projectsStale}
+        retrying={mineRefresh.retrying || (dir.projectsStale && dir.retrying)}
+        onRetry={() => {
+          mineRefresh.onRetry()
+          if (dir.projectsStale) dir.retry()
+        }}
+        className="lg:col-span-2"
+      />
       <div className="flex flex-col gap-4">
         <Link
           to="/requests"
@@ -130,6 +141,7 @@ function DeveloperSection() {
           {t('common.seeAll')}
         </Link>
       </div>
+      <RefreshFailed {...refreshOf(assigned)} />
       {assigned.isPending ? (
         <ListSkeleton rows={3} />
       ) : assigned.isError && !assigned.data ? (
@@ -201,43 +213,46 @@ function AiSpendSummary() {
   const u = usage.data
   const pct = u && u.monthlyLimitKrw ? (u.totalKrw / u.monthlyLimitKrw) * 100 : 0
   return (
-    <Link
-      to="/ops/usage"
-      className="flex flex-col gap-2 rounded-2xl bg-surface px-4 py-4 ring-1 ring-line hover:ring-field"
-    >
-      <span className="flex items-center justify-between gap-3">
-        <span className="text-sm font-semibold text-ink-500">
-          {u ? t('home.opsSpend', { month: formatMonth(u.month) }) : t('nav.aiUsage')}
-        </span>
-        <span className="flex items-center text-sm font-semibold text-accent">
-          {t('home.view')}
-          <ChevronRight className="size-4" aria-hidden />
-        </span>
-      </span>
-      {u ? (
-        <>
-          <span className="text-[28px] leading-tight font-bold tracking-tight text-ink-900">
-            {formatKrw(u.totalKrw)}
+    <>
+      <RefreshFailed {...refreshOf(usage)} />
+      <Link
+        to="/ops/usage"
+        className="flex flex-col gap-2 rounded-2xl bg-surface px-4 py-4 ring-1 ring-line hover:ring-field"
+      >
+        <span className="flex items-center justify-between gap-3">
+          <span className="text-sm font-semibold text-ink-500">
+            {u ? t('home.opsSpend', { month: formatMonth(u.month) }) : t('nav.aiUsage')}
           </span>
-          {u.monthlyLimitKrw ? (
-            <>
-              <span className="text-sm text-ink-500">
-                {t('budget.of', { limit: formatKrw(u.monthlyLimitKrw) })} · {Math.round(pct)}%
-              </span>
-              <Meter value={pct} warnAt={u.alertThresholdPct} label={t('nav.aiUsage')} />
-            </>
-          ) : null}
-        </>
-      ) : usage.isError ? (
-        // No retry button inside the link: the usage screen offers one.
-        <span className="flex items-center gap-2 text-sm text-ink-500">
-          <CircleAlert className="size-4 shrink-0 text-danger-fg" aria-hidden />
-          {t('loadError.title')}
+          <span className="flex items-center text-sm font-semibold text-accent">
+            {t('home.view')}
+            <ChevronRight className="size-4" aria-hidden />
+          </span>
         </span>
-      ) : (
-        <Skeleton className="h-16" />
-      )}
-    </Link>
+        {u ? (
+          <>
+            <span className="text-[28px] leading-tight font-bold tracking-tight text-ink-900">
+              {formatKrw(u.totalKrw)}
+            </span>
+            {u.monthlyLimitKrw ? (
+              <>
+                <span className="text-sm text-ink-500">
+                  {t('budget.of', { limit: formatKrw(u.monthlyLimitKrw) })} · {Math.round(pct)}%
+                </span>
+                <Meter value={pct} warnAt={u.alertThresholdPct} label={t('nav.aiUsage')} />
+              </>
+            ) : null}
+          </>
+        ) : usage.isError ? (
+          // No retry button inside the link: the usage screen offers one.
+          <span className="flex items-center gap-2 text-sm text-ink-500">
+            <CircleAlert className="size-4 shrink-0 text-danger-fg" aria-hidden />
+            {t('loadError.title')}
+          </span>
+        ) : (
+          <Skeleton className="h-16" />
+        )}
+      </Link>
+    </>
   )
 }
 

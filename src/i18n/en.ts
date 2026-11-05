@@ -38,6 +38,7 @@ const en: Messages = {
   loadError: {
     title: 'Could not load this',
     body: 'Please try again in a moment.',
+    stale: 'Could not load the latest information. This is what was loaded last.',
   },
   boot: {
     loading: 'Loading',

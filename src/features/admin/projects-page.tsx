@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SwitchRow } from '@/components/ui/controls'
 import { ListSkeleton } from '@/components/ui/feedback'
-import { LoadFailed } from '@/components/ui/load-failed'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { Field, Input, Label, Textarea } from '@/components/ui/field'
 import { Sheet } from '@/components/ui/sheet'
 import { PROJECT_CONSTRAINTS_MAX, ProjectIcon as ProjectIconSchema, type Project } from '@/domain/model'
@@ -311,6 +311,12 @@ export default function ProjectsPage() {
             {t('projects.add')}
           </Button>
         }
+      />
+      <RefreshFailed
+        failed={dir.projectsStale}
+        onRetry={dir.retry}
+        retrying={dir.retrying}
+        className="mb-3"
       />
       {dir.loading ? (
         <ListSkeleton />

@@ -2,13 +2,14 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router'
 import { useRequests } from '@/api/queries'
+import { refreshOf } from '@/api/refresh'
 import { useDirectory } from '@/app/hooks'
 import { PageHeader } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { RequestCard } from '@/components/request/request-card'
-import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/controls'
-import { EmptyState, ErrorState, ListSkeleton } from '@/components/ui/feedback'
+import { EmptyState, ListSkeleton } from '@/components/ui/feedback'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { Segmented } from '@/components/ui/segmented'
 import { isTerminal, turnOf } from '@/domain/lifecycle'
 import type { WorkRequestSummary } from '@/domain/model'
@@ -77,17 +78,11 @@ export default function AssignedPage() {
         </Select>
       </div>
 
+      <RefreshFailed {...refreshOf(list)} className="mb-3" />
       {list.isPending ? (
         <ListSkeleton />
-      ) : list.isError ? (
-        <ErrorState
-          title={t('common.errorTitle')}
-          action={
-            <Button variant="secondary" onClick={() => void list.refetch()}>
-              {t('common.retry')}
-            </Button>
-          }
-        />
+      ) : list.isLoadingError ? (
+        <LoadFailed error={list.error} onRetry={() => void list.refetch()} retrying={list.isFetching} />
       ) : shown.length ? (
         <div className={`grid grid-cols-1 gap-3 lg:grid-cols-2 ${list.isFetching ? 'opacity-90' : ''}`}>
           {shown.map((r) => (

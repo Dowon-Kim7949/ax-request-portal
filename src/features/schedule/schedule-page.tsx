@@ -3,15 +3,16 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { useReleases } from '@/api/queries'
+import { refreshOf } from '@/api/refresh'
 import { useDirectory } from '@/app/hooks'
 import { PageHeader } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { ProjectIcon } from '@/components/request/project-icon'
 import { StatusBadge } from '@/components/request/status'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { HqCalendarNote } from '@/components/ui/date-time'
-import { EmptyState, ErrorState, ListSkeleton } from '@/components/ui/feedback'
+import { EmptyState, ListSkeleton } from '@/components/ui/feedback'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { Segmented } from '@/components/ui/segmented'
 import type { ReleaseScheduleItem } from '@/domain/model'
 import { cn } from '@/lib/cn'
@@ -112,16 +113,14 @@ export default function SchedulePage() {
           ...dir.projects.map((p) => ({ value: p.id, label: p.name })),
         ]}
       />
+      <RefreshFailed {...refreshOf(releases)} className="mb-3" />
       {releases.isPending ? (
         <ListSkeleton />
-      ) : releases.isError ? (
-        <ErrorState
-          title={t('common.errorTitle')}
-          action={
-            <Button variant="secondary" onClick={() => void releases.refetch()}>
-              {t('common.retry')}
-            </Button>
-          }
+      ) : releases.isLoadingError ? (
+        <LoadFailed
+          error={releases.error}
+          onRetry={() => void releases.refetch()}
+          retrying={releases.isFetching}
         />
       ) : sections.length ? (
         <div className="flex flex-col gap-8">

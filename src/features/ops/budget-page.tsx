@@ -6,14 +6,16 @@ import { toast } from 'sonner'
 import * as z from 'zod'
 import { ApiError } from '@/api/client'
 import { useBudget, useUpdateBudget } from '@/api/queries'
+import { refreshOf } from '@/api/refresh'
 import { PageHeader } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { ModelName } from '@/components/ai/ai'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Meter } from '@/components/ui/controls'
-import { ErrorState, Skeleton } from '@/components/ui/feedback'
+import { Skeleton } from '@/components/ui/feedback'
 import { Field, Input } from '@/components/ui/field'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { BUDGET_LIMIT_MAX_KRW, checkBudgetLimits, type Budget } from '@/domain/model'
 import { formatKrw, formatMonth } from '@/lib/format'
 
@@ -134,17 +136,8 @@ export default function BudgetPage() {
   const b = query.data
 
   if (query.isPending) return <Skeleton className="h-64" />
-  if (query.isError || !b) {
-    return (
-      <ErrorState
-        title={t('common.errorTitle')}
-        action={
-          <Button variant="secondary" onClick={() => void query.refetch()}>
-            {t('common.retry')}
-          </Button>
-        }
-      />
-    )
+  if (query.isLoadingError || !b) {
+    return <LoadFailed error={query.error} onRetry={() => void query.refetch()} retrying={query.isFetching} />
   }
 
   const pct = b.monthlyLimitKrw ? (b.spentKrw / b.monthlyLimitKrw) * 100 : 0
@@ -153,6 +146,7 @@ export default function BudgetPage() {
   return (
     <>
       <PageHeader title={t('budget.title')} description={t('budget.subtitle')} />
+      <RefreshFailed {...refreshOf(query)} className="mb-3" />
       <div className="flex flex-col gap-4">
         <Card>
           <CardHeader className="items-start">

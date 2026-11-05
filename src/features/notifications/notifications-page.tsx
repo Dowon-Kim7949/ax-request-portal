@@ -4,10 +4,12 @@ import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { errorText } from '@/api/error-text'
 import { useMarkNotificationRead, useNotifications } from '@/api/queries'
+import { refreshOf } from '@/api/refresh'
 import { PageHeader } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { Button } from '@/components/ui/button'
-import { EmptyState, ErrorState, ListSkeleton } from '@/components/ui/feedback'
+import { EmptyState, ListSkeleton } from '@/components/ui/feedback'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import type { Notification } from '@/domain/model'
 import { cn } from '@/lib/cn'
 import { describeDateTime, formatRelative } from '@/lib/format'
@@ -46,17 +48,11 @@ export default function NotificationsPage() {
           ) : null
         }
       />
+      <RefreshFailed {...refreshOf(list)} className="mb-3" />
       {list.isPending ? (
         <ListSkeleton />
-      ) : list.isError ? (
-        <ErrorState
-          title={t('common.errorTitle')}
-          action={
-            <Button variant="secondary" onClick={() => void list.refetch()}>
-              {t('common.retry')}
-            </Button>
-          }
-        />
+      ) : list.isLoadingError ? (
+        <LoadFailed error={list.error} onRetry={() => void list.refetch()} retrying={list.isFetching} />
       ) : list.data.length ? (
         <ul className="flex flex-col overflow-hidden rounded-(--radius-card) bg-surface ring-1 ring-line">
           {list.data.map((n) => (

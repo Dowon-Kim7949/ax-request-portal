@@ -56,6 +56,10 @@ export function useDirectory() {
       usersError: users.data ? null : users.error,
       /** Why the project list could not be loaded (null while there is one) */
       projectsError: projects.data ? null : projects.error,
+      /** Refreshing the user list failed: the one on show is from an earlier load (RefreshFailed) */
+      usersStale: users.isRefetchError,
+      /** Refreshing the project list failed: the one on show is from an earlier load (RefreshFailed) */
+      projectsStale: projects.isRefetchError,
       retrying: users.isFetching || projects.isFetching,
       /** Loads again whichever list failed */
       retry: () => {
@@ -71,6 +75,8 @@ export function useDirectory() {
     projects.isPending,
     users.isError,
     projects.isError,
+    users.isRefetchError,
+    projects.isRefetchError,
     users.error,
     projects.error,
     users.isFetching,

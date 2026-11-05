@@ -3,16 +3,17 @@ import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router'
 import { ApiError } from '@/api/client'
 import { useRequest } from '@/api/queries'
+import { refreshOf } from '@/api/refresh'
 import { useCan, useCurrentUser, useDirectory } from '@/app/hooks'
 import { PageHeader } from '@/app/page'
 import { NotFoundPage } from '@/app/pages'
 import { usePageTitle } from '@/app/title'
 import { StatusBadge, Stepper } from '@/components/request/status'
 import { Timeline } from '@/components/request/timeline'
-import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { DateTimeText } from '@/components/ui/date-time'
-import { ErrorState, Skeleton } from '@/components/ui/feedback'
+import { Skeleton } from '@/components/ui/feedback'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { appConfig } from '@/config/app.config'
 import { availableEvents, isResponsibleDeveloper, isTerminal } from '@/domain/lifecycle'
 import { AiUsageCard } from './ai-usage-card'
@@ -50,18 +51,11 @@ export default function RequestDetailPage() {
 
   if (!Number.isInteger(id) || id <= 0) return <NotFoundPage />
   if (query.isPending) return <DetailSkeleton />
-  if (query.isError || !request) {
-    if (query.error instanceof ApiError && query.error.status === 404) return <NotFoundPage />
-    return (
-      <ErrorState
-        title={t('common.errorTitle')}
-        action={
-          <Button variant="secondary" onClick={() => void query.refetch()}>
-            {t('common.retry')}
-          </Button>
-        }
-      />
-    )
+  // Gone, or no longer visible to this person: even over a copy loaded before.
+  if (query.error instanceof ApiError && query.error.status === 404) return <NotFoundPage />
+  // Nothing loaded at all. A failed refresh keeps the request on screen (RefreshFailed below).
+  if (query.isLoadingError || !request) {
+    return <LoadFailed error={query.error} onRetry={() => void query.refetch()} retrying={query.isFetching} />
   }
 
   const project = dir.project(request.projectId)
@@ -109,6 +103,7 @@ export default function RequestDetailPage() {
         }
       />
 
+      <RefreshFailed {...refreshOf(query)} className="mb-4" />
       <Card className="mb-4">
         <Stepper status={request.status} />
       </Card>

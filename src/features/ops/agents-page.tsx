@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import type { AiSettingsInput } from '@/api/contract'
 import { errorText } from '@/api/error-text'
+import { refreshOf } from '@/api/refresh'
 import {
   useAiPricing,
   useAiSettings,
@@ -24,7 +25,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select } from '@/components/ui/controls'
 import { DateTimeText } from '@/components/ui/date-time'
-import { ErrorState, Skeleton } from '@/components/ui/feedback'
+import { Skeleton } from '@/components/ui/feedback'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { Field, Input } from '@/components/ui/field'
 import { Sheet } from '@/components/ui/sheet'
 import {
@@ -492,21 +494,13 @@ export default function AgentsPage() {
 
   const body = () => {
     if (settings.isPending || pricing.isPending) return <Skeleton className="h-96" />
-    if (settings.isError || pricing.isError || !settings.data || !pricing.data) {
+    if (settings.isLoadingError || pricing.isLoadingError || !settings.data || !pricing.data) {
+      const failed = [settings, pricing].filter((q) => q.isError)
       return (
-        <ErrorState
-          title={t('common.errorTitle')}
-          action={
-            <Button
-              variant="secondary"
-              onClick={() => {
-                void settings.refetch()
-                void pricing.refetch()
-              }}
-            >
-              {t('common.retry')}
-            </Button>
-          }
+        <LoadFailed
+          error={failed[0]?.error}
+          onRetry={() => failed.forEach((q) => void q.refetch())}
+          retrying={failed.some((q) => q.isFetching)}
         />
       )
     }
@@ -521,6 +515,7 @@ export default function AgentsPage() {
   return (
     <>
       <PageHeader title={t('agents.title')} description={t('agents.subtitle')} />
+      <RefreshFailed {...refreshOf(settings, pricing)} className="mb-3" />
       {body()}
     </>
   )
