@@ -20,10 +20,12 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { ApiError } from '@/api/client'
 import { useTransition, useUpdateRegression, useUpdateRelease } from '@/api/queries'
+import { useHqCalendarNote } from '@/app/time-zone'
 import { ModelName } from '@/components/ai/ai'
 import { Badge, type BadgeTone } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { DateTimeText } from '@/components/ui/date-time'
 import { Field, Input, Textarea } from '@/components/ui/field'
 import { Sheet } from '@/components/ui/sheet'
 import type {
@@ -35,7 +37,8 @@ import type {
   WorkRequest,
 } from '@/domain/model'
 import { cn } from '@/lib/cn'
-import { formatDateTime, formatKrw, toLocalDate } from '@/lib/format'
+import { formatKrw } from '@/lib/format'
+import { hqToday } from '@/lib/time-zone'
 import { releaseDateMissing, uncheckedAssumptions } from '@/domain/lifecycle'
 import { isSafeUrl } from '@/domain/url'
 import { useAiRunLimit } from './ai-limit'
@@ -109,7 +112,11 @@ export function ReportPanel({
           <CardTitle id="report-title">{t('report.title')}</CardTitle>
           <p className="mt-0.5 text-xs text-ink-400">
             {t('report.revision', { n: report.revision })} ·{' '}
-            {t('report.generatedAt', { time: formatDateTime(report.generatedAt) })}
+            <DateTimeText
+              iso={report.generatedAt}
+              variant="full"
+              sentence={(time) => t('report.generatedAt', { time })}
+            />
           </p>
           {report.generatedBy ? (
             <p className="mt-1 flex text-xs text-ink-600">
@@ -975,6 +982,8 @@ export function ReleasePanel({ request, canRelease }: { request: WorkRequest; ca
   // Mirrors the server's guard: a request is released on a planned date.
   const needsDate = releaseDateMissing(request)
   const needsDateId = useId()
+  // Release dates are head-office calendar days; the API refuses one before its today.
+  const hqDateNote = useHqCalendarNote('today')
 
   return (
     <Card>
@@ -992,11 +1001,11 @@ export function ReleasePanel({ request, canRelease }: { request: WorkRequest; ca
           )
         }}
       >
-        <Field label={t('release.date')}>
+        <Field label={t('release.date')} hint={hqDateNote}>
           {(p) => (
             <Input
               type="date"
-              min={toLocalDate()}
+              min={hqToday()}
               value={date}
               onChange={(e) => setDate(e.target.value)}
               {...p}

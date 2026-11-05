@@ -14,7 +14,8 @@ import { MonthStepper } from '@/components/ui/month-stepper'
 import { StatTile } from '@/components/ui/stat-tile'
 import type { DashboardSummary } from '@/domain/model'
 import { cn } from '@/lib/cn'
-import { formatDate, formatKrw, formatMonth, toLocalDate } from '@/lib/format'
+import { formatDate, formatKrw, formatMonth } from '@/lib/format'
+import { hqToday } from '@/lib/time-zone'
 
 /**
  * Stacked horizontal bars: done (brand) + in progress (ai), 12px thick,
@@ -104,7 +105,7 @@ export default function DashboardPage() {
   const { t } = useTranslation()
   usePageTitle(t('dashboard.title'))
   const dir = useDirectory()
-  const current = toLocalDate().slice(0, 7)
+  const current = hqToday().slice(0, 7)
   const [month, setMonth] = useState(current)
   const query = useDashboard(month)
   const data = query.data

@@ -12,7 +12,8 @@ import { AI_PROVIDERS, cacheHitRate, type AiProvider } from '@/domain/ai'
 import type { AiUsageReport } from '@/domain/model'
 import { niceScale } from '@/lib/chart'
 import { cn } from '@/lib/cn'
-import { daysInMonth, formatDate, formatKrw, formatNumber, formatPercent, toLocalDate } from '@/lib/format'
+import { daysInMonth, formatDate, formatKrw, formatNumber, formatPercent } from '@/lib/format'
+import { hqToday } from '@/lib/time-zone'
 
 type Totals = Record<AiProvider, number>
 const zero = (): Totals => ({ anthropic: 0, openai: 0 })
@@ -101,9 +102,12 @@ export function ProviderLegend() {
   )
 }
 
-/** Day rows of a month (up to today while it is in progress), cost per provider. */
+/**
+ * Day rows of a month (up to today while it is in progress), cost per provider.
+ * Days are head-office calendar days, the same buckets the API reports.
+ */
 function dailyRows(month: string, daily: AiUsageReport['daily']): { date: string; values: Totals }[] {
-  const today = toLocalDate()
+  const today = hqToday()
   const last = today.startsWith(month) ? Number(today.slice(8, 10)) : daysInMonth(month)
   const byDay = new Map<string, Totals>()
   for (const d of daily) {

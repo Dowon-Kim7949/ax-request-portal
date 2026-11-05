@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select } from '@/components/ui/controls'
+import { DateTimeText } from '@/components/ui/date-time'
 import { ErrorState, Skeleton } from '@/components/ui/feedback'
 import { Field, Input } from '@/components/ui/field'
 import { Sheet } from '@/components/ui/sheet'
@@ -37,7 +38,7 @@ import {
   type AiSettings,
   type AiTask,
 } from '@/domain/ai'
-import { formatDateTime, formatUsd } from '@/lib/format'
+import { formatUsd } from '@/lib/format'
 
 const errorText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback)
 
@@ -112,9 +113,12 @@ function Providers({ settings }: { settings: AiSettings }) {
                   {c?.connected && c.keyHint ? (
                     <p className="text-[13px] text-ink-500 tabular-nums">
                       {t('agents.keyHint', { hint: c.keyHint })}
-                      {c.updatedAt
-                        ? ` · ${t('agents.keyUpdated', { time: formatDateTime(c.updatedAt) })}`
-                        : ''}
+                      {c.updatedAt ? (
+                        <DateTimeText
+                          iso={c.updatedAt}
+                          sentence={(time) => ` · ${t('agents.keyUpdated', { time })}`}
+                        />
+                      ) : null}
                     </p>
                   ) : null}
                 </div>

@@ -66,6 +66,7 @@ import type {
 } from '../domain/model'
 import { precheckDraft } from '../domain/precheck'
 import { hasPermission, type Permission, type RolePermissions } from '../domain/roles'
+import { addCalendarDays, dateInTimeZone, hqTimeZone } from '../lib/time-zone'
 import { finishWork, generateReport, generateScope, phaseAt, simulateUsage, type UsageShape } from './ai'
 import { renderNotification, type ErrorKey, type NotificationKey, type ServerLanguage } from './copy'
 
@@ -136,6 +137,12 @@ export interface EngineOptions {
   rolePermissions: RolePermissions
   /** Ask the requester to confirm the AI's reading before a developer reviews it (default on) */
   scopeCheck?: boolean
+  /**
+   * The business calendar: "today" for desired and release dates, delays, and
+   * daily/monthly totals. Defaults to the head office (appConfig.organization.timeZone);
+   * a real backend must use the same setting.
+   */
+  timeZone?: string
 }
 
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
@@ -177,19 +184,17 @@ const GUARD_ERRORS: Record<GuardName, ErrorKey> = {
   releaseUnscheduled: 'releaseUnscheduled',
 }
 
-export function toDate(iso: string): string {
-  return iso.slice(0, 10)
+/**
+ * Calendar date (YYYY-MM-DD) of an instant on the business calendar: what the
+ * company means by "today", wherever the server or the viewer is.
+ */
+export function businessDate(at: Date | string, timeZone = hqTimeZone()): string {
+  return dateInTimeZone(at, timeZone)
 }
 
-/** Local calendar date (YYYY-MM-DD) — what a person means by "today". */
-export function localDate(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
+/** Calendar arithmetic on YYYY-MM-DD; no time zone involved. */
 export function addDays(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00Z`)
-  return new Date(d.getTime() + days * DAY).toISOString().slice(0, 10)
+  return addCalendarDays(date, days)
 }
 
 /* ------------------------------------------------------------------ */
@@ -206,6 +211,16 @@ export class MockEngine {
   }
 
   /* ---------- helpers ---------- */
+
+  /** Business-calendar date of an instant (see EngineOptions.timeZone). */
+  dateOf(at: Date | string): string {
+    return businessDate(at, this.opts.timeZone)
+  }
+
+  /** "Today" on the business calendar. */
+  today(now: Date): string {
+    return this.dateOf(now)
+  }
 
   newId(prefix: string): string {
     this.state.seq += 1
@@ -543,7 +558,7 @@ export class MockEngine {
       }
       this.bookAi('precheck', this.selectionFor(draft.projectId, 'precheck'), shape, now.toISOString())
     }
-    return precheckDraft(draft, localDate(now), lang)
+    return precheckDraft(draft, this.today(now), lang)
   }
 
   createRequest(user: User, draft: RequestDraft, now: Date, lang: ServerLanguage): WorkRequest {
@@ -602,7 +617,7 @@ export class MockEngine {
       status: 'submitted',
       createdAt: at,
       updatedAt: at,
-      precheck: precheckDraft(draft, localDate(now), lang),
+      precheck: precheckDraft(draft, this.today(now), lang),
       regression: [],
       verification: [],
       timeline: [
@@ -787,6 +802,16 @@ export class MockEngine {
     if (!this.isResponsible(user, req)) throw new HttpError(403, 'forbidden', 'developerOnlySchedule')
     if (!['code_review', 'verification', 'changes_requested', 'release_scheduled'].includes(req.status)) {
       throw new HttpError(409, 'invalid_transition', 'cannotScheduleNow')
+    }
+    // A new date cannot be in the past on the business calendar. Re-sending the
+    // date already set (only the note changes) stays possible after it has passed.
+    const today = this.today(now)
+    if (
+      input.scheduledDate &&
+      input.scheduledDate !== req.release?.scheduledDate &&
+      input.scheduledDate < today
+    ) {
+      throw new HttpError(400, 'bad_request', 'releaseDateInPast', { today })
     }
     const at = now.toISOString()
     const next = this.replace({
@@ -1020,7 +1045,7 @@ export class MockEngine {
     const byProvider = group((e) => e.provider)
     const byModel = group((e) => `${e.provider}/${e.model}`)
     const byTask = group((e) => e.task)
-    const daily = group((e) => `${localDate(new Date(e.at))}/${e.provider}`)
+    const daily = group((e) => `${this.dateOf(e.at)}/${e.provider}`)
     const byRequest = group((e) => e.requestId ?? 0)
     byRequest.delete(0)
     return {
@@ -1073,7 +1098,7 @@ export class MockEngine {
   /* ---------- insights ---------- */
 
   private usageIn(month: string): AiUsageEntry[] {
-    return this.state.aiUsage.filter((e) => localDate(new Date(e.at)).startsWith(month))
+    return this.state.aiUsage.filter((e) => this.dateOf(e.at).startsWith(month))
   }
 
   budget(month: string): Budget {
@@ -1103,7 +1128,7 @@ export class MockEngine {
 
   dashboard(user: User, month: string, now: Date): DashboardSummary {
     this.require(user, 'dashboard:view')
-    const today = localDate(now)
+    const today = this.today(now)
     const prev = (() => {
       const [y, m] = month.split('-').map(Number) as [number, number]
       return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`
@@ -1112,13 +1137,14 @@ export class MockEngine {
     // While a month is in progress, compare it with the same span of the previous month,
     // not the whole of it — otherwise every month looks like a collapse on day 2.
     const lastDay = month === today.slice(0, 7) ? today.slice(8, 10) : '31'
-    const filed = (r: WorkRequest) => localDate(new Date(r.createdAt))
+    const filed = (r: WorkRequest) => this.dateOf(r.createdAt)
     const receivedPrevMonth = reqs.filter((r) => {
       const d = filed(r)
       return d.startsWith(prev) && d.slice(8, 10) <= lastDay
     }).length
     const open = reqs.filter((r) => !isTerminal(r.status))
-    const doneInMonth = reqs.filter((r) => r.status === 'done' && r.release?.releasedAt?.startsWith(month))
+    const released = (r: WorkRequest) => (r.release?.releasedAt ? this.dateOf(r.release.releasedAt) : '')
+    const doneInMonth = reqs.filter((r) => r.status === 'done' && released(r).startsWith(month))
     const leads = doneInMonth.map((r) => (Date.parse(r.release!.releasedAt!) - Date.parse(r.createdAt)) / DAY)
     const delayed = open.filter((r) => this.isDelayed(r, today))
     const weekEnd = addDays(today, 7)
@@ -1165,9 +1191,7 @@ export class MockEngine {
     // The schedule is company-wide on purpose: "when does it ship?" is the question sales asks most.
     for (const r of this.state.requests) {
       if (r.status === 'cancelled' || r.status === 'rejected') continue
-      const date = r.release?.releasedAt
-        ? localDate(new Date(r.release.releasedAt))
-        : r.release?.scheduledDate
+      const date = r.release?.releasedAt ? this.dateOf(r.release.releasedAt) : r.release?.scheduledDate
       if (!date || (from && date < from) || (to && date > to)) continue
       const key = `${date}|${r.projectId}`
       const item = groups.get(key) ?? { date, projectId: r.projectId, requests: [] }

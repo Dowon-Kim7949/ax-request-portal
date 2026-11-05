@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/ui/feedback'
 import type { Notification } from '@/domain/model'
 import { cn } from '@/lib/cn'
-import { formatRelative } from '@/lib/format'
+import { describeDateTime, formatRelative } from '@/lib/format'
 
 export default function NotificationsPage() {
   const { t } = useTranslation()
@@ -76,7 +76,11 @@ export default function NotificationsPage() {
                     {n.readAt ? null : <span className="sr-only"> ({t('notifications.unread')})</span>}
                   </span>
                   <span className="line-clamp-2 text-sm text-ink-500">{n.body}</span>
-                  <time dateTime={n.createdAt} className="text-xs text-ink-400">
+                  <time
+                    dateTime={n.createdAt}
+                    title={describeDateTime(n.createdAt).text}
+                    className="text-xs text-ink-400"
+                  >
                     {formatRelative(n.createdAt)}
                   </time>
                 </span>

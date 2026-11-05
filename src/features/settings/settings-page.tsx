@@ -12,6 +12,7 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { SwitchRow } from '@/components/ui/controls'
 import { ErrorState, Skeleton } from '@/components/ui/feedback'
 import type { NotificationSettings } from '@/domain/model'
+import { TimeZoneSection } from './time-zone-section'
 
 const ROWS = [
   { key: 'inApp', label: 'settings.inApp', hint: 'settings.inAppHint' },
@@ -107,6 +108,7 @@ export default function SettingsPage() {
       <PageHeader title={t('settings.title')} description={t('settings.subtitle')} />
       <div className="grid max-w-2xl grid-cols-1 gap-4">
         <DisplaySection />
+        <TimeZoneSection />
         <NotificationsSection />
       </div>
     </>

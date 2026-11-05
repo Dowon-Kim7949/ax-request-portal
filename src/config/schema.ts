@@ -7,6 +7,19 @@ const Locale = z.enum(LOCALES)
 /** One string per shipped language */
 const Localized = z.record(Locale, z.string().min(1))
 
+/** An IANA time zone name the runtime knows, e.g. "Asia/Seoul" or "America/Los_Angeles" */
+const TimeZone = z.string().refine(
+  (tz) => {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: tz })
+      return true
+    } catch {
+      return false
+    }
+  },
+  { message: 'unknown IANA time zone' },
+)
+
 export const AppConfigSchema = z
   .object({
     brand: z.object({
@@ -15,6 +28,17 @@ export const AppConfigSchema = z
       /** 1–4 characters for the compact logo mark */
       shortName: z.string().min(1).max(4),
       tagline: Localized,
+    }),
+    organization: z.object({
+      /**
+       * Time zone of the head office. It is the business calendar: "today" for
+       * desired and release dates, delays, and daily/monthly totals follow it, in
+       * the UI and in the API alike. Timestamps are shown in the viewer's own
+       * time zone, with head-office time added when the two differ.
+       */
+      timeZone: TimeZone,
+      /** Short place name put before head-office times: "Korea Nov 5, 11:00 AM" */
+      timeZoneLabel: Localized,
     }),
     /** Languages offered in the language switcher, in display order */
     locales: z.array(Locale).min(1),

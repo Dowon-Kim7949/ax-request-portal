@@ -25,15 +25,15 @@ import {
   formatPercent,
   formatSmallKrw,
   formatUsd,
-  toLocalDate,
 } from '@/lib/format'
+import { hqToday } from '@/lib/time-zone'
 import { DailyChart, ModelBars, ProviderLegend, ProviderSplit } from './usage-charts'
 
 export default function UsagePage() {
   const { t } = useTranslation()
   usePageTitle(t('usage.title'))
   const dir = useDirectory()
-  const [month, setMonth] = useState(() => toLocalDate().slice(0, 7))
+  const [month, setMonth] = useState(() => hqToday().slice(0, 7))
   const query = useAiUsage(month)
   const u = query.data
   const stale = query.isFetching && query.isPlaceholderData

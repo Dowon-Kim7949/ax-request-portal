@@ -12,7 +12,6 @@ import type { ServerLanguage } from './copy'
 import {
   addDays,
   DEFAULT_NOTIFICATION_SETTINGS,
-  localDate,
   MockEngine,
   STATE_VERSION,
   type EngineOptions,
@@ -1115,7 +1114,7 @@ export function buildSeedState(now: Date, opts: EngineOptions, lang: ServerLangu
   const state = emptyState(now, lang)
   const engine = new MockEngine(state, opts)
   const at = (hoursAgo: number) => new Date(now.getTime() - hoursAgo * 3_600_000)
-  const today = localDate(now)
+  const today = engine.today(now)
   const user = (id: string) => {
     const u = state.users.find((x) => x.id === id)
     if (!u) throw new Error(`seed: unknown user ${id}`)
