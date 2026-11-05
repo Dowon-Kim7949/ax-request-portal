@@ -24,6 +24,9 @@ test-results
 blob-report
 playwright/.cache
 
+# Agent worktrees (e.g. Claude Code workflows) hold whole checkouts of the repository
+.claude/worktrees/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

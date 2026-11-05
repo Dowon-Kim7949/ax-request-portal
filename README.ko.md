@@ -88,13 +88,13 @@ npm run dev
 
 출력된 주소를 열고 데모 계정을 고르면 됩니다. Node 22.22.2 이상, 24.15 이상, 26 이상 중 하나가 필요합니다(`.nvmrc`는 24). React Router 8과 jsdom 30이 이 하한을 정하며, CI가 세 줄기의 하한인 22.22.2, 24.15.0, 26.0.0에서 확인합니다.
 
-| 스크립트           | 하는 일                                                         |
-| ------------------ | --------------------------------------------------------------- |
-| `npm run dev`      | 목 API와 함께 개발 서버 실행                                    |
-| `npm run build`    | `dist/`에 배포용 빌드                                           |
-| `npm run verify`   | oxlint, Prettier 검사, 타입 검사, 단위 테스트, 빌드 (CI와 같음) |
-| `npm run test:e2e` | 휴대폰(WebKit), 태블릿(WebKit), PC(Chromium)에서 Playwright     |
-| `npm run openapi`  | 계약을 바꾼 뒤 `docs/openapi.json` 다시 생성                    |
+| 스크립트           | 하는 일                                                                           |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `npm run dev`      | 목 API와 함께 개발 서버 실행                                                      |
+| `npm run build`    | `dist/`에 배포용 빌드                                                             |
+| `npm run verify`   | oxlint, Prettier 검사, 타입 검사, 단위 테스트, 빌드, 실서버 빌드 검사 (CI와 같음) |
+| `npm run test:e2e` | 휴대폰(WebKit), 태블릿(WebKit), PC(Chromium)에서 Playwright                       |
+| `npm run openapi`  | 계약을 바꾼 뒤 `docs/openapi.json` 다시 생성                                      |
 
 ## 내 서비스로 바꾸기
 
@@ -126,7 +126,7 @@ npm run dev
    VITE_API_MOCK=false VITE_API_BASE_URL=/api npm run build
    ```
 
-`VITE_API_MOCK=false`이면 목 코드는 아예 불러오지 않습니다. [`.env.example`](.env.example)을 참고하세요.
+`VITE_API_MOCK=false`이면 목 코드와 시연 데이터는 빌드에 아예 들어가지 않습니다(`npm run verify`가 확인합니다). [`.env.example`](.env.example)을 참고하세요.
 
 ## nginx로 배포
 

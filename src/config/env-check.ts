@@ -13,6 +13,8 @@
 export interface EnvInput {
   readonly VITE_API_MOCK?: string
   readonly VITE_API_BASE_URL?: string
+  /** Public path the app is served from (vite.config.ts `base`); "/" when unset */
+  readonly VITE_BASE?: string
 }
 
 export interface EnvReport {
@@ -51,7 +53,7 @@ function shown(value: string): string {
   )
 }
 
-function checkBaseUrl(value: string, errors: string[], warnings: string[]): void {
+function checkBaseUrl(value: string, base: string, errors: string[], warnings: string[]): void {
   if (!value.trim()) {
     errors.push(`VITE_API_MOCK=false needs VITE_API_BASE_URL, the backend to call. ${BASE_URL_HINT}`)
     return
@@ -66,6 +68,26 @@ function checkBaseUrl(value: string, errors: string[], warnings: string[]): void
     if (/[?#]/.test(value)) {
       errors.push(
         `VITE_API_BASE_URL must not contain "?" or "#": API paths are appended to it (got ${shown(value)}).`,
+      )
+      return
+    }
+    if (value.split('/').some((segment) => segment === '.' || segment === '..')) {
+      errors.push(
+        `VITE_API_BASE_URL must not contain "." or ".." segments: browsers resolve them to another path (got ${shown(value)}).`,
+      )
+      return
+    }
+    // API paths (/requests, /auth/login …) are appended to it. Where it is the path the app is served
+    // from, they are the app's own pages: nginx answers with index.html, and nothing reaches a backend.
+    const apiPath = value.replace(/\/+$/, '')
+    const appPath = base.replace(/\/+$/, '')
+    if (apiPath === appPath) {
+      errors.push(
+        `VITE_API_BASE_URL ${shown(value)} is the path the app is served from (VITE_BASE=${shown(base)}), so API calls would load the app's pages (e.g. ${apiPath}/requests). Give the API a path of its own, such as "${appPath}/api".`,
+      )
+    } else if (!apiPath) {
+      warnings.push(
+        `VITE_API_BASE_URL "/" sends API calls to the site root (e.g. /requests, /auth/login) while the app is served from ${shown(base)}: make sure the backend is proxied there.`,
       )
     }
     return
@@ -111,7 +133,8 @@ function checkBaseUrl(value: string, errors: string[], warnings: string[]): void
   }
   warnings.push(
     `API calls go to ${url.origin}. Unless the app is served from that same origin, add it to connect-src in the ` +
-      `Content-Security-Policy (deploy/nginx.conf) and allow the app's origin in the backend's CORS settings.`,
+      `Content-Security-Policy (deploy/nginx.conf), and to img-src as well if it serves attachment or preview ` +
+      `images, and allow the app's origin in the backend's CORS settings.`,
   )
 }
 
@@ -128,7 +151,7 @@ export function checkEnv(input: EnvInput): EnvReport {
   }
 
   const apiMock = isApiMock(mock)
-  if (!apiMock) checkBaseUrl(input.VITE_API_BASE_URL ?? '', errors, warnings)
+  if (!apiMock) checkBaseUrl(input.VITE_API_BASE_URL ?? '', input.VITE_BASE || '/', errors, warnings)
 
   return { apiMock, errors, warnings }
 }

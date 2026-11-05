@@ -62,13 +62,18 @@ for path in / /requests/1024 "/$asset" /version.json /assets/does-not-exist.js; 
   done
 done
 
-# 9. The CSP runs index.html's inline scripts by hash and allows no other inline script
+# 9. The CSP runs index.html's inline scripts by hash and allows no other inline script.
+#    The hashes are read before the loop: a command failing inside a for loop's
+#    word list does not stop the script, and the check would pass unchecked.
+command -v node >/dev/null || fail "node is required for the CSP hash check (it hashes index.html's inline scripts)"
 csp="$(header / content-security-policy)"
 script_src="$(tr ';' '\n' <<<"$csp" | sed 's/^ *//' | grep '^script-src ' || true)"
 [[ -n "$script_src" ]] || fail "the CSP has no script-src"
 [[ "$script_src" != *unsafe-inline* && "$script_src" != *unsafe-eval* ]] \
   || fail "script-src must not allow 'unsafe-inline' or 'unsafe-eval'"
-for hash in $(curl -fsS "$BASE/" | node "$HERE/csp-hashes.mjs"); do
+hashes="$(curl -fsS "$BASE/" | node "$HERE/csp-hashes.mjs")" || fail "could not hash the inline scripts of index.html"
+[[ -n "$hashes" ]] || fail "index.html has no inline script to check (the theme script is expected)"
+for hash in $hashes; do
   [[ "$script_src" == *"$hash"* ]] \
     || fail "script-src lacks $hash, an inline script in index.html (print the hashes with: node deploy/csp-hashes.mjs dist/index.html)"
 done

@@ -55,6 +55,11 @@ describe('Content-Security-Policy in deploy/nginx.conf', () => {
     }
   })
 
+  it('shows the images the demo keeps in the browser (attachments, preview screenshots)', () => {
+    // A backend or file store on another origin is added here too (see the comment in deploy/nginx.conf).
+    expect(csp.get('img-src')).toEqual(expect.arrayContaining(["'self'", 'data:', 'blob:']))
+  })
+
   it('stays strict where it matters', () => {
     expect(csp.get('default-src')).toEqual(["'self'"])
     expect(csp.get('connect-src')).toContain("'self'")

@@ -60,6 +60,47 @@ describe('checkEnv: VITE_API_BASE_URL with VITE_API_MOCK=false', () => {
     expect(warnings).toHaveLength(1)
     expect(warnings[0]).toContain('https://api.acme.co.kr')
     expect(warnings[0]).toContain('connect-src')
+    // Attachments and preview screenshots it serves are images: the page policy must allow them too.
+    expect(warnings[0]).toContain('img-src')
+  })
+
+  it("rejects the path the app is served from: API calls would load the app's own pages", () => {
+    for (const [VITE_API_BASE_URL, VITE_BASE] of [
+      ['/', undefined],
+      ['/', '/'],
+      ['/', ''],
+      ['/ax', '/ax/'],
+      ['/ax/', '/ax/'],
+    ] as const) {
+      const { errors } = checkEnv({ VITE_API_MOCK: 'false', VITE_API_BASE_URL, VITE_BASE })
+      expect(errors, `${VITE_API_BASE_URL} on ${VITE_BASE}`).toHaveLength(1)
+      expect(errors[0]).toContain('path the app is served from')
+    }
+  })
+
+  it('accepts the site root for an app served under a sub-path, with a reminder', () => {
+    const { errors, warnings } = checkEnv({
+      VITE_API_MOCK: 'false',
+      VITE_API_BASE_URL: '/',
+      VITE_BASE: '/ax/',
+    })
+    expect(errors).toEqual([])
+    expect(warnings).toHaveLength(1)
+    expect(warnings[0]).toContain('site root')
+    expect(checkEnv({ VITE_API_MOCK: 'false', VITE_API_BASE_URL: '/ax/api', VITE_BASE: '/ax/' })).toEqual({
+      apiMock: false,
+      errors: [],
+      warnings: [],
+    })
+  })
+
+  it('rejects "." and ".." segments', () => {
+    for (const value of ['/./', '/..', '/api/../x', '/./api']) {
+      const { errors } = real(value)
+      expect(errors, value).toHaveLength(1)
+      expect(errors[0]).toContain('segments')
+    }
+    expect(real('/api.v2').errors).toEqual([])
   })
 
   it('warns about plain http outside the local machine', () => {
