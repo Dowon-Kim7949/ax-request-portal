@@ -35,9 +35,10 @@ function DateGroup({ date, items, today }: { date: string; items: ReleaseSchedul
         {items.map((item) => {
           const project = dir.project(item.projectId)
           return (
+            // Past days sit on the muted tint instead of fading out: faded text loses its contrast.
             <section
               key={item.projectId}
-              className={cn('rounded-(--radius-card) bg-surface p-4 ring-1 ring-line', past && 'opacity-75')}
+              className={cn('rounded-(--radius-card) p-4 ring-1 ring-line', past ? 'bg-muted' : 'bg-surface')}
             >
               <div className="mb-2 flex items-center gap-2.5">
                 <ProjectIcon icon={project?.icon} className="size-8 rounded-lg" />
@@ -51,7 +52,10 @@ function DateGroup({ date, items, today }: { date: string; items: ReleaseSchedul
                   <li key={r.id}>
                     <Link
                       to={`/requests/${r.id}`}
-                      className="-mx-2 flex min-h-11 items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted"
+                      className={cn(
+                        '-mx-2 flex min-h-11 items-center gap-2 rounded-lg px-2 py-1.5',
+                        past ? 'hover:bg-surface' : 'hover:bg-muted',
+                      )}
                     >
                       <span className="text-xs text-ink-400">#{r.id}</span>
                       <span className="min-w-0 flex-1 truncate text-[15px]">{r.title}</span>

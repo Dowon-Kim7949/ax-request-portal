@@ -661,14 +661,17 @@ function ReviewRow({ label, children, onEdit }: { label: string; children: React
   return (
     <div className="flex items-start gap-3 py-3.5">
       <dt className="w-24 shrink-0 pt-0.5 text-[13px] font-semibold text-ink-500 sm:w-32">{label}</dt>
-      <dd className="min-w-0 flex-1 text-[15px] whitespace-pre-line text-ink-900">{children}</dd>
-      <button
-        type="button"
-        onClick={onEdit}
-        className="-my-1.5 h-9 shrink-0 rounded-lg px-2.5 text-sm font-semibold text-accent hover:bg-brand-50"
-      >
-        {t('common.edit')}
-      </button>
+      {/* The edit button sits in the <dd>: a <dl> group holds only <dt> and <dd>. */}
+      <dd className="flex min-w-0 flex-1 items-start gap-3">
+        <div className="min-w-0 flex-1 text-[15px] whitespace-pre-line text-ink-900">{children}</div>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="-my-1.5 h-9 shrink-0 rounded-lg px-2.5 text-sm font-semibold text-accent hover:bg-brand-50"
+        >
+          {t('common.edit')}
+        </button>
+      </dd>
     </div>
   )
 }

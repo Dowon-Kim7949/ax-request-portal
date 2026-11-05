@@ -29,13 +29,24 @@ import type { RouteHandle } from './router'
 /* Small pieces                                                        */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Text drawn by CSS (initials, a counter) inside a control whose name already
+ * says it. As DOM text it would be part of the control's visible label, and a
+ * visible label must be contained in the accessible name (WCAG 2.5.3): "AX",
+ * "11" or "김" are not words of "AX 업무 요청", "알림 (11)" or "내 계정 김기획".
+ */
+function Glyph({ text, className }: { text: string; className?: string }) {
+  return <span aria-hidden data-glyph={text} className={cn('before:content-[attr(data-glyph)]', className)} />
+}
+
 function BrandMark({ compact }: { compact?: boolean }) {
   const brand = useBrand()
   return (
     <Link to="/" className="flex items-center gap-2.5 rounded-lg" aria-label={brand.name}>
-      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-inverse text-[13px] font-black tracking-tight text-on-inverse">
-        {brand.shortName}
-      </span>
+      <Glyph
+        text={brand.shortName}
+        className="grid size-9 shrink-0 place-items-center rounded-xl bg-inverse text-[13px] font-black tracking-tight text-on-inverse"
+      />
       {compact ? null : <span className="text-[15px] font-bold text-ink-900">{brand.name}</span>}
     </Link>
   )
@@ -57,9 +68,10 @@ function NotificationBell() {
     >
       <Bell className="size-5.5" aria-hidden />
       {unread ? (
-        <span className="absolute top-1.5 right-1.5 grid min-w-4.5 place-items-center rounded-full bg-danger-600 px-1 text-[10px] leading-4.5 font-bold text-white">
-          {unread > 99 ? '99+' : unread}
-        </span>
+        <Glyph
+          text={unread > 99 ? '99+' : String(unread)}
+          className="absolute top-1.5 right-1.5 grid min-w-4.5 place-items-center rounded-full bg-danger-600 px-1 text-[10px] leading-4.5 font-bold text-white"
+        />
       ) : null}
     </Link>
   )
@@ -125,13 +137,15 @@ function AccountMenu() {
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
-        aria-label={t('nav.account')}
         onClick={() => setOpen((o) => !o)}
         className="flex h-11 items-center gap-2 rounded-full pr-3 pl-1.5 text-sm font-semibold text-ink-700 hover:bg-muted"
       >
-        <span className="grid size-8 place-items-center rounded-full bg-brand-100 text-[13px] font-bold text-accent-strong">
-          {user.name.slice(0, 1)}
-        </span>
+        <Glyph
+          text={user.name.slice(0, 1)}
+          className="grid size-8 place-items-center rounded-full bg-brand-100 text-[13px] font-bold text-accent-strong"
+        />
+        {/* Named "내 계정", plus the user's name where it shows (the words a voice user would say). */}
+        <span className="sr-only">{t('nav.account')}</span>{' '}
         <span className="hidden lg:inline">{user.name}</span>
       </button>
       {open ? (
