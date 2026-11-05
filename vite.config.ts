@@ -1,9 +1,12 @@
 /// <reference types="vitest/config" />
 import { execSync } from 'node:child_process'
+import { rmSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath, URL } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig, loadEnv, type Plugin } from 'vite'
+import { checkEnv, type EnvReport } from './src/config/env-check.ts'
 
 /**
  * Identifies a build: VITE_BUILD_ID if set, else the commit (rebuilding the
@@ -32,16 +35,53 @@ function versionFile(buildId: string): Plugin {
   }
 }
 
+/**
+ * A real-backend build ships no mock service worker. Vite copies public/ as
+ * is, so the file is removed from the output once it has been written.
+ */
+function dropMockWorker(): Plugin {
+  return {
+    name: 'ax:drop-mock-worker',
+    apply: 'build',
+    writeBundle({ dir }) {
+      if (dir) rmSync(join(dir, 'mockServiceWorker.js'), { force: true })
+    },
+  }
+}
+
+/**
+ * `vite build` stops on a setting that would ship a broken or silently mocked
+ * app. The dev server only warns: it never reaches users, and with a malformed
+ * VITE_API_MOCK it falls back to the mock, which the demo banner shows.
+ */
+function reportEnv(report: EnvReport, command: 'build' | 'serve'): void {
+  const list = (items: string[]) => items.map((m) => `\n  - ${m}`).join('')
+  if (command === 'build' && report.errors.length) {
+    throw new Error(`Invalid build settings (see .env.example):${list(report.errors)}`)
+  }
+  const warnings = [...report.errors, ...report.warnings]
+  if (warnings.length) console.warn(`[env] Check the build settings (see .env.example):${list(warnings)}`)
+  if (command === 'build' && report.apiMock) {
+    console.info(
+      '[env] Demo build: the in-browser mock API answers every call and data stays in each browser. ' +
+        'Set VITE_API_MOCK=false and VITE_API_BASE_URL to use a real backend.',
+    )
+  }
+}
+
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode, isPreview }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const buildId = resolveBuildId(env)
+  const envReport = checkEnv(env)
+  // `vite preview` serves an existing build, and Vitest only borrows this config.
+  if (!isPreview && mode !== 'test' && !process.env.VITEST) reportEnv(envReport, command)
 
   return {
     // Sub-path deployments (e.g. https://host/ax/) set VITE_BASE=/ax/
     base: env.VITE_BASE || '/',
     define: { __BUILD_ID__: JSON.stringify(buildId) },
-    plugins: [react(), tailwindcss(), versionFile(buildId)],
+    plugins: [react(), tailwindcss(), versionFile(buildId), envReport.apiMock ? null : dropMockWorker()],
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -58,7 +98,12 @@ export default defineConfig(({ mode }) => {
               { name: 'vendor-router', test: /node_modules[\\/]react-router[\\/]/ },
               { name: 'vendor-query', test: /node_modules[\\/](@tanstack|zustand)[\\/]/ },
               { name: 'vendor-i18n', test: /node_modules[\\/](i18next|react-i18next)[\\/]/ },
-              { name: 'vendor-zod', test: /node_modules[\\/]zod[\\/]/ },
+              // zod-jitless rides along: a chunk runs after the chunks it imports, so in the entry
+              // chunk it would run after the schemas in the app chunks were built (see that file).
+              {
+                name: 'vendor-zod',
+                test: /node_modules[\\/]zod[\\/]|[\\/]src[\\/]config[\\/]zod-jitless\.ts$/,
+              },
               {
                 name: 'vendor-ui',
                 test: /node_modules[\\/](radix-ui|@radix-ui|@floating-ui|react-remove-scroll[^\\/]*|aria-hidden|use-callback-ref|use-sidecar|sonner|tailwind-merge|clsx|class-variance-authority)[\\/]/,

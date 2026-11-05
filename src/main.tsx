@@ -1,3 +1,5 @@
+// Before any Zod schema is built: no eval probe under the strict CSP (deploy/nginx.conf).
+import './config/zod-jitless'
 // i18n first: the language decides the mock seed and every text below.
 import i18n, { currentLocale } from './i18n'
 import { QueryClientProvider } from '@tanstack/react-query'

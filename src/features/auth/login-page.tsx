@@ -10,6 +10,7 @@ import type { Session } from '@/api/contract'
 import { useLogin } from '@/api/queries'
 import { useBrand } from '@/app/brand'
 import { loadDemoAccounts } from '@/app/demo'
+import { DemoBanner } from '@/app/demo-banner'
 import { QuickDisplayToggles } from '@/app/display-controls'
 import { usePageTitle } from '@/app/title'
 import { Button } from '@/components/ui/button'
@@ -78,6 +79,7 @@ export default function LoginPage() {
           </span>
           <h1 className="text-[28px] leading-tight font-bold tracking-tight">{brand.name}</h1>
           <p className="text-[15px] text-ink-500">{brand.tagline}</p>
+          <DemoBanner variant="inline" />
         </div>
 
         {ended?.reason === 'expired' ? (
