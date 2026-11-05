@@ -3,7 +3,7 @@ import { Bot, Check, CircleAlert, X } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { ApiError } from '@/api/client'
+import { errorText } from '@/api/error-text'
 import { useSaveVerification, useTransition } from '@/api/queries'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,8 +12,6 @@ import { Sheet } from '@/components/ui/sheet'
 import { requesterStatusOf, turnOf } from '@/domain/lifecycle'
 import type { CriterionCheck, WorkRequest } from '@/domain/model'
 import { cn } from '@/lib/cn'
-
-const errorText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback)
 
 /** What is happening now, in one plain sentence, with a live indicator while the AI works. */
 export function StatusExplainer({ request }: { request: WorkRequest }) {

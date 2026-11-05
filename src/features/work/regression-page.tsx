@@ -44,7 +44,7 @@ export default function RegressionPage() {
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <StatusBadge status={item.status} />
                 <span className="text-xs text-ink-400">#{item.requestId}</span>
-                <span className="text-xs text-ink-400">· {dir.project(item.projectId)?.name}</span>
+                <span className="text-xs text-ink-400">· {dir.projectName(item.projectId)}</span>
               </div>
               <h2 id={`rg-${item.requestId}`} className="mb-3 text-[15px] font-bold">
                 <Link to={`/requests/${item.requestId}`} className="hover:underline">

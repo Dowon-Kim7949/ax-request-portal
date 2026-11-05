@@ -1,7 +1,6 @@
 import { Check, CircleAlert, FileText, ImagePlus, Paperclip, Plus, Sparkles, Trash2, X } from 'lucide-react'
 import { useRef, useState, type ReactNode } from 'react'
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form'
-import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useUploadAttachment } from '@/api/queries'
@@ -11,16 +10,13 @@ import { ProjectIcon } from '@/components/request/project-icon'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/feedback'
 import { Field, Input, Textarea, type Advice } from '@/components/ui/field'
+import { LoadFailed } from '@/components/ui/load-failed'
 import { appConfig } from '@/config/app.config'
 import { ACCEPTANCE_CRITERIA_MAX, CHECKLIST_ITEMS_MAX, type PrecheckIssue } from '@/domain/model'
 import { cn } from '@/lib/cn'
 import { formatBytes, formatDate } from '@/lib/format'
 import { hqToday } from '@/lib/time-zone'
 import { EMPTY_ROW, parseChecklist, STEPS, stepOfField, type WizardValues } from './schema'
-
-// The app's own namespace: ReturnType<typeof useTranslation> would widen it to every
-// namespace and the dictionary type gets too deep for the compiler as it grows.
-type TFn = TFunction<'translation'>
 
 export function StepTitle({ children, hint }: { children: ReactNode; hint?: ReactNode }) {
   return (
@@ -95,6 +91,9 @@ export function ProjectStep({ onPicked }: { onPicked: () => void }) {
   return (
     <>
       <StepTitle hint={t('wizard.project.hint')}>{t('wizard.project.title')}</StepTitle>
+      {dir.projectsError ? (
+        <LoadFailed compact error={dir.projectsError} onRetry={dir.retry} retrying={dir.retrying} />
+      ) : null}
       <div role="radiogroup" aria-label={t('wizard.field.projectId')} className="flex flex-col gap-3">
         {dir.loading ? <Spinner label={t('common.loading')} /> : null}
         {dir.projects
@@ -613,17 +612,10 @@ export function ExtraStep({ advice }: { advice: Map<string, PrecheckIssue[]> }) 
 
 /* 7 ---------------------------------------------------------------- */
 
-function ReviewRow({
-  label,
-  children,
-  onEdit,
-  t,
-}: {
-  label: string
-  children: ReactNode
-  onEdit: () => void
-  t: TFn
-}) {
+// Reads `t` itself: passing it as a prop (typed from useTranslation) runs into
+// TypeScript's instantiation depth limit once the dictionary grows (TS2589).
+function ReviewRow({ label, children, onEdit }: { label: string; children: ReactNode; onEdit: () => void }) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-start gap-3 py-3.5">
       <dt className="w-24 shrink-0 pt-0.5 text-[13px] font-semibold text-ink-500 sm:w-32">{label}</dt>
@@ -643,11 +635,14 @@ export function ReviewStep({
   issues,
   checking,
   checkFailed,
+  onRecheck,
   goTo,
 }: {
   issues: PrecheckIssue[]
   checking: boolean
+  /** The check could not run; submitting is still allowed (it is advisory) */
   checkFailed: boolean
+  onRecheck: () => void
   goTo: (step: number) => void
 }) {
   const { t } = useTranslation()
@@ -667,22 +662,37 @@ export function ReviewStep({
       <div
         className={cn(
           'mb-5 flex gap-3 rounded-2xl px-4 py-3.5',
-          checking ? 'bg-ai-50' : issues.length ? 'bg-warning-50' : 'bg-success-50',
+          checking
+            ? 'bg-ai-50'
+            : checkFailed
+              ? 'bg-muted ring-1 ring-line'
+              : issues.length
+                ? 'bg-warning-50'
+                : 'bg-success-50',
         )}
         aria-live="polite"
       >
-        <Sparkles
-          className={cn(
-            'mt-0.5 size-5 shrink-0',
-            checking ? 'animate-pulse text-ai-600' : issues.length ? 'text-warning-fg' : 'text-success-fg',
-          )}
-          aria-hidden
-        />
+        {checkFailed && !checking ? (
+          <CircleAlert className="mt-0.5 size-5 shrink-0 text-ink-500" aria-hidden />
+        ) : (
+          <Sparkles
+            className={cn(
+              'mt-0.5 size-5 shrink-0',
+              checking ? 'animate-pulse text-ai-600' : issues.length ? 'text-warning-fg' : 'text-success-fg',
+            )}
+            aria-hidden
+          />
+        )}
         <div className="flex flex-col gap-1.5 text-sm">
           {checking ? (
             <p className="font-semibold text-ai-700">{t('wizard.review.checking')}</p>
           ) : checkFailed ? (
-            <p className="font-semibold text-ink-700">{t('wizard.review.checkFailed')}</p>
+            <>
+              <p className="font-semibold text-ink-700">{t('wizard.review.checkFailed')}</p>
+              <Button variant="secondary" className="w-fit" onClick={onRecheck}>
+                {t('wizard.review.recheck')}
+              </Button>
+            </>
           ) : issues.length ? (
             <>
               <p className="font-bold text-warning-fg">
@@ -721,26 +731,26 @@ export function ReviewStep({
       ) : null}
 
       <dl className="divide-y divide-line rounded-2xl bg-surface px-4 ring-1 ring-line">
-        <ReviewRow t={t} label={t('wizard.field.projectId')} onEdit={() => goTo(step('project'))}>
+        <ReviewRow label={t('wizard.field.projectId')} onEdit={() => goTo(step('project'))}>
           {project?.name ?? none}
         </ReviewRow>
-        <ReviewRow t={t} label={t('wizard.field.type')} onEdit={() => goTo(step('type'))}>
+        <ReviewRow label={t('wizard.field.type')} onEdit={() => goTo(step('type'))}>
           {v.type ? t(`requestType.${v.type}.label`) : none}
         </ReviewRow>
-        <ReviewRow t={t} label={t('wizard.field.targetIds')} onEdit={() => goTo(step('targets'))}>
+        <ReviewRow label={t('wizard.field.targetIds')} onEdit={() => goTo(step('targets'))}>
           {targets.length ? targets.join(', ') : none}
         </ReviewRow>
-        <ReviewRow t={t} label={t('wizard.field.title')} onEdit={() => goTo(step('describe'))}>
+        <ReviewRow label={t('wizard.field.title')} onEdit={() => goTo(step('describe'))}>
           {v.title || none}
         </ReviewRow>
-        <ReviewRow t={t} label={t('wizard.field.currentBehavior')} onEdit={() => goTo(step('describe'))}>
+        <ReviewRow label={t('wizard.field.currentBehavior')} onEdit={() => goTo(step('describe'))}>
           {v.currentBehavior.trim() || none}
         </ReviewRow>
-        <ReviewRow t={t} label={t('wizard.field.desiredBehavior')} onEdit={() => goTo(step('describe'))}>
+        <ReviewRow label={t('wizard.field.desiredBehavior')} onEdit={() => goTo(step('describe'))}>
           {v.desiredBehavior || none}
         </ReviewRow>
         {v.type === 'checklist' ? (
-          <ReviewRow t={t} label={t('wizard.field.checklist')} onEdit={() => goTo(step('criteria'))}>
+          <ReviewRow label={t('wizard.field.checklist')} onEdit={() => goTo(step('criteria'))}>
             {v.checklistSource.trim() ? (
               <p className="mb-1 text-ink-600">{v.checklistSource.trim()}</p>
             ) : null}
@@ -755,7 +765,7 @@ export function ReviewStep({
             </ol>
           </ReviewRow>
         ) : (
-          <ReviewRow t={t} label={t('wizard.field.acceptanceCriteria')} onEdit={() => goTo(step('criteria'))}>
+          <ReviewRow label={t('wizard.field.acceptanceCriteria')} onEdit={() => goTo(step('criteria'))}>
             <ol className="flex list-decimal flex-col gap-1 pl-4">
               {v.acceptanceCriteria
                 .filter((c) => c.text.trim())
@@ -765,10 +775,10 @@ export function ReviewStep({
             </ol>
           </ReviewRow>
         )}
-        <ReviewRow t={t} label={t('wizard.field.outOfScope')} onEdit={() => goTo(step('extra'))}>
+        <ReviewRow label={t('wizard.field.outOfScope')} onEdit={() => goTo(step('extra'))}>
           {v.outOfScope.trim() || none}
         </ReviewRow>
-        <ReviewRow t={t} label={t('wizard.field.attachmentIds')} onEdit={() => goTo(step('extra'))}>
+        <ReviewRow label={t('wizard.field.attachmentIds')} onEdit={() => goTo(step('extra'))}>
           {v.attachments.length ? (
             <span className="inline-flex items-center gap-1">
               <Paperclip className="size-4 text-ink-400" aria-hidden />
@@ -778,7 +788,7 @@ export function ReviewStep({
             none
           )}
         </ReviewRow>
-        <ReviewRow t={t} label={t('wizard.field.desiredDate')} onEdit={() => goTo(step('extra'))}>
+        <ReviewRow label={t('wizard.field.desiredDate')} onEdit={() => goTo(step('extra'))}>
           {v.desiredDate
             ? `${formatDate(v.desiredDate)}${v.desiredDateReason ? ` · ${v.desiredDateReason}` : ''}`
             : none}

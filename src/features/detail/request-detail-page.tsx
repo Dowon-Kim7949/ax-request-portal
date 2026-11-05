@@ -65,7 +65,6 @@ export default function RequestDetailPage() {
   }
 
   const project = dir.project(request.projectId)
-  const requester = dir.user(request.requesterId)
   const isRequester = request.requesterId === user.id
   const ctx = { user, request, project, rolePermissions: appConfig.rolePermissions }
   const events = availableEvents(ctx)
@@ -95,11 +94,11 @@ export default function RequestDetailPage() {
         title={request.title}
         description={
           <span className="flex flex-wrap gap-x-2 text-sm">
-            <span>{project?.name}</span>
+            <span>{dir.projectName(request.projectId)}</span>
             <span aria-hidden>·</span>
             <span>{t(`requestType.${request.type}.label`)}</span>
             <span aria-hidden>·</span>
-            <span>{t('detail.requestedBy', { name: requester?.name ?? '' })}</span>
+            <span>{t('detail.requestedBy', { name: dir.userName(request.requesterId) })}</span>
             <span aria-hidden>·</span>
             <DateTimeText
               iso={request.createdAt}

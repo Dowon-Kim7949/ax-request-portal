@@ -3,25 +3,30 @@ import { ChevronLeft, X } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { useNavigate, useSearchParams } from 'react-router'
+import { useBlocker, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
-import { ApiError } from '@/api/client'
+import { errorText } from '@/api/error-text'
 import { useCreateRequest, usePrecheck } from '@/api/queries'
 import { useCurrentUser, useDirectory } from '@/app/hooks'
 import { usePageTitle } from '@/app/title'
 import { Button } from '@/components/ui/button'
+import { Sheet } from '@/components/ui/sheet'
 import type { PrecheckIssue } from '@/domain/model'
+import { debounce } from '@/lib/debounce'
 import {
   adviceByField,
   clearDraft,
+  DRAFT_SAVE_DELAY_MS,
   EMPTY_VALUES,
   firstInvalidStep,
+  hasWrittenContent,
   isEmptyDraft,
   loadDraft,
   saveDraft,
   STEPS,
   toDraft,
   WizardSchema,
+  type DraftSaveResult,
   type WizardValues,
 } from './schema'
 import {
@@ -81,19 +86,50 @@ export default function WizardPage() {
   }, [step])
 
   // Unknown project in ?project= (e.g. deactivated) → start from the project list.
+  // Not when the list failed to load: then nothing is known about the project yet.
   useEffect(() => {
-    if (presetProject && !dir.loading && !dir.project(presetProject)) {
+    if (presetProject && !dir.loading && !dir.projectsError && !dir.project(presetProject)) {
       form.setValue('projectId', '')
       goTo(0, true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [presetProject, dir.loading])
+  }, [presetProject, dir.loading, dir.projectsError])
 
-  // Persist every keystroke so switching apps on a phone loses nothing.
+  /* ---- draft: saved as you type, so switching apps on a phone loses nothing ---- */
+  /** Set once the request is created: from then on nothing may write the draft back. */
+  const submitted = useRef(false)
+  const [lastSave, setLastSave] = useState<DraftSaveResult>('saved')
+  const warned = useRef(new Set<DraftSaveResult>())
+  const draftSaver = useMemo(
+    () =>
+      debounce(() => {
+        if (submitted.current) return
+        const result = saveDraft(user.id, form.getValues())
+        setLastSave(result)
+        // Storage full: say so once per kind, without stopping the person.
+        if (result !== 'saved' && !warned.current.has(result)) {
+          warned.current.add(result)
+          toast.warning(result === 'failed' ? t('wizard.draftNotSaved') : t('wizard.draftWithoutAttachments'))
+        }
+      }, DRAFT_SAVE_DELAY_MS),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `t` is read when the save runs
+    [form, user.id],
+  )
   useEffect(() => {
-    const sub = form.watch((values) => saveDraft(user.id, values as WizardValues))
-    return () => sub.unsubscribe()
-  }, [form, user.id])
+    const sub = form.watch(() => draftSaver.schedule())
+    // A phone may discard a hidden tab without warning: write what is pending first.
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden') draftSaver.flush()
+    }
+    document.addEventListener('visibilitychange', onHidden)
+    window.addEventListener('pagehide', draftSaver.flush)
+    return () => {
+      sub.unsubscribe()
+      document.removeEventListener('visibilitychange', onHidden)
+      window.removeEventListener('pagehide', draftSaver.flush)
+      draftSaver.flush()
+    }
+  }, [form, draftSaver])
 
   const discard = () => {
     clearDraft(user.id)
@@ -121,29 +157,63 @@ export default function WizardPage() {
   /* ---- submission check on the review step ---- */
   const precheck = usePrecheck()
   const [issues, setIssues] = useState<PrecheckIssue[]>([])
-  useEffect(() => {
-    if (current.key !== 'review') return
+  // Advice from an earlier check must not outlive a new one, failed or not.
+  const runPrecheck = () => {
+    setIssues([])
     precheck.mutate(toDraft(form.getValues()), { onSuccess: (r) => setIssues(r.issues) })
+  }
+  useEffect(() => {
+    if (current.key === 'review') runPrecheck()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current.key])
   const advice = useMemo(() => adviceByField(issues), [issues])
 
+  /* ---- submission ---- */
+  // Handled by the hook, so the draft is deleted and the outcome told even when
+  // the person has left the wizard while the request was on its way.
+  const create = useCreateRequest({
+    onCreated: () => {
+      submitted.current = true
+      draftSaver.cancel()
+      clearDraft(user.id)
+      toast.success(t('wizard.review.submitted'))
+    },
+    onFailed: (e) => toast.error(errorText(e, t('errors.generic'))),
+  })
+  const submit = () => {
+    create.mutate(toDraft(form.getValues()), {
+      onSuccess: (req) => navigate(`/requests/${req.id}`, { replace: true }),
+    })
+  }
+
+  /* ---- leaving with something written: confirm (the draft is kept either way) ---- */
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      currentLocation.pathname !== nextLocation.pathname &&
+      !submitted.current &&
+      // Leaving while it is sent is fine: the hook finishes the job.
+      !create.isPending &&
+      hasWrittenContent(form.getValues()),
+  )
+  useEffect(() => {
+    if (blocker.state === 'blocked') draftSaver.flush()
+  }, [blocker.state, draftSaver])
+  useEffect(() => {
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      draftSaver.flush()
+      // A reload would also cut off a submission on its way.
+      if (submitted.current || (!create.isPending && !hasWrittenContent(form.getValues()))) return
+      event.preventDefault()
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [form, draftSaver, create.isPending])
+
   /* ---- navigation ---- */
-  const create = useCreateRequest()
   const next = async () => {
     const ok = await form.trigger([...current.fields] as Array<keyof WizardValues>)
     if (!ok) return
     if (step < LAST) goTo(step + 1)
-  }
-  const submit = () => {
-    create.mutate(toDraft(form.getValues()), {
-      onSuccess: (req) => {
-        clearDraft(user.id)
-        toast.success(t('wizard.review.submitted'))
-        navigate(`/requests/${req.id}`, { replace: true })
-      },
-      onError: (e) => toast.error(e instanceof ApiError ? e.message : t('errors.generic')),
-    })
   }
   const back = () => {
     if (step === 0) return navigate('/')
@@ -165,6 +235,7 @@ export default function WizardPage() {
         issues={issues}
         checking={precheck.isPending}
         checkFailed={precheck.isError}
+        onRecheck={runPrecheck}
         goTo={(s) => goTo(s)}
       />
     ),
@@ -234,6 +305,34 @@ export default function WizardPage() {
           </div>
         </form>
       </div>
+
+      <Sheet
+        open={blocker.state === 'blocked'}
+        onOpenChange={(open) => {
+          if (!open && blocker.state === 'blocked') blocker.reset()
+        }}
+        title={t('wizard.leave.title')}
+        description={lastSave === 'failed' ? t('wizard.leave.unsaved') : t('wizard.leave.saved')}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              size="lg"
+              className="flex-1"
+              onClick={() => blocker.state === 'blocked' && blocker.proceed()}
+            >
+              {t('wizard.leave.go')}
+            </Button>
+            <Button
+              size="lg"
+              className="flex-1"
+              onClick={() => blocker.state === 'blocked' && blocker.reset()}
+            >
+              {t('wizard.leave.stay')}
+            </Button>
+          </>
+        }
+      />
     </FormProvider>
   )
 }

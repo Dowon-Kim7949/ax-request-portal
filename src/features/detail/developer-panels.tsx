@@ -18,7 +18,7 @@ import {
 import { useId, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { ApiError } from '@/api/client'
+import { errorText } from '@/api/error-text'
 import { useTransition, useUpdateRegression, useUpdateRelease } from '@/api/queries'
 import { useHqCalendarNote } from '@/app/time-zone'
 import { ModelName } from '@/components/ai/ai'
@@ -44,8 +44,6 @@ import { isSafeUrl } from '@/domain/url'
 import { useAiRunLimit } from './ai-limit'
 import { FeedbackBadge, PreviewImages } from './preview-panels'
 import { AiRunLimitReason } from './ai-usage-card'
-
-const errorText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback)
 
 function reviewTerm(project: Project | undefined): 'MR' | 'PR' {
   return project?.repository.provider === 'github' ? 'PR' : 'MR'

@@ -1,4 +1,14 @@
-import { Bot, ChartColumn, ChartPie, ChevronRight, FolderGit2, Tags, Users, Wallet } from 'lucide-react'
+import {
+  Bot,
+  ChartColumn,
+  ChartPie,
+  ChevronRight,
+  CircleAlert,
+  FolderGit2,
+  Tags,
+  Users,
+  Wallet,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { useAiUsage, useRequests } from '@/api/queries'
@@ -10,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Meter } from '@/components/ui/controls'
 import { EmptyState, ListSkeleton, Skeleton } from '@/components/ui/feedback'
+import { LoadFailed } from '@/components/ui/load-failed'
 import { isTerminal, turnOf } from '@/domain/lifecycle'
 import { formatKrw, formatMonth } from '@/lib/format'
 
@@ -20,6 +31,8 @@ function RequesterSection() {
   const open = mine.data?.filter((r) => !isTerminal(r.status)) ?? []
   const myTurn = open.filter((r) => turnOf(r.status) === 'requester')
   const projects = dir.projects.filter((p) => p.active)
+  // Nothing loaded: say so. (A failed refresh keeps showing what was loaded before.)
+  const failed = mine.isError && !mine.data
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -31,6 +44,9 @@ function RequesterSection() {
           <span className="font-bold text-ink-900">
             {mine.isPending ? (
               <Skeleton className="h-5 w-32" />
+            ) : failed ? (
+              // A failed load is not "0 in progress": just link to the list.
+              t('nav.myRequests')
             ) : (
               t('home.inProgress', { count: open.length })
             )}
@@ -47,6 +63,13 @@ function RequesterSection() {
           </h2>
           {mine.isPending ? (
             <ListSkeleton rows={2} />
+          ) : failed ? (
+            <LoadFailed
+              compact
+              error={mine.error}
+              onRetry={() => void mine.refetch()}
+              retrying={mine.isFetching}
+            />
           ) : myTurn.length ? (
             myTurn.map((r) => <RequestCard key={r.id} request={r} myTurn />)
           ) : (
@@ -63,6 +86,8 @@ function RequesterSection() {
         </CardHeader>
         {dir.loading ? (
           <ListSkeleton rows={3} />
+        ) : dir.projectsError ? (
+          <LoadFailed compact error={dir.projectsError} onRetry={dir.retry} retrying={dir.retrying} />
         ) : (
           <ul className="flex flex-col gap-2">
             {projects.map((p) => (
@@ -107,6 +132,13 @@ function DeveloperSection() {
       </div>
       {assigned.isPending ? (
         <ListSkeleton rows={3} />
+      ) : assigned.isError && !assigned.data ? (
+        <LoadFailed
+          compact
+          error={assigned.error}
+          onRetry={() => void assigned.refetch()}
+          retrying={assigned.isFetching}
+        />
       ) : queue.length ? (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {queue.slice(0, 6).map((r) => (
@@ -196,6 +228,12 @@ function AiSpendSummary() {
             </>
           ) : null}
         </>
+      ) : usage.isError ? (
+        // No retry button inside the link: the usage screen offers one.
+        <span className="flex items-center gap-2 text-sm text-ink-500">
+          <CircleAlert className="size-4 shrink-0 text-danger-fg" aria-hidden />
+          {t('loadError.title')}
+        </span>
       ) : (
         <Skeleton className="h-16" />
       )}

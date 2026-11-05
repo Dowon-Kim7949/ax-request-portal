@@ -63,6 +63,7 @@ async function bootstrap() {
     getLanguage: currentLocale,
     messages: {
       network: () => i18n.t('errors.network'),
+      timeout: () => i18n.t('errors.timeout'),
       http: (status) => i18n.t('errors.http', { status }),
       contract: () => i18n.t('errors.contract'),
     },
