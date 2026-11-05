@@ -2,8 +2,8 @@
 title: Project Profile
 tags:
   - llm-wiki
-  - needs-review
-status: needs_review
+  - verified
+status: verified
 doc_type: project_profile
 project: ax-request-portal
 last_updated: 2026-11-03
