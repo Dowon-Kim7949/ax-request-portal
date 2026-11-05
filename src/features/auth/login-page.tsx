@@ -68,7 +68,7 @@ export default function LoginPage() {
     login.error instanceof ApiError ? login.error.message : login.error ? t('errors.generic') : undefined
 
   return (
-    <main className="relative flex min-h-dvh items-center justify-center px-4 py-16 pt-safe">
+    <main className="relative flex min-h-dvh items-center justify-center px-4 pt-[calc(4rem+env(safe-area-inset-top))] pb-16">
       <div className="absolute top-[max(1rem,env(safe-area-inset-top))] right-4">
         <QuickDisplayToggles />
       </div>

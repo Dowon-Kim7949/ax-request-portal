@@ -24,7 +24,10 @@ beforeAll(() => t.server.listen({ onUnhandledFrame: 'error' }))
 afterAll(() => t.server.close())
 beforeEach(() => {
   qc = createQueryClient()
-  configureClient({ getToken: () => useSession.getState().token, onUnauthorized: () => expireSession(qc) })
+  configureClient({
+    getToken: () => useSession.getState().token,
+    onUnauthorized: (token) => expireSession(qc, token),
+  })
   useSession.setState({ token: null, user: null, ended: null })
 })
 
@@ -127,9 +130,27 @@ describe('ending a session', () => {
   })
 
   it('a 401 arriving after signing out does not turn the sign-out into an expiry', () => {
+    useSession.getState().setSession({ token: 'token-a', user: { id: 'u-han' } as Session['user'] })
     useSession.getState().clear('signedOut')
-    expireSession(qc)
+    expireSession(qc, 'token-a')
     expect(useSession.getState().ended?.reason).toBe('signedOut')
+  })
+
+  it("a late 401 to the previous session's request leaves the next session alone", async () => {
+    const admin = await signIn('admin@example.com')
+    const requester = await signIn('planner@example.com')
+    useSession.getState().setSession(admin)
+    qc.setQueryData(['probe'], 'cached')
+    // Signed out and in as someone else while a request with the first token was on its way.
+    useSession.getState().clear('signedOut')
+    useSession.getState().setSession(requester)
+    expireSession(qc, admin.token)
+    expect(useSession.getState()).toMatchObject({ token: requester.token, user: { id: requester.user.id } })
+    expect(qc.getQueryData(['probe'])).toBe('cached')
+    // Through the client: a refusal of the current token still ends the session.
+    useSession.getState().setSession({ token: t.tokenFor('u-gone'), user: requester.user })
+    await expect(call(api.me)).rejects.toMatchObject({ status: 401 })
+    expect(useSession.getState().ended).toEqual({ reason: 'expired', userId: requester.user.id })
   })
 })
 

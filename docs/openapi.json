@@ -1149,7 +1149,7 @@
     "/requests/{id}/release": {
       "put": {
         "operationId": "updateRelease",
-        "summary": "Set or change the planned release date (responsible developer)",
+        "summary": "Set or change the planned release date (responsible developer; 400 when a new date is before today on the head-office calendar)",
         "tags": [
           "requests"
         ],

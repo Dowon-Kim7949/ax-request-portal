@@ -40,8 +40,12 @@ export interface ClientMessages {
 
 export interface ClientHooks {
   getToken: () => string | null
-  /** Called on 401 so the app can drop the session and show the login screen */
-  onUnauthorized: () => void
+  /**
+   * Called on 401 so the app can drop the session and show the login screen.
+   * Gets the token the refused request carried (null without one), so a late
+   * answer to an earlier session's request cannot end a newer session.
+   */
+  onUnauthorized: (token: string | null) => void
   /**
    * Mock mode: given a response that did not come from the mock, re-attaches
    * the mock and resolves true, and the request is sent once more. A bypassed
@@ -169,7 +173,7 @@ export async function call<E extends EndpointSpec>(spec: E, ...rest: [Args<E>] |
 
     if (!res.ok) {
       const parsed = ApiErrorBody.safeParse(await res.json().catch(() => null))
-      if (res.status === 401 && !spec.public) hooks.onUnauthorized()
+      if (res.status === 401 && !spec.public) hooks.onUnauthorized(token)
       if (parsed.success)
         throw new ApiError(res.status, parsed.data.code, parsed.data.message, parsed.data.issues)
       throw new ApiError(res.status, 'internal', message('http')(res.status))

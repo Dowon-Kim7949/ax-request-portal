@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Sheet } from '@/components/ui/sheet'
 import type { PrecheckIssue } from '@/domain/model'
 import { debounce } from '@/lib/debounce'
+import { useSession } from '@/stores/session'
 import {
   adviceByField,
   clearDraft,
@@ -187,9 +188,13 @@ export default function WizardPage() {
   }
 
   /* ---- leaving with something written: confirm (the draft is kept either way) ---- */
+  // The form holds what the person signed in at opening wrote. When another tab signs in as someone
+  // else, this tab moves on without asking: the new person must not continue someone else's request.
+  const author = useRef(user.id)
   const blocker = useBlocker(
     ({ currentLocation, nextLocation }) =>
       currentLocation.pathname !== nextLocation.pathname &&
+      useSession.getState().user?.id === author.current &&
       !submitted.current &&
       // Leaving while it is sent is fine: the hook finishes the job.
       !create.isPending &&

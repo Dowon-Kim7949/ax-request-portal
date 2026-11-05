@@ -64,7 +64,7 @@ async function bootstrap() {
   const clientHooks: ClientHooks = {
     getToken: () => useSession.getState().token,
     // The server refused the token: drop the session and the cached data; the login screen keeps `next`.
-    onUnauthorized: () => expireSession(queryClient),
+    onUnauthorized: (token) => expireSession(queryClient, token),
     getLanguage: currentLocale,
     messages: {
       network: () => i18n.t('errors.network'),

@@ -9,11 +9,15 @@ import { SESSION_STORAGE_KEY, sessionChangeFrom, useSession } from '@/stores/ses
  * A 401 from the API: the server no longer accepts the token. Drops the
  * session and every cached response; the login screen then keeps `next` so
  * the same person returns to the page they had open.
+ *
+ * `token` is the one the refused request carried. Only a refusal of the
+ * current token ends the session: a request still in flight while signing out
+ * (the session already ended, and its reason stands) or one sent before
+ * signing in again (a newer session) changes nothing.
  */
-export function expireSession(queryClient: QueryClient): void {
+export function expireSession(queryClient: QueryClient, token: string | null): void {
   const session = useSession.getState()
-  // A request still in flight while signing out: the session already ended, and its reason stands.
-  if (!session.token) return
+  if (!session.token || session.token !== token) return
   queryClient.clear()
   session.clear('expired')
 }

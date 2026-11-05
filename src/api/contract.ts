@@ -387,7 +387,8 @@ export const api = {
     method: 'PUT',
     path: '/requests/{id}/release',
     tag: 'requests',
-    summary: 'Set or change the planned release date (responsible developer)',
+    summary:
+      'Set or change the planned release date (responsible developer; 400 when a new date is before today on the head-office calendar)',
     params: IdParam,
     body: ReleaseInput,
     response: WorkRequest,

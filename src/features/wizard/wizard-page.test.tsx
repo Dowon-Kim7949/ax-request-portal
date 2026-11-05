@@ -2,9 +2,14 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import { createMemoryRouter, RouterProvider } from 'react-router'
+import { createMemoryRouter, Outlet, RouterProvider } from 'react-router'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import '@/i18n'
+import { call } from '@/api/client'
+import { api } from '@/api/contract'
+import { SessionSync } from '@/app/guards'
+import { DEMO_PASSWORD } from '@/mocks/seed'
+import { SESSION_STORAGE_KEY, useSession } from '@/stores/session'
 import { createTestApi } from '@/test/mock-api'
 import { signInAs, testQueryClient } from '@/test/session'
 import { EMPTY_VALUES, loadDraft, saveDraft, type WizardValues } from './schema'
@@ -45,9 +50,20 @@ afterAll(() => t.server.close())
 function renderWizard(at: string) {
   const router = createMemoryRouter(
     [
-      { path: '/', element: <h1>홈 화면</h1> },
-      { path: '/requests/new', element: <WizardPage /> },
-      { path: '/requests/:id', element: <h1>요청 상세</h1> },
+      {
+        // As in the app: the root route follows sign-ins made in other tabs.
+        element: (
+          <>
+            <SessionSync />
+            <Outlet />
+          </>
+        ),
+        children: [
+          { path: '/', element: <h1>홈 화면</h1> },
+          { path: '/requests/new', element: <WizardPage /> },
+          { path: '/requests/:id', element: <h1>요청 상세</h1> },
+        ],
+      },
     ],
     { initialEntries: [at] },
   )
@@ -149,6 +165,30 @@ describe('leaving', () => {
     await userEvent.click(await screen.findByRole('button', { name: '나가기' }))
     expect(await screen.findByRole('heading', { name: '홈 화면' })).toBeInTheDocument()
     expect(loadDraft(USER)?.title).toBe('사진이 안 올라감')
+  })
+
+  it('moves on without asking when another tab signs in as someone else', async () => {
+    saveDraft(USER, { ...READY, title: '' })
+    renderWizard('/requests/new?step=3')
+    await userEvent.type(await screen.findByLabelText('요청 제목'), '사진이 안 올라감')
+    const other = await call(api.login, { body: { email: 'admin@example.com', password: DEMO_PASSWORD } })
+
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: SESSION_STORAGE_KEY,
+          newValue: JSON.stringify({ state: other, version: 0 }),
+          storageArea: localStorage,
+        }),
+      )
+    })
+
+    expect(await screen.findByRole('heading', { name: '홈 화면' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(useSession.getState().user?.id).toBe(other.user.id)
+    // What was written stays the first person's draft, not the new person's.
+    expect(loadDraft(USER)?.title).toBe('사진이 안 올라감')
+    expect(loadDraft(other.user.id)).toBeNull()
   })
 
   it('does not ask when nothing has been written', async () => {
