@@ -199,7 +199,10 @@ export function useLogin() {
   })
 }
 
-/** Signing out on purpose: the login screen then starts fresh, without `next` (see RequireAuth). */
+/**
+ * Signing out on purpose: the login screen then starts fresh, without `next`
+ * (see RequireAuth), and the person's unsubmitted draft is deleted (see useSession).
+ */
 export function useLogout() {
   const clear = useSession((s) => s.clear)
   const qc = useQueryClient()

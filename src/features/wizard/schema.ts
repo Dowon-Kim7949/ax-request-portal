@@ -1,6 +1,9 @@
 import * as z from 'zod'
 import { Attachment, RequestType, type PrecheckIssue, type RequestDraft } from '@/domain/model'
 import { ACCEPTANCE_CRITERIA_MAX, CHECKLIST_ITEMS_MAX } from '@/domain/model'
+import { draftKey } from '@/stores/draft'
+
+export { clearDraft } from '@/stores/draft'
 
 const ChecklistRow = z.object({
   ref: z.string().max(60),
@@ -182,8 +185,6 @@ export function parseChecklist(text: string): ChecklistRow[] {
 /* Draft persistence: phones switch apps; the draft must survive it.   */
 /* ------------------------------------------------------------------ */
 
-const draftKey = (userId: string) => `ax-request-portal:draft:${userId}`
-
 /**
  * Shape-only schema for a half-written draft. It must not reuse WizardSchema's
  * constraints: an empty "desired behaviour" is normal mid-way, and rejecting it
@@ -249,14 +250,6 @@ export function saveDraft(userId: string, values: WizardValues): DraftSaveResult
     }
   }
   return 'failed'
-}
-
-export function clearDraft(userId: string): void {
-  try {
-    localStorage.removeItem(draftKey(userId))
-  } catch {
-    // ignore
-  }
 }
 
 export function isEmptyDraft(v: WizardValues): boolean {

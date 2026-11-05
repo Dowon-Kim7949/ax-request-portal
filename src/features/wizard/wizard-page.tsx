@@ -105,6 +105,9 @@ export default function WizardPage() {
     () =>
       debounce(() => {
         if (submitted.current) return
+        // Signed out on purpose (here or in another tab): the draft went with the session, and the
+        // write still pending when the wizard closes must not bring it back.
+        if (useSession.getState().ended?.reason === 'signedOut') return
         const result = saveDraft(user.id, form.getValues())
         setLastSave(result)
         // Storage full: say so once per kind, without stopping the person.

@@ -10,7 +10,7 @@ import { useSession } from '../stores/session'
 export async function signInAs(userId: string): Promise<User> {
   configureClient({ getToken: () => useSession.getState().token, onUnauthorized: () => {} })
   const token = tokenFor(userId)
-  useSession.setState({ token, user: null })
+  useSession.setState({ token, user: null, ended: null })
   const user = await call(api.me)
   useSession.setState({ token, user })
   return user

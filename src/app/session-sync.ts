@@ -24,11 +24,15 @@ export function expireSession(queryClient: QueryClient, token: string | null): v
 
 /**
  * Follows sign-ins and sign-outs made in other tabs of this browser
- * (`storage` events on the persisted session), and re-reads the session when
- * the page comes back from the back/forward cache, which misses those events.
+ * (`storage` events on the persisted session). It also re-reads the session
+ * once it starts listening, for a change made while this tab was still
+ * starting up, and when the page comes back from the back/forward cache: both
+ * miss those events, and writing the stale session back would undo the change.
  *
  * - Signed out elsewhere: drop the session and the cache; `RequireAuth` shows
  *   the login screen without `next`, as after a sign-out here.
+ * - Expired elsewhere: the same, as an expiry: `next` and the notice stay, as
+ *   after this tab's own 401.
  * - Signed in elsewhere while this tab was signed out: take the session; the
  *   login screen moves on by itself.
  * - Signed in as someone else: take the new session, drop the previous
@@ -50,8 +54,9 @@ export function useSessionSync(): void {
           session.setSession(change.session)
           return
         case 'signedOut':
+        case 'expired':
           queryClient.clear()
-          session.clear('signedOut')
+          session.clear(change.kind)
           return
         case 'signedIn':
           queryClient.clear()
@@ -71,16 +76,22 @@ export function useSessionSync(): void {
       if (e.key === null) apply(null)
       else if (e.key === SESSION_STORAGE_KEY) apply(e.newValue)
     }
-    const onPageShow = (e: PageTransitionEvent) => {
-      if (!e.persisted) return
+    const reread = () => {
       try {
         apply(localStorage.getItem(SESSION_STORAGE_KEY))
       } catch {
         // Storage blocked: nothing to follow.
       }
     }
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) reread()
+    }
     window.addEventListener('storage', onStorage)
     window.addEventListener('pageshow', onPageShow)
+    // The store was read from storage when the app's code loaded; until now (the mock API may take
+    // seconds to start) nothing was listening. Rendered before the routes, so this runs before
+    // `RequireAuth` can save the session again.
+    reread()
     return () => {
       window.removeEventListener('storage', onStorage)
       window.removeEventListener('pageshow', onPageShow)

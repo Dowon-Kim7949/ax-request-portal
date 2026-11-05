@@ -191,6 +191,30 @@ describe('leaving', () => {
     expect(loadDraft(other.user.id)).toBeNull()
   })
 
+  it('a sign-out in another tab deletes the draft, and the wizard does not write it back', async () => {
+    saveDraft(USER, { ...READY, title: '' })
+    const router = renderWizard('/requests/new?step=3')
+    await userEvent.type(await screen.findByLabelText('요청 제목'), '사진이 안 올라감')
+
+    act(() => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: SESSION_STORAGE_KEY,
+          newValue: JSON.stringify({
+            state: { token: null, user: null, endReason: 'signedOut' },
+            version: 0,
+          }),
+          storageArea: localStorage,
+        }),
+      )
+    })
+    expect(useSession.getState().ended?.reason).toBe('signedOut')
+    await act(() => router.navigate('/'))
+    // Past the moment the pending save would have run.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)))
+    expect(localStorage.getItem(DRAFT_KEY)).toBeNull()
+  })
+
   it('does not ask when nothing has been written', async () => {
     const router = renderWizard('/requests/new?project=p-portal')
     expect(await screen.findByRole('heading', { name: '어떤 종류의 요청인가요?' })).toBeInTheDocument()

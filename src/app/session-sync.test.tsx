@@ -85,8 +85,8 @@ async function openAt(path: string, heading: string) {
 const where = (router: ReturnType<typeof createMemoryRouter>) =>
   router.state.location.pathname + router.state.location.search
 
-function storeInOtherTab(session: Session | null) {
-  const newValue = JSON.stringify({ state: session ?? { token: null, user: null }, version: 0 })
+function storeInOtherTab(session: Session | null, endReason: 'signedOut' | 'expired' = 'signedOut') {
+  const newValue = JSON.stringify({ state: session ?? { token: null, user: null, endReason }, version: 0 })
   act(() => {
     window.dispatchEvent(
       new StorageEvent('storage', { key: SESSION_STORAGE_KEY, newValue, storageArea: localStorage }),
@@ -165,6 +165,42 @@ describe('other tabs', () => {
     expect(where(router)).toBe('/login')
     expect(useSession.getState()).toMatchObject({ token: null, ended: { reason: 'signedOut' } })
     expect(qc.getQueryData(['probe'])).toBeUndefined()
+  })
+
+  it('an expiry in another tab is an expiry here too: next and the notice stay', async () => {
+    useSession.getState().setSession(await signIn('admin@example.com'))
+    const router = await openAt('/admin/users?tab=all', 'users')
+
+    storeInOtherTab(null, 'expired')
+
+    await screen.findByRole('heading', { name: 'login' })
+    expect(where(router)).toBe(`/login?next=${encodeURIComponent('/admin/users?tab=all')}`)
+    expect(useSession.getState()).toMatchObject({
+      token: null,
+      ended: { reason: 'expired', userId: 'u-han' },
+    })
+    expect(qc.getQueryData(['probe'])).toBeUndefined()
+  })
+
+  it('takes up a sign-out made while this tab was starting, instead of saving the old session again', async () => {
+    const admin = await signIn('admin@example.com')
+    useSession.getState().setSession(admin)
+    // Another tab signed out before this one listened: storage says so, the store still has the session.
+    localStorage.setItem(
+      SESSION_STORAGE_KEY,
+      JSON.stringify({ state: { token: null, user: null, endReason: 'signedOut' }, version: 0 }),
+    )
+    const router = createMemoryRouter(routes, { initialEntries: ['/admin/users'] })
+    render(
+      <QueryClientProvider client={qc}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    )
+
+    await screen.findByRole('heading', { name: 'login' })
+    expect(where(router)).toBe('/login')
+    expect(useSession.getState()).toMatchObject({ token: null, ended: { reason: 'signedOut' } })
+    expect(localStorage.getItem(SESSION_STORAGE_KEY)).not.toContain(admin.token)
   })
 
   it('a sign-in as someone else takes the new session, empties the cache and goes home', async () => {
