@@ -4,7 +4,7 @@
  * Checks the computed style of every visible interactive element, so a new
  * button that forgets it fails here. Desktop only: touch screens have no cursor.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './fixtures.ts'
 import { COLD_START_TIMEOUT, loginAs, openInApp } from './helpers.ts'
 
 async function expectCursorContract(page: Page, where: string) {

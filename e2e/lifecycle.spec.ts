@@ -7,7 +7,7 @@
  * The mock's AI is real time: the report takes 6 s and the work 20 s
  * (appConfig.mock), and the detail page polls until they finish.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './fixtures.ts'
 import {
   addDaysIso,
   expectNoHorizontalScroll,

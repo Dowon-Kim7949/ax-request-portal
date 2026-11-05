@@ -5,7 +5,7 @@
  * fails on any violation the browser reports, whether or not it breaks a
  * visible feature (a blocked font, image or inline style).
  */
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './fixtures.ts'
 import { COLD_START_TIMEOUT, loginAs } from './helpers.ts'
 
 declare global {

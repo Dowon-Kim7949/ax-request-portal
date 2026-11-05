@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 import { loginAs, viewportOf } from './helpers.ts'
 
 test('a skip link is the first tab stop and moves focus to the main content', async ({ page }, info) => {

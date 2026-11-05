@@ -6,7 +6,7 @@
  * Runs in the phone and desktop projects (see testIgnore in playwright.config.ts).
  */
 import AxeBuilder from '@axe-core/playwright'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './fixtures.ts'
 import { COLD_START_TIMEOUT, loginAs, openInApp } from './helpers.ts'
 
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']

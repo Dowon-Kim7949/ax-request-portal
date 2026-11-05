@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 import { expectNoHorizontalScroll, loginAs, openInApp } from './helpers.ts'
 
 /** A 1×1 PNG: small enough for the demo to keep it inline as a data: URL. */

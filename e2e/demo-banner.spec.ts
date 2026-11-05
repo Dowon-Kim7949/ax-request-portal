@@ -3,7 +3,7 @@
  * build: the login screen and every signed-in screen must say so, without
  * a way to close the notice and without widening a phone screen.
  */
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 import { COLD_START_TIMEOUT, expectNoHorizontalScroll, loginAs, openInApp } from './helpers.ts'
 
 const NOTICE = '데모 모드 · 데이터는 이 브라우저에만 저장돼요'

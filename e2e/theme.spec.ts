@@ -2,7 +2,7 @@
  * Dark mode: follows the system, can be overridden, persists, and never
  * flashes white before the app starts.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './fixtures.ts'
 import { COLD_START_TIMEOUT, expectNoHorizontalScroll, loginAs, openInApp } from './helpers.ts'
 
 const DARK_CANVAS = 'rgb(13, 18, 29)'

@@ -2,7 +2,7 @@
  * Visual capture of key screens for manual review (not an assertion suite).
  * Run: SCREENS=1 npx playwright test e2e/screens.spec.ts
  */
-import { test } from '@playwright/test'
+import { test } from './fixtures.ts'
 import { loginAs } from './helpers.ts'
 
 test.skip(!process.env.SCREENS, 'set SCREENS=1 to capture screenshots')

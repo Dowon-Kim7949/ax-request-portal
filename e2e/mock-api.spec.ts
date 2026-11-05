@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 import { COLD_START_TIMEOUT, loginAs } from './helpers.ts'
 
 test('the in-browser mock API answers contract calls', async ({ page }) => {

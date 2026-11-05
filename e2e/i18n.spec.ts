@@ -4,7 +4,7 @@
  * Labels that are deliberately in another language carry a `lang` attribute
  * (the "한국어" option in the language switch) and are excluded.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './fixtures.ts'
 import {
   COLD_START_TIMEOUT,
   expectNoHorizontalScroll,

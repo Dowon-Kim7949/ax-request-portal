@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 
 /**
  * Regression: a reload during the very first load used to leave a blank page

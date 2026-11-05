@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 import { expectNoHorizontalScroll, expectSignedIn, loginAs, openInApp } from './helpers.ts'
 
 test('requester files a request through the wizard', async ({ page }) => {

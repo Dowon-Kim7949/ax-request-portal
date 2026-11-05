@@ -3,7 +3,7 @@
  * head-office (Korea) time when the clock differs. Date-only values (desired
  * dates, release dates) are calendar dates and read the same everywhere.
  */
-import { expect, test, type Page } from '@playwright/test'
+import { expect, keepFramesRunning, test, type Page } from './fixtures.ts'
 import { expectNoHorizontalScroll, loginAs } from './helpers.ts'
 
 /** "한국 11월 5일 오전 11:00" */
@@ -82,7 +82,10 @@ test.describe('viewer in Seoul', () => {
   })
 })
 
-test('date-only values read the same date in Seoul and in Los Angeles', async ({ browser }, testInfo) => {
+test('date-only values read the same date in Seoul and in Los Angeles', async ({
+  browser,
+  browserName,
+}, testInfo) => {
   const { baseURL, viewport, userAgent, deviceScaleFactor, isMobile, hasTouch, locale, colorScheme } =
     testInfo.project.use
   const dates: string[] = []
@@ -98,6 +101,7 @@ test('date-only values read the same date in Seoul and in Los Angeles', async ({
       colorScheme,
       timezoneId,
     })
+    await keepFramesRunning(context, browserName)
     const page = await context.newPage()
     await openDetail(page)
     await expect(desiredDate(page)).toHaveText(/\d{1,2}월 \d{1,2}일/)

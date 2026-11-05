@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 import { expectNoHorizontalScroll, loginAs, openInApp } from './helpers.ts'
 
 test('executive reads the company dashboard', async ({ page }) => {

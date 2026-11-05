@@ -3,7 +3,7 @@
  * still in use (320 px) and a tablet held sideways. Width is all that matters
  * here, so these run once, in the desktop (Chromium) project.
  */
-import { expect, test, type Locator, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from './fixtures.ts'
 import {
   COLD_START_TIMEOUT,
   expectNoHorizontalScroll,

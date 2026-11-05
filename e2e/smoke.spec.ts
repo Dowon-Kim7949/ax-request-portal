@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 import { COLD_START_TIMEOUT, expectNoHorizontalScroll, loginAs, viewportOf } from './helpers.ts'
 
 test('login screen fits the viewport', async ({ page }) => {

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 import { addDaysIso, expectNoHorizontalScroll, loginAs, openInApp } from './helpers.ts'
 
 test('developer runs AI work from the report and approves the merge request', async ({ page }) => {

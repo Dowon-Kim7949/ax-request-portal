@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Page } from './fixtures.ts'
 import { loginAs, signOut, viewportOf } from './helpers.ts'
 
 const FORBIDDEN = '이 작업을 할 권한이 없어요.'
