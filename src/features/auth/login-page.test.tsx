@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
@@ -78,7 +78,7 @@ describe('LoginPage', () => {
   it('after an expiry, returns the same person to next', async () => {
     useSession.setState({ ended: { reason: 'expired', userId: 'u-han' } })
     const router = openLogin(next('/admin/users'))
-    expect(await screen.findByRole('status')).toHaveTextContent('로그인이 만료됐어요.')
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('로그인이 만료됐어요.'))
     await submit('admin@example.com')
     expect(await screen.findByRole('heading', { name: 'users' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/admin/users')
@@ -90,6 +90,20 @@ describe('LoginPage', () => {
     await submit('admin@example.com')
     expect(await screen.findByRole('heading', { name: 'home' })).toBeInTheDocument()
     expect(router.state.location.pathname).toBe('/')
+  })
+
+  it('announces the expiry once the screen is up, and describes the first field with it', async () => {
+    useSession.setState({ ended: { reason: 'expired', userId: 'u-han' } })
+    openLogin(next('/admin/users'))
+    // Shown at once; the status starts empty, so screen readers notice the text arriving.
+    expect(screen.getByText(/로그인이 만료됐어요/)).toBeVisible()
+    expect(screen.getByRole('status')).toBeEmptyDOMElement()
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('로그인이 만료됐어요.'))
+    expect(await screen.findByLabelText('이메일')).toHaveAccessibleDescription(/로그인이 만료됐어요/)
+    // Read once: the visible copy is hidden from screen readers, which hear the status.
+    expect(
+      screen.getAllByText(/로그인이 만료됐어요/).filter((el) => el.getAttribute('aria-hidden') !== 'true'),
+    ).toHaveLength(1)
   })
 
   it('shows no expiry notice after signing out', async () => {

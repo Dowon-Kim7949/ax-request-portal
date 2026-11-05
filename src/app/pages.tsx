@@ -32,6 +32,13 @@ const reload = () => window.location.reload()
 /**
  * What a screen shows when it fails to load or render. The raw error (module
  * URLs, stack) goes to the console, and to the page only in development.
+ *
+ * A screen whose code could not be fetched is not necessarily a deployment
+ * (the tab's chunk files gone): a dropped connection fails the same way, and
+ * the browser cannot tell them apart. The copy names both, or the connection
+ * when the browser knows it is offline; the update check (router.tsx) says so
+ * when it does find a new version. Reloading is the way out of both, and the
+ * home screen stays offered: its code is usually loaded already.
  */
 export function RouteErrorView({
   error,
@@ -42,6 +49,7 @@ export function RouteErrorView({
 }) {
   const { t } = useTranslation()
   const chunk = isChunkLoadError(error)
+  const offline = chunk && typeof navigator !== 'undefined' && navigator.onLine === false
 
   useEffect(() => {
     console.error('[route] the screen failed to load', error)
@@ -60,15 +68,15 @@ export function RouteErrorView({
     <div className="mx-auto max-w-xl p-6">
       <ErrorState
         title={chunk ? t('routeError.chunkTitle') : t('common.errorTitle')}
-        body={chunk ? t('routeError.chunkBody') : t('routeError.body')}
+        body={
+          offline ? t('routeError.chunkOffline') : chunk ? t('routeError.chunkBody') : t('routeError.body')
+        }
         action={
           <>
             <div className="flex flex-wrap justify-center gap-2">
-              {chunk ? null : (
-                <Button asChild variant="secondary">
-                  <Link to="/">{t('common.goHome')}</Link>
-                </Button>
-              )}
+              <Button asChild variant="secondary">
+                <Link to="/">{t('common.goHome')}</Link>
+              </Button>
               <Button variant={chunk ? 'primary' : 'secondary'} onClick={reload}>
                 {t('routeError.reload')}
               </Button>

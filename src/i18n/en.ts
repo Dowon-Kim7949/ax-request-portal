@@ -52,8 +52,9 @@ const en: Messages = {
     reload: 'Reload',
   },
   routeError: {
-    chunkTitle: 'A new version has been deployed',
-    chunkBody: 'This screen needs to be loaded again to use the new version.',
+    chunkTitle: 'This screen could not be loaded',
+    chunkBody: 'A new version may have been deployed, or the connection dropped for a moment. Please reload.',
+    chunkOffline: 'You seem to be offline. Check the connection, then reload.',
     body: 'Load the screen again, or go back to the home screen. If it keeps happening, let your administrator know.',
     reload: 'Load again',
     detail: 'Details for developers',

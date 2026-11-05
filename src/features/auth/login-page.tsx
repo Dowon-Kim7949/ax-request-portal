@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Bot, ChartColumn, ChevronRight, Code, Settings, Send } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { Navigate, useNavigate, useSearchParams } from 'react-router'
@@ -22,6 +22,9 @@ import { resolvePostLoginPath } from './post-login'
 const LoginForm = z.object({ email: z.email(), password: z.string().min(1) })
 type LoginForm = z.infer<typeof LoginForm>
 
+/** How long after the login screen appears the expiry is announced (see `announcement`). */
+const ANNOUNCE_DELAY_MS = 100
+
 const ROLE_ICON: Record<Role, typeof Send> = {
   requester: Send,
   executive: ChartColumn,
@@ -39,6 +42,17 @@ export default function LoginPage() {
   // How the previous session in this tab ended. Read once: signing in resets it in the store, and the
   // redirect that follows must still see it.
   const [ended] = useState(() => useSession.getState().ended)
+  const expired = ended?.reason === 'expired'
+  const expiredId = useId()
+  // Screen readers do not read a live region that arrives with its text already in it (this screen
+  // opens right after the expiry): the status below starts empty and gets the text a moment after
+  // it is on screen, once the screen reader has registered it.
+  const [announcement, setAnnouncement] = useState('')
+  useEffect(() => {
+    if (!expired) return
+    const timer = setTimeout(() => setAnnouncement(t('auth.sessionExpired')), ANNOUNCE_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [expired, t])
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const next = params.get('next')
@@ -82,9 +96,15 @@ export default function LoginPage() {
           <DemoBanner variant="inline" />
         </div>
 
-        {ended?.reason === 'expired' ? (
+        <p role="status" className="sr-only">
+          {announcement}
+        </p>
+        {expired ? (
+          // Shown at once; read through the status above and as the email field's description,
+          // so it is heard once, not twice while reading the page.
           <p
-            role="status"
+            id={expiredId}
+            aria-hidden
             className="rounded-(--radius-card) bg-warning-50 px-4 py-3 text-sm font-medium text-warning-fg"
           >
             {t('auth.sessionExpired')}
@@ -106,6 +126,10 @@ export default function LoginPage() {
                 autoComplete="username"
                 inputMode="email"
                 {...p}
+                aria-describedby={
+                  [p['aria-describedby'], expired ? expiredId : undefined].filter(Boolean).join(' ') ||
+                  undefined
+                }
                 {...form.register('email')}
               />
             )}

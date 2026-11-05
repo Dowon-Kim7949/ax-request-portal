@@ -12,6 +12,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   consoleError.mockRestore()
+  vi.restoreAllMocks()
 })
 
 function view(error: unknown, showDetail = false) {
@@ -23,13 +24,24 @@ function view(error: unknown, showDetail = false) {
 }
 
 describe('RouteErrorPage', () => {
-  it('explains a page whose code was replaced by a deployment, and offers only a reload', () => {
+  it('names both causes of a screen whose code could not be loaded, and offers a reload first', () => {
     view(new TypeError(`Failed to fetch dynamically imported module: ${CHUNK_URL}`))
-    expect(screen.getByRole('alert')).toHaveTextContent('새 버전이 배포됐어요')
-    expect(screen.getByText('새 버전이 배포되어 화면을 다시 불러와야 해요.')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('화면을 불러오지 못했어요')
+    // A deployment and a dropped connection fail the same way: the screen does not claim either.
+    expect(
+      screen.getByText('새 버전이 배포됐거나 연결이 잠시 끊겼을 수 있어요. 다시 불러와 주세요.'),
+    ).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '다시 불러오기' })).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: '처음으로' })).toBeNull()
+    expect(screen.getByRole('link', { name: '처음으로' })).toHaveAttribute('href', '/')
     expect(document.body).not.toHaveTextContent(CHUNK_URL)
+  })
+
+  it('says the connection is the cause when the browser knows it is offline', () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    view(new TypeError(`Failed to fetch dynamically imported module: ${CHUNK_URL}`))
+    expect(
+      screen.getByText('인터넷 연결이 끊긴 것 같아요. 연결을 확인한 뒤 다시 불러와 주세요.'),
+    ).toBeInTheDocument()
   })
 
   it('shows any other failure without its raw message, with a way home and a reload', () => {
@@ -58,6 +70,6 @@ describe('RouteErrorPage', () => {
       },
     ])
     render(<RouterProvider router={router} />)
-    expect(await screen.findByText('새 버전이 배포됐어요')).toBeInTheDocument()
+    expect(await screen.findByText('화면을 불러오지 못했어요')).toBeInTheDocument()
   })
 })
