@@ -1,8 +1,12 @@
 import { Bot, Cog, User } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useDirectory } from '@/app/hooks'
+import { DateTimeText } from '@/components/ui/date-time'
 import type { TimelineEntry } from '@/domain/model'
-import { formatDateTime } from '@/lib/format'
+import { formatDate } from '@/lib/format'
+
+/** A release date is stored as YYYY-MM-DD: a calendar date, written as is. */
+const CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/
 
 const KNOWN_EVENTS = new Set([
   'created',
@@ -59,12 +63,10 @@ export function Timeline({ entries }: { entries: TimelineEntry[] }) {
               <p className="text-sm font-semibold text-ink-900">
                 {label} <span className="font-normal text-ink-500">· {who}</span>
               </p>
-              <time dateTime={e.at} className="text-xs text-ink-400">
-                {formatDateTime(e.at)}
-              </time>
+              <DateTimeText iso={e.at} variant="full" className="text-xs text-ink-400" />
               {e.note ? (
                 <p className="mt-1 rounded-lg bg-muted px-3 py-2 text-[13px] whitespace-pre-line text-ink-600">
-                  {e.note}
+                  {e.event === 'release_updated' && CALENDAR_DATE.test(e.note) ? formatDate(e.note) : e.note}
                 </p>
               ) : null}
             </div>

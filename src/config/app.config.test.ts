@@ -19,6 +19,13 @@ describe('appConfig', () => {
     expect(AppConfigSchema.safeParse(nobodyManagesUsers).success).toBe(false)
   })
 
+  it('refuses a head-office time zone the runtime does not know', () => {
+    const typo = { ...appConfig, organization: { ...appConfig.organization, timeZone: 'Asia/Soeul' } }
+    expect(AppConfigSchema.safeParse(typo).success).toBe(false)
+    const ny = { ...appConfig, organization: { ...appConfig.organization, timeZone: 'America/New_York' } }
+    expect(AppConfigSchema.safeParse(ny).success).toBe(true)
+  })
+
   it('refuses a configuration where nobody runs AI operations', () => {
     const noOperator = { ...appConfig, enabledRoles: ['requester', 'executive', 'developer', 'admin'] }
     expect(AppConfigSchema.safeParse(noOperator).success).toBe(false)

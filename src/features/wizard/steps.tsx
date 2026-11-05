@@ -1,10 +1,12 @@
 import { Check, CircleAlert, FileText, ImagePlus, Paperclip, Plus, Sparkles, Trash2, X } from 'lucide-react'
 import { useRef, useState, type ReactNode } from 'react'
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form'
+import type { TFunction } from 'i18next'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useUploadAttachment } from '@/api/queries'
 import { useDirectory } from '@/app/hooks'
+import { useHqCalendarNote } from '@/app/time-zone'
 import { ProjectIcon } from '@/components/request/project-icon'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/feedback'
@@ -12,10 +14,13 @@ import { Field, Input, Textarea, type Advice } from '@/components/ui/field'
 import { appConfig } from '@/config/app.config'
 import { ACCEPTANCE_CRITERIA_MAX, CHECKLIST_ITEMS_MAX, type PrecheckIssue } from '@/domain/model'
 import { cn } from '@/lib/cn'
-import { formatBytes, formatDate, toLocalDate } from '@/lib/format'
+import { formatBytes, formatDate } from '@/lib/format'
+import { hqToday } from '@/lib/time-zone'
 import { EMPTY_ROW, parseChecklist, STEPS, stepOfField, type WizardValues } from './schema'
 
-type TFn = ReturnType<typeof useTranslation>['t']
+// The app's own namespace: ReturnType<typeof useTranslation> would widen it to every
+// namespace and the dictionary type gets too deep for the compiler as it grows.
+type TFn = TFunction<'translation'>
 
 export function StepTitle({ children, hint }: { children: ReactNode; hint?: ReactNode }) {
   return (
@@ -475,6 +480,7 @@ export function ExtraStep({ advice }: { advice: Map<string, PrecheckIssue[]> }) 
   const [attachments, desiredDate] = useWatch({ control, name: ['attachments', 'desiredDate'] })
   const upload = useUploadAttachment()
   const fileInput = useRef<HTMLInputElement>(null)
+  const hqDateNote = useHqCalendarNote('today')
 
   const onFiles = async (files: FileList | null) => {
     if (!files) return
@@ -583,9 +589,10 @@ export function ExtraStep({ advice }: { advice: Map<string, PrecheckIssue[]> }) 
             label={t('wizard.extra.desiredDate')}
             optional
             optionalLabel={t('common.optional')}
+            hint={hqDateNote}
             advice={advice.get('desiredDate')}
           >
-            {(p) => <Input type="date" min={toLocalDate()} {...p} {...register('desiredDate')} />}
+            {(p) => <Input type="date" min={hqToday()} {...p} {...register('desiredDate')} />}
           </Field>
           {desiredDate ? (
             <Field label={t('wizard.extra.desiredDateReason')} advice={advice.get('desiredDateReason')}>

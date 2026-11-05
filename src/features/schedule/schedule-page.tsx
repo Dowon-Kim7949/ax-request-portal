@@ -10,11 +10,13 @@ import { ProjectIcon } from '@/components/request/project-icon'
 import { StatusBadge } from '@/components/request/status'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { HqCalendarNote } from '@/components/ui/date-time'
 import { EmptyState, ErrorState, ListSkeleton } from '@/components/ui/feedback'
 import { Segmented } from '@/components/ui/segmented'
 import type { ReleaseScheduleItem } from '@/domain/model'
 import { cn } from '@/lib/cn'
-import { addDays, formatDate, toLocalDate } from '@/lib/format'
+import { addDays, formatDate } from '@/lib/format'
+import { hqToday } from '@/lib/time-zone'
 
 function DateGroup({ date, items, today }: { date: string; items: ReleaseScheduleItem[]; today: string }) {
   const { t } = useTranslation()
@@ -69,7 +71,8 @@ export default function SchedulePage() {
   const { t } = useTranslation()
   usePageTitle(t('schedule.title'))
   const dir = useDirectory()
-  const today = toLocalDate()
+  // Release dates are head-office calendar days, so "today" is the head office's.
+  const today = hqToday()
   const [projectId, setProjectId] = useState('all')
   const releases = useReleases(addDays(today, -45), addDays(today, 90))
 
@@ -98,6 +101,7 @@ export default function SchedulePage() {
   return (
     <>
       <PageHeader title={t('schedule.title')} description={t('schedule.subtitle')} />
+      <HqCalendarNote className="-mt-2 mb-4" />
       <Segmented
         className="mb-5"
         label={t('schedule.allProjects')}

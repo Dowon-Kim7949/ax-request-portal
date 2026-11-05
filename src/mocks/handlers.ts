@@ -3,7 +3,7 @@ import type * as z from 'zod'
 import { api, type ApiErrorBody, type EndpointSpec } from '../api/contract'
 import type { User } from '../domain/model'
 import { errorText, serverLanguage, type ErrorKey, type ServerLanguage } from './copy'
-import { HttpError, localDate } from './engine'
+import { HttpError } from './engine'
 import { DEMO_PASSWORD } from './seed'
 import type { MockStore } from './store'
 
@@ -275,19 +275,19 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
 
     /* insights */
     route(api.dashboard, ({ store, me, query, now }) =>
-      store.engine.dashboard(me, query.month ?? localDate(now).slice(0, 7), now),
+      store.engine.dashboard(me, query.month ?? store.engine.today(now).slice(0, 7), now),
     ),
     route(api.releases, ({ store, me, query }) => store.engine.releases(me, query.from, query.to)),
     route(api.getBudget, ({ store, me, now }) => {
       store.engine.require(me, 'budget:manage')
-      return store.engine.budget(localDate(now).slice(0, 7))
+      return store.engine.budget(store.engine.today(now).slice(0, 7))
     }),
     route(
       api.updateBudget,
       ({ store, me, body, now }) => {
         store.engine.require(me, 'budget:manage')
         store.engine.state.budget = body
-        return store.engine.budget(localDate(now).slice(0, 7))
+        return store.engine.budget(store.engine.today(now).slice(0, 7))
       },
       edit,
     ),
@@ -309,7 +309,7 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
     route(api.getAiPricing, ({ store, me }) => store.engine.aiPricing(me)),
     route(api.updateAiPricing, ({ store, me, body }) => store.engine.updateAiPricing(me, body), edit),
     route(api.aiUsage, ({ store, me, query, now }) =>
-      store.engine.aiUsageReport(me, query.month ?? localDate(now).slice(0, 7)),
+      store.engine.aiUsageReport(me, query.month ?? store.engine.today(now).slice(0, 7)),
     ),
   ]
 }

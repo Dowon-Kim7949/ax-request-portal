@@ -19,10 +19,12 @@ export default defineConfig({
     baseURL: `http://localhost:${PORT}`,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    // The app follows the browser language and color scheme; pin the defaults.
-    // i18n.spec.ts and theme.spec.ts switch them per test.
+    // The app follows the browser language, color scheme and time zone; pin the defaults
+    // (the time zone to the head office's). i18n.spec.ts, theme.spec.ts and
+    // time-zone.spec.ts switch them per test.
     locale: 'ko-KR',
     colorScheme: 'light',
+    timezoneId: 'Asia/Seoul',
   },
   projects: [
     { name: 'phone', use: { ...devices['iPhone 14'] }, testIgnore: DESKTOP_ONLY },

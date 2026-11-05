@@ -8,9 +8,9 @@ import { usePreviewFeedback } from '@/api/queries'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { DateTimeText } from '@/components/ui/date-time'
 import { Field, Textarea } from '@/components/ui/field'
 import type { PreviewFeedback, WorkPreview, WorkRequest } from '@/domain/model'
-import { formatDateTime } from '@/lib/format'
 
 const errorText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback)
 
@@ -92,7 +92,11 @@ export function PreviewCard({ request }: { request: WorkRequest }) {
           <PreviewLink url={preview.url} label={t('detail.preview.open')} />
           {preview.expiresAt ? (
             <p className="mt-1.5 text-center text-xs text-ink-500">
-              {t('detail.preview.until', { date: formatDateTime(preview.expiresAt) })}
+              <DateTimeText
+                iso={preview.expiresAt}
+                variant="full"
+                sentence={(date) => t('detail.preview.until', { date })}
+              />
             </p>
           ) : null}
         </div>

@@ -52,6 +52,7 @@ const ERRORS = {
     developerOnlyRegression: '담당 개발자만 기록할 수 있습니다.',
     developerOnlySchedule: '담당 개발자만 일정을 정할 수 있습니다.',
     cannotScheduleNow: '지금 단계에서는 배포 일정을 정할 수 없습니다.',
+    releaseDateInPast: (p) => `배포 예정일은 오늘(본사 기준 ${p.today}) 이후로 정해 주세요.`,
     emailTaken: '이미 등록된 이메일입니다.',
     userNotFound: '사용자를 찾을 수 없습니다.',
     cannotChangeSelf: '자신의 역할이나 활성 상태는 바꿀 수 없습니다.',
@@ -94,6 +95,8 @@ const ERRORS = {
     developerOnlyRegression: 'Only the responsible developer can record this.',
     developerOnlySchedule: 'Only the responsible developer can set the release date.',
     cannotScheduleNow: 'A release date cannot be set at this step.',
+    releaseDateInPast: (p) =>
+      `The release date cannot be in the past. Today is ${p.today} at the head office.`,
     emailTaken: 'This email is already registered.',
     userNotFound: 'User not found.',
     cannotChangeSelf: 'You cannot change your own role or status.',

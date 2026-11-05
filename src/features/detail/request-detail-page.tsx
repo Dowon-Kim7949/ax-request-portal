@@ -11,10 +11,10 @@ import { StatusBadge, Stepper } from '@/components/request/status'
 import { Timeline } from '@/components/request/timeline'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { DateTimeText } from '@/components/ui/date-time'
 import { ErrorState, Skeleton } from '@/components/ui/feedback'
 import { appConfig } from '@/config/app.config'
 import { availableEvents, isResponsibleDeveloper, isTerminal } from '@/domain/lifecycle'
-import { formatDate } from '@/lib/format'
 import { AiUsageCard } from './ai-usage-card'
 import { DecisionCard, RegressionChecks, ReleasePanel, ReportPanel, WorkPanel } from './developer-panels'
 import { ReleaseCard, RequestContent } from './request-content'
@@ -101,9 +101,11 @@ export default function RequestDetailPage() {
             <span aria-hidden>·</span>
             <span>{t('detail.requestedBy', { name: requester?.name ?? '' })}</span>
             <span aria-hidden>·</span>
-            <span>
-              {t('detail.filedOn', { date: formatDate(request.createdAt.slice(0, 10), { weekday: false }) })}
-            </span>
+            <DateTimeText
+              iso={request.createdAt}
+              variant="date"
+              sentence={(date) => t('detail.filedOn', { date })}
+            />
           </span>
         }
       />

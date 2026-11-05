@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDirectory } from '@/app/hooks'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { DateTimeText } from '@/components/ui/date-time'
 import type { WorkRequest } from '@/domain/model'
 import { formatBytes, formatDate } from '@/lib/format'
 
@@ -123,11 +124,18 @@ export function ReleaseCard({ request }: { request: WorkRequest }) {
           aria-hidden
         />
         <span className={released || scheduled ? 'font-semibold' : 'text-ink-500'}>
-          {released
-            ? t('detail.releasedOn', { date: formatDate(released.slice(0, 10)) })
-            : scheduled
-              ? t('detail.scheduledFor', { date: formatDate(scheduled) })
-              : t('detail.notScheduled')}
+          {released ? (
+            <DateTimeText
+              iso={released}
+              variant="date"
+              weekday
+              sentence={(date) => t('detail.releasedOn', { date })}
+            />
+          ) : scheduled ? (
+            t('detail.scheduledFor', { date: formatDate(scheduled) })
+          ) : (
+            t('detail.notScheduled')
+          )}
         </span>
       </p>
       {request.release?.note ? <p className="mt-2 text-sm text-ink-500">{request.release.note}</p> : null}
