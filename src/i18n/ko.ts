@@ -236,9 +236,23 @@ const ko = {
     draftNotSaved:
       '저장 공간이 부족해 이 기기에 초안을 저장하지 못했어요. 제출할 때까지 이 화면을 닫지 말아 주세요.',
     draftWithoutAttachments: '저장 공간이 부족해 첨부 파일은 빼고 초안을 저장했어요.',
+    draftAttachmentsDropped: '초안의 첨부 파일 일부는 불러오지 못했어요. 다시 올려 주세요: {{names}}',
+    sendingEarlier: {
+      title: '앞서 제출한 요청을 보내고 있어요…',
+      body: '접수되면 새 요청을 쓸 수 있어요.',
+    },
+    missingAttachments: {
+      toast: '제출하지 못했어요. 첨부 파일을 찾을 수 없어요: {{names}}',
+      title: '찾을 수 없는 첨부가 있어요',
+      body: '표시된 첨부를 지우고 다시 올린 뒤 제출해 주세요: {{names}}',
+      fix: '첨부 고치기',
+      item: '다시 올려 주세요',
+    },
     leave: {
       title: '작성을 멈추고 나갈까요?',
       saved: '지금까지 쓴 내용은 초안으로 저장돼 있어요. 새 요청을 다시 열면 이어서 쓸 수 있어요.',
+      savedWithoutAttachments:
+        '글은 초안으로 저장돼 있지만 첨부 파일은 저장하지 못했어요. 다시 열면 첨부를 다시 올려 주세요.',
       unsaved: '초안을 저장하지 못해서, 나가면 지금까지 쓴 내용이 사라져요.',
       stay: '계속 쓰기',
       go: '나가기',

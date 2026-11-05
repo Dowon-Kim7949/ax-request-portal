@@ -235,10 +235,25 @@ const en: Messages = {
       'There is not enough storage to keep a draft on this device. Please keep this screen open until you submit.',
     draftWithoutAttachments:
       'There is not enough storage on this device, so the draft was saved without its attachments.',
+    draftAttachmentsDropped:
+      'Some attachments in your draft could not be restored. Please upload them again: {{names}}',
+    sendingEarlier: {
+      title: 'Sending the request you submitted earlier…',
+      body: 'You can start a new request once it has gone through.',
+    },
+    missingAttachments: {
+      toast: 'Not submitted. These attachments could not be found: {{names}}',
+      title: 'Some attachments could not be found',
+      body: 'Remove the marked attachments, upload them again, then submit: {{names}}',
+      fix: 'Fix attachments',
+      item: 'Upload again',
+    },
     leave: {
       title: 'Leave this request for now?',
       saved:
         'What you have written is saved as a draft. Open a new request again to pick up where you left off.',
+      savedWithoutAttachments:
+        'Your text is saved as a draft, but the attachments could not be saved. When you come back, upload them again.',
       unsaved: 'The draft could not be saved, so leaving will lose what you have written.',
       stay: 'Keep writing',
       go: 'Leave',

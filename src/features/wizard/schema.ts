@@ -186,6 +186,19 @@ export function parseChecklist(text: string): ChecklistRow[] {
 /* ------------------------------------------------------------------ */
 
 /**
+ * An attachment as a draft stores it: shape only. Whether the URL may be shown
+ * is checked per attachment after reading (`restoreDraft`), so a contract rule
+ * that grew stricter drops that attachment, not the whole draft.
+ */
+const DraftAttachment = z.object({
+  id: z.string(),
+  name: z.string(),
+  size: z.number(),
+  mimeType: z.string(),
+  url: z.string(),
+})
+
+/**
  * Shape-only schema for a half-written draft. It must not reuse WizardSchema's
  * constraints: an empty "desired behaviour" is normal mid-way, and rejecting it
  * would silently throw the whole draft away.
@@ -205,25 +218,61 @@ const DraftShape = z
       .array(z.object({ ref: z.string(), clause: z.string(), finding: z.string(), expected: z.string() }))
       .max(CHECKLIST_ITEMS_MAX),
     outOfScope: z.string(),
-    attachments: z.array(Attachment),
+    attachments: z.array(DraftAttachment),
     desiredDate: z.string(),
     desiredDateReason: z.string(),
   })
   .partial()
 
-export function loadDraft(userId: string): WizardValues | null {
+/** A draft read back: the values, and the names of attachments that could not be kept. */
+export interface RestoredDraft {
+  values: WizardValues
+  /** Attachments the draft held whose URL is no longer accepted (e.g. a type an earlier version allowed) */
+  droppedAttachments: string[]
+}
+
+export function restoreDraft(userId: string): RestoredDraft | null {
   try {
     const raw = localStorage.getItem(draftKey(userId))
     if (!raw) return null
     const parsed = DraftShape.safeParse(JSON.parse(raw))
     if (!parsed.success) return null
-    const draft = { ...EMPTY_VALUES, ...parsed.data }
-    if (!draft.acceptanceCriteria.length) draft.acceptanceCriteria = [{ text: '' }]
-    if (!draft.checklist.length) draft.checklist = [EMPTY_ROW]
-    return draft
+    const { attachments = [], ...rest } = parsed.data
+    const kept: Attachment[] = []
+    const droppedAttachments: string[] = []
+    for (const a of attachments) {
+      const ok = Attachment.safeParse(a)
+      if (ok.success) kept.push(ok.data)
+      else droppedAttachments.push(a.name)
+    }
+    const values: WizardValues = { ...EMPTY_VALUES, ...rest, attachments: kept }
+    if (!values.acceptanceCriteria.length) values.acceptanceCriteria = [{ text: '' }]
+    if (!values.checklist.length) values.checklist = [EMPTY_ROW]
+    return { values, droppedAttachments }
   } catch {
     return null
   }
+}
+
+export function loadDraft(userId: string): WizardValues | null {
+  return restoreDraft(userId)?.values ?? null
+}
+
+/**
+ * The attachments a submission was refused for: the server names each one it
+ * cannot find as `attachmentIds.<index>` in `issues` (see createRequest in the
+ * contract). Ids, in the order sent; empty when the refusal is about something else.
+ */
+export function missingAttachmentIds(
+  issues: ReadonlyArray<{ path: string; message: string }> | undefined,
+  attachmentIds: readonly string[],
+): string[] {
+  const ids = (issues ?? []).flatMap((issue) => {
+    const index = /^attachmentIds\.(\d+)$/.exec(issue.path)?.[1]
+    const id = index === undefined ? undefined : attachmentIds[Number(index)]
+    return id === undefined ? [] : [id]
+  })
+  return [...new Set(ids)]
 }
 
 /** How long typing pauses before the draft is written (every keystroke would re-serialise attachments). */

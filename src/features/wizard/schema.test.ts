@@ -5,7 +5,9 @@ import {
   firstInvalidStep,
   hasWrittenContent,
   loadDraft,
+  missingAttachmentIds,
   parseChecklist,
+  restoreDraft,
   saveDraft,
   STEPS,
   toDraft,
@@ -34,6 +36,31 @@ describe('draft storage', () => {
     const values = { ...EMPTY_VALUES, title: '사진이 안 올라감', attachments: [photo] }
     expect(saveDraft(userId, values)).toBe('withoutAttachments')
     expect(loadDraft(userId)).toMatchObject({ title: '사진이 안 올라감', attachments: [] })
+  })
+
+  it('drops only the attachments whose URL is no longer accepted, and keeps the words', () => {
+    // An older demo kept any small file inline, e.g. as data:text/plain.
+    const note = {
+      ...photo,
+      id: 'att-2',
+      name: 'note.txt',
+      mimeType: 'text/plain',
+      url: 'data:text/plain;base64,QQ==',
+    }
+    localStorage.setItem(
+      `ax-request-portal:draft:${userId}`,
+      JSON.stringify({ ...EMPTY_VALUES, title: '사진이 안 올라감', attachments: [photo, note] }),
+    )
+    const restored = restoreDraft(userId)
+    expect(restored?.values).toMatchObject({ title: '사진이 안 올라감', attachments: [photo] })
+    expect(restored?.droppedAttachments).toEqual(['note.txt'])
+  })
+
+  it('still drops a draft that is not a draft at all', () => {
+    localStorage.setItem(`ax-request-portal:draft:${userId}`, JSON.stringify({ title: 42 }))
+    expect(restoreDraft(userId)).toBeNull()
+    localStorage.setItem(`ax-request-portal:draft:${userId}`, '{not json')
+    expect(restoreDraft(userId)).toBeNull()
   })
 
   it('reports a draft it could not keep at all', () => {
@@ -110,5 +137,22 @@ describe('wizard schema for audit findings', () => {
     expect(
       toDraft({ ...change, acceptanceCriteria: [{ text: '검색하면 결과가 보인다' }] }).checklist,
     ).toBeUndefined()
+  })
+})
+
+describe('missingAttachmentIds', () => {
+  it('maps the issues the server named to the attachments sent', () => {
+    const issues = [
+      { path: 'attachmentIds.0', message: 'gone' },
+      { path: 'attachmentIds.2', message: 'gone' },
+      { path: 'attachmentIds.2', message: 'gone' },
+    ]
+    expect(missingAttachmentIds(issues, ['a', 'b', 'c'])).toEqual(['a', 'c'])
+  })
+
+  it('finds nothing in a refusal about something else', () => {
+    expect(missingAttachmentIds(undefined, ['a'])).toEqual([])
+    expect(missingAttachmentIds([{ path: 'title', message: 'too short' }], ['a'])).toEqual([])
+    expect(missingAttachmentIds([{ path: 'attachmentIds.7', message: 'gone' }], ['a'])).toEqual([])
   })
 })

@@ -80,6 +80,27 @@ function OptionCard({
   )
 }
 
+/**
+ * The server refused the submission because it cannot find these attachments
+ * (expired or removed uploads): which ones, and what to do.
+ */
+function MissingAttachments({ names, action }: { names: string[]; action?: ReactNode }) {
+  const { t } = useTranslation()
+  if (!names.length) return null
+  return (
+    <div role="alert" className="flex gap-3 rounded-2xl bg-danger-50 px-4 py-3.5 text-sm">
+      <CircleAlert className="mt-0.5 size-5 shrink-0 text-danger-fg" aria-hidden />
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <p className="font-bold text-danger-fg">{t('wizard.missingAttachments.title')}</p>
+        <p className="[overflow-wrap:anywhere] text-ink-700">
+          {t('wizard.missingAttachments.body', { names: names.join(', ') })}
+        </p>
+        {action}
+      </div>
+    </div>
+  )
+}
+
 /* 1 ---------------------------------------------------------------- */
 
 export function ProjectStep({ onPicked }: { onPicked: () => void }) {
@@ -473,10 +494,18 @@ function CriteriaList({ advice }: { advice: Map<string, PrecheckIssue[]> }) {
 
 /* 6 ---------------------------------------------------------------- */
 
-export function ExtraStep({ advice }: { advice: Map<string, PrecheckIssue[]> }) {
+export function ExtraStep({
+  advice,
+  missing,
+}: {
+  advice: Map<string, PrecheckIssue[]>
+  /** Ids of attachments the server could not find when the request was submitted */
+  missing: ReadonlySet<string>
+}) {
   const { t } = useTranslation()
   const { control, register, setValue } = useFormContext<WizardValues>()
   const [attachments, desiredDate] = useWatch({ control, name: ['attachments', 'desiredDate'] })
+  const missingNames = attachments.filter((a) => missing.has(a.id)).map((a) => a.name)
   const upload = useUploadAttachment()
   const fileInput = useRef<HTMLInputElement>(null)
   const hqDateNote = useHqCalendarNote('today')
@@ -525,10 +554,17 @@ export function ExtraStep({ advice }: { advice: Map<string, PrecheckIssue[]> }) 
             {t('wizard.extra.attachments')}
             <span className="ml-1.5 text-xs font-medium text-ink-400">{t('common.optional')}</span>
           </p>
+          <MissingAttachments names={missingNames} />
           {attachments.length ? (
             <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {attachments.map((a) => (
-                <li key={a.id} className="flex items-center gap-3 rounded-xl bg-surface p-2 ring-1 ring-line">
+                <li
+                  key={a.id}
+                  className={cn(
+                    'flex items-center gap-3 rounded-xl bg-surface p-2 ring-1',
+                    missing.has(a.id) ? 'ring-2 ring-danger-600' : 'ring-line',
+                  )}
+                >
                   {a.mimeType.startsWith('image/') ? (
                     <img src={a.url} alt="" className="size-12 rounded-lg object-cover" />
                   ) : (
@@ -538,7 +574,13 @@ export function ExtraStep({ advice }: { advice: Map<string, PrecheckIssue[]> }) 
                   )}
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-sm font-semibold">{a.name}</span>
-                    <span className="text-xs text-ink-400">{formatBytes(a.size)}</span>
+                    {missing.has(a.id) ? (
+                      <span className="text-xs font-semibold text-danger-fg">
+                        {t('wizard.missingAttachments.item')}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-ink-400">{formatBytes(a.size)}</span>
+                    )}
                   </span>
                   <Button
                     variant="ghost"
@@ -637,6 +679,7 @@ export function ReviewStep({
   checkFailed,
   onRecheck,
   goTo,
+  missing,
 }: {
   issues: PrecheckIssue[]
   checking: boolean
@@ -644,6 +687,8 @@ export function ReviewStep({
   checkFailed: boolean
   onRecheck: () => void
   goTo: (step: number) => void
+  /** Ids of attachments the server could not find when the request was submitted */
+  missing: ReadonlySet<string>
 }) {
   const { t } = useTranslation()
   const dir = useDirectory()
@@ -654,10 +699,24 @@ export function ReviewStep({
   if (v.targetOther.trim()) targets.push(v.targetOther.trim())
   const step = (key: (typeof STEPS)[number]['key']) => STEPS.findIndex((s) => s.key === key)
   const none = <span className="text-ink-400">{t('common.none')}</span>
+  const missingNames = v.attachments.filter((a) => missing.has(a.id)).map((a) => a.name)
 
   return (
     <>
       <StepTitle>{t('wizard.review.title')}</StepTitle>
+
+      {missingNames.length ? (
+        <div className="mb-5">
+          <MissingAttachments
+            names={missingNames}
+            action={
+              <Button variant="secondary" className="w-fit" onClick={() => goTo(step('extra'))}>
+                {t('wizard.missingAttachments.fix')}
+              </Button>
+            }
+          />
+        </div>
+      ) : null}
 
       <div
         className={cn(

@@ -108,6 +108,56 @@ describe('submitting', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
+  it('waits for a submission still on its way instead of opening its draft again', async () => {
+    saveDraft(USER, READY)
+    const hold = gate()
+    let posts = 0
+    t.server.use(
+      http.post('*/api/requests', async () => {
+        posts += 1
+        await hold.closed
+      }),
+    )
+    const router = renderWizard(REVIEW)
+    await screen.findByText(/확인해 보면 좋은 점 \d+개/)
+    await userEvent.click(screen.getByRole('button', { name: '요청 제출' }))
+    await screen.findByRole('button', { name: '제출 중…' })
+
+    await act(() => router.navigate('/'))
+    await act(() => router.navigate(REVIEW))
+    expect(await screen.findByText('앞서 제출한 요청을 보내고 있어요…')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '요청 제출' })).toBeNull()
+
+    hold.open()
+    // Once it has arrived, the form starts empty: that draft became the request.
+    expect(await screen.findByRole('heading', { name: '어느 서비스에 대한 요청인가요?' })).toBeInTheDocument()
+    expect(localStorage.getItem(DRAFT_KEY)).toBeNull()
+    expect(posts).toBe(1)
+  })
+
+  it('names the attachments the server could not find and leads back to them', async () => {
+    const photo = {
+      id: 'att-expired',
+      name: 'screen.png',
+      size: 4,
+      mimeType: 'image/png',
+      url: 'data:image/png;base64,iVBORw==',
+    }
+    saveDraft(USER, { ...READY, attachments: [photo] })
+    renderWizard(REVIEW)
+    await screen.findByText(/확인해 보면 좋은 점 \d+개/)
+    await userEvent.click(screen.getByRole('button', { name: '요청 제출' }))
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent('찾을 수 없는 첨부가 있어요')
+    expect(alert).toHaveTextContent('screen.png')
+    await userEvent.click(screen.getByRole('button', { name: '첨부 고치기' }))
+
+    expect(await screen.findByText('다시 올려 주세요')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'screen.png 지우기' }))
+    expect(screen.queryByText('찾을 수 없는 첨부가 있어요')).toBeNull()
+  })
+
   it('opens the new request and leaves no draft behind', async () => {
     saveDraft(USER, READY)
     renderWizard(REVIEW)
@@ -213,6 +263,28 @@ describe('leaving', () => {
     // Past the moment the pending save would have run.
     await act(() => new Promise((resolve) => setTimeout(resolve, 400)))
     expect(localStorage.getItem(DRAFT_KEY)).toBeNull()
+  })
+
+  it('says when the draft was kept without its attachments', async () => {
+    const original = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
+      if (key === DRAFT_KEY && value.includes('data:')) throw new DOMException('full', 'QuotaExceededError')
+      original.call(this, key, value)
+    })
+    const photo = {
+      id: 'att-1',
+      name: 'screen.png',
+      size: 4,
+      mimeType: 'image/png',
+      url: 'data:image/png;base64,QQ==',
+    }
+    original.call(localStorage, DRAFT_KEY, JSON.stringify({ ...READY, title: '', attachments: [photo] }))
+    const router = renderWizard('/requests/new?step=3')
+    await userEvent.type(await screen.findByLabelText('요청 제목'), '사진이 안 올라감')
+
+    await act(() => router.navigate('/'))
+    const dialog = await screen.findByRole('dialog', { name: '작성을 멈추고 나갈까요?' })
+    expect(dialog).toHaveTextContent('첨부 파일은 저장하지 못했어요')
   })
 
   it('does not ask when nothing has been written', async () => {

@@ -143,7 +143,11 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
         if (spec.response === null) return new HttpResponse(null, { status: 204 })
         return HttpResponse.json(result as never, { status: spec.status ?? 200 })
       } catch (err) {
-        if (err instanceof HttpError) return errorResponse(lang, err.status, err.code, err.key, err.params)
+        if (err instanceof HttpError) {
+          const message = errorText(lang, err.key, err.params)
+          const issues = err.paths.length ? err.paths.map((path) => ({ path, message })) : undefined
+          return errorResponse(lang, err.status, err.code, err.key, err.params, issues)
+        }
         console.error('[mock api]', err)
         return errorResponse(lang, 500, 'internal', 'unknown')
       }

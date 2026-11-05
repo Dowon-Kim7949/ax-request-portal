@@ -340,7 +340,8 @@ export const api = {
     method: 'POST',
     path: '/requests',
     tag: 'requests',
-    summary: 'Submit a request. The AI starts the feasibility report immediately.',
+    summary:
+      'Submit a request. The AI starts the feasibility report immediately. 400 when an attachment is missing or was uploaded by someone else, with one issue per such attachment (path attachmentIds.<index>).',
     body: RequestDraft,
     status: 201,
     response: WorkRequest,

@@ -159,17 +159,21 @@ export class HttpError extends Error {
     'bad_request' | 'unauthorized' | 'forbidden' | 'not_found' | 'invalid_transition' | 'guard_failed'
   readonly key: ErrorKey
   readonly params: Record<string, string | number>
+  /** Body fields the error is about (`issues[].path`), e.g. `attachmentIds.1` */
+  readonly paths: string[]
   constructor(
     status: number,
     code: HttpError['code'],
     key: ErrorKey,
     params: Record<string, string | number> = {},
+    paths: string[] = [],
   ) {
     super(key)
     this.status = status
     this.code = code
     this.key = key
     this.params = params
+    this.paths = paths
   }
 }
 
@@ -568,12 +572,15 @@ export class MockEngine {
     const unknownTarget = draft.targetIds.find((t) => !project.targets.some((pt) => pt.id === t))
     if (unknownTarget) throw new HttpError(400, 'bad_request', 'unknownTarget', { target: unknownTarget })
 
-    // Ids are easy to guess: someone else's upload is treated as missing.
-    const attachments = [...new Set(draft.attachmentIds)].map((aid) => {
+    // Ids are easy to guess: someone else's upload is treated as missing. Each missing one is named
+    // (issues[].path = attachmentIds.<index>), so the form can say which to upload again.
+    const mine = (aid: string) => {
       const stored = this.state.attachments.find((a) => a.id === aid)
-      if (!stored || stored.ownerId !== user.id) throw new HttpError(400, 'bad_request', 'attachmentNotFound')
-      return publicAttachment(stored)
-    })
+      return stored && stored.ownerId === user.id ? stored : undefined
+    }
+    const missing = draft.attachmentIds.flatMap((aid, i) => (mine(aid) ? [] : [`attachmentIds.${i}`]))
+    if (missing.length) throw new HttpError(400, 'bad_request', 'attachmentNotFound', {}, missing)
+    const attachments = [...new Set(draft.attachmentIds)].map((aid) => publicAttachment(mine(aid)!))
     const at = now.toISOString()
     const id = this.state.nextRequestId++
 

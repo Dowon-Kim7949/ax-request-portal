@@ -221,23 +221,30 @@ export function usePrecheck() {
   })
 }
 
+/** Marks request submissions, so a wizard opened while one is on its way can wait for it (useIsMutating). */
+export const CREATE_REQUEST_KEY = ['createRequest'] as const
+
 /**
  * `onCreated` / `onFailed` run with the hook's own handling, so they run even
  * when the screen that submitted has been left meanwhile (per-call `mutate`
  * callbacks are dropped on unmount). The wizard deletes its draft there.
  */
 export function useCreateRequest(
-  options: { onCreated?: (req: WorkRequest) => void; onFailed?: (error: Error) => void } = {},
+  options: {
+    onCreated?: (req: WorkRequest) => void
+    onFailed?: (error: Error, body: BodyOf<typeof api.createRequest>) => void
+  } = {},
 ) {
   const qc = useQueryClient()
   const { onCreated, onFailed } = options
   return useMutation({
+    mutationKey: CREATE_REQUEST_KEY,
     mutationFn: (body: BodyOf<typeof api.createRequest>) => call(api.createRequest, { body }),
     onSuccess: (req) => {
       onRequestChanged(qc, req)
       onCreated?.(req)
     },
-    onError: onFailed,
+    onError: (error, body) => onFailed?.(error, body),
   })
 }
 

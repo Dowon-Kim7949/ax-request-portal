@@ -68,6 +68,16 @@ describe('attachments', () => {
     expect(WorkRequest.parse(await res.json()).attachments).toEqual([mine])
   })
 
+  it('names every attachment it cannot find, by its place in attachmentIds', async () => {
+    const mine = await upload('u-kim', png())
+    const res = await createRequest('u-kim', ['att-gone', mine.id, 'att-also-gone'])
+    expect(res.status).toBe(400)
+    const body = ApiErrorBody.parse(await res.json())
+    expect(body.code).toBe('bad_request')
+    expect(body.issues?.map((i) => i.path)).toEqual(['attachmentIds.0', 'attachmentIds.2'])
+    expect(body.issues?.[0]?.message).toBe(body.message)
+  })
+
   it('keeps a file a browser could run as a page as plain bytes, for this session only', async () => {
     const page = await upload(
       'u-kim',

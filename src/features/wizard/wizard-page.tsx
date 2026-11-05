@@ -1,15 +1,18 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useIsMutating } from '@tanstack/react-query'
 import { ChevronLeft, X } from 'lucide-react'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { useBlocker, useNavigate, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
+import { ApiError } from '@/api/client'
 import { errorText } from '@/api/error-text'
-import { useCreateRequest, usePrecheck } from '@/api/queries'
+import { CREATE_REQUEST_KEY, useCreateRequest, usePrecheck } from '@/api/queries'
 import { useCurrentUser, useDirectory } from '@/app/hooks'
 import { usePageTitle } from '@/app/title'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/feedback'
 import { Sheet } from '@/components/ui/sheet'
 import type { PrecheckIssue } from '@/domain/model'
 import { debounce } from '@/lib/debounce'
@@ -22,7 +25,8 @@ import {
   firstInvalidStep,
   hasWrittenContent,
   isEmptyDraft,
-  loadDraft,
+  missingAttachmentIds,
+  restoreDraft,
   saveDraft,
   STEPS,
   toDraft,
@@ -41,10 +45,34 @@ import {
 } from './steps'
 
 const LAST = STEPS.length - 1
+const EXTRA = STEPS.findIndex((s) => s.key === 'extra')
 
+/**
+ * The new-request wizard. A request submitted from an earlier visit may still
+ * be on its way (the wizard was left while it was sent): its draft is deleted
+ * once it arrives, so the form waits until then instead of opening that draft
+ * again, which could submit the same request twice.
+ */
 export default function WizardPage() {
   const { t } = useTranslation()
   usePageTitle(t('wizard.title'))
+  const sending = useIsMutating({ mutationKey: CREATE_REQUEST_KEY }) > 0
+  // Only a submission already on its way when the page opened: this page's own keeps the form.
+  const [waiting, setWaiting] = useState(sending)
+  if (waiting && !sending) setWaiting(false)
+  if (waiting) {
+    return (
+      <div className="mx-auto flex max-w-2xl flex-col items-center gap-2 py-16 text-center">
+        <Spinner label={t('wizard.sendingEarlier.title')} />
+        <p className="text-sm text-ink-500">{t('wizard.sendingEarlier.body')}</p>
+      </div>
+    )
+  }
+  return <WizardForm />
+}
+
+function WizardForm() {
+  const { t } = useTranslation()
   const user = useCurrentUser()
   const dir = useDirectory()
   const navigate = useNavigate()
@@ -52,7 +80,8 @@ export default function WizardPage() {
   const presetProject = params.get('project')
 
   // Restore a draft once; a ?project= link from the home screen overrides its project.
-  const [restored] = useState(() => loadDraft(user.id))
+  const [draft] = useState(() => restoreDraft(user.id))
+  const restored = draft?.values ?? null
   const initial = useMemo<WizardValues>(() => {
     const base = restored ?? EMPTY_VALUES
     if (presetProject && presetProject !== base.projectId)
@@ -145,6 +174,9 @@ export default function WizardPage() {
     if (restored && !isEmptyDraft(restored)) {
       toast(t('wizard.draftRestored'), { action: { label: t('wizard.discard'), onClick: discard } })
     }
+    if (draft?.droppedAttachments.length) {
+      toast.warning(t('wizard.draftAttachmentsDropped', { names: draft.droppedAttachments.join(', ') }))
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -173,6 +205,15 @@ export default function WizardPage() {
   const advice = useMemo(() => adviceByField(issues), [issues])
 
   /* ---- submission ---- */
+  /** Attachments the server could not find at the last submission (marked until removed). */
+  const [missing, setMissing] = useState<ReadonlySet<string>>(() => new Set())
+  const mounted = useRef(false)
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
   // Handled by the hook, so the draft is deleted and the outcome told even when
   // the person has left the wizard while the request was on its way.
   const create = useCreateRequest({
@@ -182,7 +223,22 @@ export default function WizardPage() {
       clearDraft(user.id)
       toast.success(t('wizard.review.submitted'))
     },
-    onFailed: (e) => toast.error(errorText(e, t('errors.generic'))),
+    onFailed: (e, body) => {
+      const gone = missingAttachmentIds(e instanceof ApiError ? e.issues : undefined, body.attachmentIds)
+      if (!gone.length || !mounted.current) {
+        toast.error(errorText(e, t('errors.generic')))
+        return
+      }
+      // Say which ones, mark them on the attachment step and offer the way there.
+      setMissing(new Set(gone))
+      const names = form
+        .getValues('attachments')
+        .filter((a) => gone.includes(a.id))
+        .map((a) => a.name)
+      toast.error(t('wizard.missingAttachments.toast', { names: names.join(', ') }), {
+        action: { label: t('wizard.missingAttachments.fix'), onClick: () => goTo(EXTRA) },
+      })
+    },
   })
   const submit = () => {
     create.mutate(toDraft(form.getValues()), {
@@ -237,7 +293,7 @@ export default function WizardPage() {
     targets: <TargetsStep advice={advice} />,
     describe: <DescribeStep advice={advice} />,
     criteria: <CriteriaStep advice={advice} />,
-    extra: <ExtraStep advice={advice} />,
+    extra: <ExtraStep advice={advice} missing={missing} />,
     review: (
       <ReviewStep
         issues={issues}
@@ -245,6 +301,7 @@ export default function WizardPage() {
         checkFailed={precheck.isError}
         onRecheck={runPrecheck}
         goTo={(s) => goTo(s)}
+        missing={missing}
       />
     ),
   }[current.key]
@@ -320,7 +377,13 @@ export default function WizardPage() {
           if (!open && blocker.state === 'blocked') blocker.reset()
         }}
         title={t('wizard.leave.title')}
-        description={lastSave === 'failed' ? t('wizard.leave.unsaved') : t('wizard.leave.saved')}
+        description={
+          lastSave === 'failed'
+            ? t('wizard.leave.unsaved')
+            : lastSave === 'withoutAttachments'
+              ? t('wizard.leave.savedWithoutAttachments')
+              : t('wizard.leave.saved')
+        }
         footer={
           <>
             <Button
