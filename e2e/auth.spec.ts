@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { loginAs, viewportOf, type Viewport } from './helpers.ts'
+import { loginAs, signOut, viewportOf } from './helpers.ts'
 
 const FORBIDDEN = '이 작업을 할 권한이 없어요.'
 const REQUESTER_HOME = '어떤 일을 도와드릴까요?'
@@ -13,17 +13,6 @@ async function openSignedOut(page: Page, path: string) {
 
 async function startAsRequester(page: Page) {
   await page.getByRole('button', { name: /요청자로 시작/ }).click()
-}
-
-/** Signs out through the account menu (tablet, desktop) or the "more" sheet (phone). */
-async function signOut(page: Page, viewport: Viewport) {
-  if (viewport === 'phone') {
-    await page.getByRole('navigation', { name: '하단 메뉴' }).getByRole('button', { name: '더보기' }).click()
-    await page.getByRole('dialog', { name: '더보기' }).getByRole('button', { name: '로그아웃' }).click()
-  } else {
-    await page.getByRole('button', { name: '내 계정' }).click()
-    await page.getByRole('button', { name: '로그아웃' }).click()
-  }
 }
 
 test('signing out of an admin page and in as a requester starts at home', async ({ page }, info) => {

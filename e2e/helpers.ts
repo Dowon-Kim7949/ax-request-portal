@@ -47,6 +47,28 @@ export async function loginAs(page: Page, role: '요청자' | '경영진' | '담
   await expectSignedIn(page)
 }
 
+/** Signs out through the account menu (tablet, desktop) or the "more" sheet (phone). */
+export async function signOut(page: Page, viewport: Viewport) {
+  if (viewport === 'phone') {
+    await page.getByRole('navigation', { name: '하단 메뉴' }).getByRole('button', { name: '더보기' }).click()
+    await page.getByRole('dialog', { name: '더보기' }).getByRole('button', { name: '로그아웃' }).click()
+  } else {
+    await page.getByRole('button', { name: '내 계정' }).click()
+    await page.getByRole('button', { name: '로그아웃' }).click()
+  }
+}
+
+/**
+ * Hands the browser to another role the way a person would: sign out (which
+ * lands on /login without `next`) and start again from a demo button.
+ */
+export async function switchRole(page: Page, viewport: Viewport, role: Parameters<typeof loginAs>[1]) {
+  await signOut(page, viewport)
+  await expect(page).toHaveURL((url) => url.pathname === '/login' && url.search === '')
+  await page.getByRole('button', { name: new RegExp(`${role}로 시작`) }).click()
+  await expectSignedIn(page)
+}
+
 /** Same as loginAs, for a browser whose language is English. */
 export async function loginAsEnglish(
   page: Page,
