@@ -28,11 +28,23 @@ async function openLoginScreen(page: Page, brandName: string) {
   })
 }
 
+/**
+ * Waits until the app has left the login screen for good. Signing in moves on
+ * twice (the sign-in call's success, and the screen's own redirect once it
+ * sees the session), and the URL changes before the screen does: a move made
+ * in between (openInApp) can be overtaken by the second one. Once the login
+ * form has gone, both have been made.
+ */
+export async function expectSignedIn(page: Page) {
+  await expect(page).not.toHaveURL(/\/login/)
+  await expect(page.locator('input[type="password"]')).toHaveCount(0)
+}
+
 /** Signs in through the demo buttons on the login screen (mock mode). */
 export async function loginAs(page: Page, role: '요청자' | '경영진' | '담당자' | '관리자' | '운영자') {
   await openLoginScreen(page, 'AX 업무 요청')
   await page.getByRole('button', { name: new RegExp(`${role}로 시작`) }).click()
-  await expect(page).not.toHaveURL(/\/login/)
+  await expectSignedIn(page)
 }
 
 /** Same as loginAs, for a browser whose language is English. */
@@ -42,7 +54,7 @@ export async function loginAsEnglish(
 ) {
   await openLoginScreen(page, 'AX Request Portal')
   await page.getByRole('button', { name: new RegExp(`Sign in as ${role}`) }).click()
-  await expect(page).not.toHaveURL(/\/login/)
+  await expectSignedIn(page)
 }
 
 /**

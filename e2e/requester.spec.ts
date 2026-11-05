@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { expectNoHorizontalScroll, loginAs, openInApp } from './helpers.ts'
+import { expectNoHorizontalScroll, expectSignedIn, loginAs, openInApp } from './helpers.ts'
 
 test('requester files a request through the wizard', async ({ page }) => {
   await loginAs(page, '요청자')
@@ -82,7 +82,7 @@ test('requester answers the developer’s questions', async ({ page }) => {
   await page.getByLabel('이메일').fill('sales@example.com')
   await page.getByLabel('비밀번호').fill('demo')
   await page.getByRole('button', { name: '로그인', exact: true }).click()
-  await expect(page).not.toHaveURL(/\/login/)
+  await expectSignedIn(page)
   await openInApp(page, '/requests/1022')
   await expect(page.getByRole('heading', { name: '담당자가 물어본 것' })).toBeVisible()
   await page.getByLabel('답변').fill('월간 매출 리포트입니다. 3초 안에 열리면 충분합니다.')
