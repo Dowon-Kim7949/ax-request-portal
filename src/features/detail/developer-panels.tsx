@@ -8,6 +8,7 @@ import {
   FileCode2,
   FlaskConical,
   GitPullRequestArrow,
+  Info,
   Plus,
   ShieldAlert,
   ShieldCheck,
@@ -17,12 +18,14 @@ import {
 import { useId, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { ApiError } from '@/api/client'
+import { errorText } from '@/api/error-text'
 import { useTransition, useUpdateRegression, useUpdateRelease } from '@/api/queries'
+import { useHqCalendarNote } from '@/app/time-zone'
 import { ModelName } from '@/components/ai/ai'
 import { Badge, type BadgeTone } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { DateTimeText } from '@/components/ui/date-time'
 import { Field, Input, Textarea } from '@/components/ui/field'
 import { Sheet } from '@/components/ui/sheet'
 import type {
@@ -34,13 +37,13 @@ import type {
   WorkRequest,
 } from '@/domain/model'
 import { cn } from '@/lib/cn'
-import { formatDateTime, formatKrw, toLocalDate } from '@/lib/format'
-import { uncheckedAssumptions } from '@/domain/lifecycle'
+import { formatKrw } from '@/lib/format'
+import { hqToday } from '@/lib/time-zone'
+import { releaseDateMissing, uncheckedAssumptions } from '@/domain/lifecycle'
+import { isSafeUrl } from '@/domain/url'
 import { useAiRunLimit } from './ai-limit'
 import { FeedbackBadge, PreviewImages } from './preview-panels'
 import { AiRunLimitReason } from './ai-usage-card'
-
-const errorText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback)
 
 function reviewTerm(project: Project | undefined): 'MR' | 'PR' {
   return project?.repository.provider === 'github' ? 'PR' : 'MR'
@@ -107,7 +110,11 @@ export function ReportPanel({
           <CardTitle id="report-title">{t('report.title')}</CardTitle>
           <p className="mt-0.5 text-xs text-ink-400">
             {t('report.revision', { n: report.revision })} ·{' '}
-            {t('report.generatedAt', { time: formatDateTime(report.generatedAt) })}
+            <DateTimeText
+              iso={report.generatedAt}
+              variant="full"
+              sentence={(time) => t('report.generatedAt', { time })}
+            />
           </p>
           {report.generatedBy ? (
             <p className="mt-1 flex text-xs text-ink-600">
@@ -748,7 +755,7 @@ export function WorkPanel({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
                 <PreviewImages preview={work.preview} compact />
                 <div className="flex min-w-0 flex-col gap-2 text-sm">
-                  {work.preview.url ? (
+                  {work.preview.url && isSafeUrl(work.preview.url, 'link') ? (
                     <a
                       href={work.preview.url}
                       target="_blank"
@@ -785,7 +792,7 @@ export function WorkPanel({
           >
             {t('workRun.approve')}
           </Button>
-          {work.mergeRequest ? (
+          {work.mergeRequest && isSafeUrl(work.mergeRequest.url, 'link') ? (
             <Button asChild variant="secondary" size="lg" className="sm:flex-1">
               <a href={work.mergeRequest.url} target="_blank" rel="noreferrer">
                 <ExternalLink aria-hidden />
@@ -970,6 +977,11 @@ export function ReleasePanel({ request, canRelease }: { request: WorkRequest; ca
   const [date, setDate] = useState(request.release?.scheduledDate ?? '')
   const [confirmOpen, setConfirmOpen] = useState(false)
   const fail = (e: unknown) => toast.error(errorText(e, t('errors.generic')))
+  // Mirrors the server's guard: a request is released on a planned date.
+  const needsDate = releaseDateMissing(request)
+  const needsDateId = useId()
+  // Release dates are head-office calendar days; the API refuses one before its today.
+  const hqDateNote = useHqCalendarNote('today')
 
   return (
     <Card>
@@ -987,11 +999,11 @@ export function ReleasePanel({ request, canRelease }: { request: WorkRequest; ca
           )
         }}
       >
-        <Field label={t('release.date')}>
+        <Field label={t('release.date')} hint={hqDateNote}>
           {(p) => (
             <Input
               type="date"
-              min={toLocalDate()}
+              min={hqToday()}
               value={date}
               onChange={(e) => setDate(e.target.value)}
               {...p}
@@ -1009,9 +1021,24 @@ export function ReleasePanel({ request, canRelease }: { request: WorkRequest; ca
         </Button>
       </form>
       {canRelease ? (
-        <Button size="lg" block className="mt-2" onClick={() => setConfirmOpen(true)}>
-          {t('release.markReleased')}
-        </Button>
+        <>
+          <Button
+            size="lg"
+            block
+            className="mt-2"
+            disabled={needsDate}
+            aria-describedby={needsDate ? needsDateId : undefined}
+            onClick={() => setConfirmOpen(true)}
+          >
+            {t('release.markReleased')}
+          </Button>
+          {needsDate ? (
+            <p id={needsDateId} className="mt-1.5 flex gap-1.5 text-[13px] leading-snug text-ink-500">
+              <Info className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+              {t('release.needDate')}
+            </p>
+          ) : null}
+        </>
       ) : null}
       <Sheet
         open={confirmOpen}

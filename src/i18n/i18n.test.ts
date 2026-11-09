@@ -56,6 +56,9 @@ describe('formatting follows the UI language', () => {
   it('formats in Korean', async () => {
     await i18n.changeLanguage('ko')
     expect(formatKrw(184_000)).toBe('18.4만 원')
+    expect(formatKrw(99_990_000)).toBe('9,999만 원')
+    expect(formatKrw(150_000_000)).toBe('1.5억 원')
+    expect(formatKrw(10_000_000_000)).toBe('100억 원')
     expect(formatKrw(9_800)).toBe('9,800원')
     expect(formatMonth('2026-10')).toBe('2026년 10월')
     expect(formatDate('2026-11-06')).toMatch(/11월 6일/)

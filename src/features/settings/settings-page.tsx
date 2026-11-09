@@ -3,15 +3,17 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { ApiError } from '@/api/client'
 import { useNotificationSettings, useUpdateNotificationSettings } from '@/api/queries'
+import { refreshOf } from '@/api/refresh'
 import { demoDataLanguage } from '@/app/demo'
 import { LanguagePicker, ThemePicker } from '@/app/display-controls'
 import { PageHeader } from '@/app/page'
 import { usePageTitle } from '@/app/title'
-import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { SwitchRow } from '@/components/ui/controls'
-import { ErrorState, Skeleton } from '@/components/ui/feedback'
+import { Skeleton } from '@/components/ui/feedback'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import type { NotificationSettings } from '@/domain/model'
+import { TimeZoneSection } from './time-zone-section'
 
 const ROWS = [
   { key: 'inApp', label: 'settings.inApp', hint: 'settings.inAppHint' },
@@ -61,16 +63,16 @@ function NotificationsSection() {
         <CardTitle id="notifications-title">{t('settings.notifications')}</CardTitle>
         <p className="text-sm text-ink-500">{t('settings.notificationsHint')}</p>
       </CardHeader>
+      <RefreshFailed {...refreshOf(query)} className="mt-3" />
       {query.isPending ? (
         <Skeleton className="mt-3 h-56" />
-      ) : query.isError || !query.data ? (
-        <ErrorState
-          title={t('common.errorTitle')}
-          action={
-            <Button variant="secondary" onClick={() => void query.refetch()}>
-              {t('common.retry')}
-            </Button>
-          }
+      ) : query.isLoadingError || !query.data ? (
+        <LoadFailed
+          compact
+          className="mt-3"
+          error={query.error}
+          onRetry={() => void query.refetch()}
+          retrying={query.isFetching}
         />
       ) : (
         <div className="divide-y divide-line">
@@ -107,6 +109,7 @@ export default function SettingsPage() {
       <PageHeader title={t('settings.title')} description={t('settings.subtitle')} />
       <div className="grid max-w-2xl grid-cols-1 gap-4">
         <DisplaySection />
+        <TimeZoneSection />
         <NotificationsSection />
       </div>
     </>

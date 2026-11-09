@@ -1,23 +1,29 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Bot, ChartColumn, ChevronRight, Code, Settings, Send } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { Navigate, useNavigate, useSearchParams } from 'react-router'
 import * as z from 'zod'
 import { ApiError } from '@/api/client'
+import type { Session } from '@/api/contract'
 import { useLogin } from '@/api/queries'
 import { useBrand } from '@/app/brand'
 import { loadDemoAccounts } from '@/app/demo'
+import { DemoBanner } from '@/app/demo-banner'
 import { QuickDisplayToggles } from '@/app/display-controls'
 import { usePageTitle } from '@/app/title'
 import { Button } from '@/components/ui/button'
 import { Field, Input } from '@/components/ui/field'
 import type { Role, User } from '@/domain/model'
 import { useSession } from '@/stores/session'
+import { resolvePostLoginPath } from './post-login'
 
 const LoginForm = z.object({ email: z.email(), password: z.string().min(1) })
 type LoginForm = z.infer<typeof LoginForm>
+
+/** How long after the login screen appears the expiry is announced (see `announcement`). */
+const ANNOUNCE_DELAY_MS = 100
 
 const ROLE_ICON: Record<Role, typeof Send> = {
   requester: Send,
@@ -27,19 +33,29 @@ const ROLE_ICON: Record<Role, typeof Send> = {
   operator: Bot,
 }
 
-/** Only allow in-app paths as the post-login destination. */
-function safeNext(next: string | null): string {
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/'
-}
-
 export default function LoginPage() {
   const { t, i18n } = useTranslation()
   usePageTitle(t('auth.title'))
   const brand = useBrand()
   const token = useSession((s) => s.token)
+  const user = useSession((s) => s.user)
+  // How the previous session in this tab ended. Read once: signing in resets it in the store, and the
+  // redirect that follows must still see it.
+  const [ended] = useState(() => useSession.getState().ended)
+  const expired = ended?.reason === 'expired'
+  const expiredId = useId()
+  // Screen readers do not read a live region that arrives with its text already in it (this screen
+  // opens right after the expiry): the status below starts empty and gets the text a moment after
+  // it is on screen, once the screen reader has registered it.
+  const [announcement, setAnnouncement] = useState('')
+  useEffect(() => {
+    if (!expired) return
+    const timer = setTimeout(() => setAnnouncement(t('auth.sessionExpired')), ANNOUNCE_DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [expired, t])
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const next = safeNext(params.get('next'))
+  const next = params.get('next')
   const login = useLogin()
   const [demo, setDemo] = useState<{ accounts: User[]; password: string } | null>(null)
 
@@ -53,16 +69,20 @@ export default function LoginPage() {
     defaultValues: { email: '', password: '' },
   })
 
-  const submit = (values: LoginForm) =>
-    login.mutate(values, { onSuccess: () => navigate(next, { replace: true }) })
+  // Every way out of this screen goes through resolvePostLoginPath: `next` only if the new user may open
+  // it. After a session ended in this tab, `next` is the page that person had open: only they return to it.
+  const destination = (signedIn: User | null) =>
+    resolvePostLoginPath(ended?.userId && ended.userId !== signedIn?.id ? null : next, signedIn)
+  const goOn = (session: Session) => navigate(destination(session.user), { replace: true })
+  const submit = (values: LoginForm) => login.mutate(values, { onSuccess: goOn })
 
-  if (token && !login.isPending) return <Navigate to={next} replace />
+  if (token && !login.isPending) return <Navigate to={destination(user)} replace />
 
   const errorMessage =
     login.error instanceof ApiError ? login.error.message : login.error ? t('errors.generic') : undefined
 
   return (
-    <main className="relative flex min-h-dvh items-center justify-center px-4 py-16 pt-safe">
+    <main className="relative flex min-h-dvh items-center justify-center px-4 pt-[calc(4rem+env(safe-area-inset-top))] pb-16">
       <div className="absolute top-[max(1rem,env(safe-area-inset-top))] right-4">
         <QuickDisplayToggles />
       </div>
@@ -73,7 +93,23 @@ export default function LoginPage() {
           </span>
           <h1 className="text-[28px] leading-tight font-bold tracking-tight">{brand.name}</h1>
           <p className="text-[15px] text-ink-500">{brand.tagline}</p>
+          <DemoBanner variant="inline" />
         </div>
+
+        <p role="status" className="sr-only">
+          {announcement}
+        </p>
+        {expired ? (
+          // Shown at once; read through the status above and as the email field's description,
+          // so it is heard once, not twice while reading the page.
+          <p
+            id={expiredId}
+            aria-hidden
+            className="rounded-(--radius-card) bg-warning-50 px-4 py-3 text-sm font-medium text-warning-fg"
+          >
+            {t('auth.sessionExpired')}
+          </p>
+        ) : null}
 
         <form
           noValidate
@@ -90,6 +126,10 @@ export default function LoginPage() {
                 autoComplete="username"
                 inputMode="email"
                 {...p}
+                aria-describedby={
+                  [p['aria-describedby'], expired ? expiredId : undefined].filter(Boolean).join(' ') ||
+                  undefined
+                }
                 {...form.register('email')}
               />
             )}
@@ -126,10 +166,7 @@ export default function LoginPage() {
                       type="button"
                       disabled={login.isPending}
                       onClick={() =>
-                        login.mutate(
-                          { email: u.email, password: demo.password },
-                          { onSuccess: () => navigate(next, { replace: true }) },
-                        )
+                        login.mutate({ email: u.email, password: demo.password }, { onSuccess: goOn })
                       }
                       className="flex w-full items-center gap-3 rounded-2xl bg-surface p-3.5 text-left ring-1 ring-line transition hover:ring-brand-500 disabled:opacity-50"
                     >

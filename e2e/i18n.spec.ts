@@ -4,8 +4,16 @@
  * Labels that are deliberately in another language carry a `lang` attribute
  * (the "한국어" option in the language switch) and are excluded.
  */
-import { expect, test, type Page } from '@playwright/test'
-import { expectNoHorizontalScroll, loginAsEnglish as signIn } from './helpers.ts'
+import { expect, test, type Page } from './fixtures.ts'
+import {
+  COLD_START_TIMEOUT,
+  expectNoHorizontalScroll,
+  keepDraftOffline,
+  loginAsEnglish as signIn,
+  openInApp,
+  SEEDED_DRAFTS,
+  seedSavedDrafts,
+} from './helpers.ts'
 
 /** Hangul anywhere on screen, except inside elements marked as another language. */
 async function koreanOnScreen(page: Page): Promise<string[]> {
@@ -26,7 +34,9 @@ test.describe('English browser', () => {
 
   test('login screen is in English', async ({ page }) => {
     await page.goto('/login')
-    await expect(page.getByRole('heading', { level: 1, name: 'AX Request Portal' })).toBeVisible()
+    await expect(page.getByRole('heading', { level: 1, name: 'AX Request Portal' })).toBeVisible({
+      timeout: COLD_START_TIMEOUT,
+    })
     await expect(page.locator('html')).toHaveAttribute('lang', 'en')
     await expect(page.getByRole('button', { name: /Sign in as Requester/ })).toBeVisible()
     expect(await koreanOnScreen(page)).toEqual([])
@@ -54,12 +64,46 @@ test.describe('English browser', () => {
     for (const [role, routes] of Object.entries(plan)) {
       await signIn(page, role as keyof typeof plan)
       for (const route of routes) {
-        await page.goto(route)
+        await openInApp(page, route)
         await settle(page)
         expect(await koreanOnScreen(page), `${role} ${route}`).toEqual([])
         await expectNoHorizontalScroll(page)
       }
     }
+  })
+
+  test('saved drafts are in English', async ({ page }) => {
+    const titles = SEEDED_DRAFTS.en
+    await keepDraftOffline(page, titles.offline)
+    await signIn(page, 'Requester')
+    await seedSavedDrafts(page, titles)
+    await page.reload()
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: COLD_START_TIMEOUT })
+    await settle(page)
+    const home = page.getByRole('region', { name: 'Saved drafts' })
+    await expect(home.getByText('4/20')).toBeVisible()
+    await expect(home.getByText('This device only')).toBeVisible()
+    await expect(home.getByRole('link', { name: 'See all saved drafts' })).toBeVisible()
+    expect(await koreanOnScreen(page), '/').toEqual([])
+
+    await openInApp(page, '/requests')
+    await settle(page)
+    const drafts = page.locator('#drafts')
+    await expect(drafts.getByText('4/20')).toBeVisible()
+    await page.getByRole('button', { name: 'Show all 5' }).click()
+    await expect(drafts.getByText('Conflict')).toBeVisible()
+    await expect(drafts.getByText(titles.untitled, { exact: true })).toBeVisible()
+    expect(await koreanOnScreen(page), '/requests').toEqual([])
+    await expectNoHorizontalScroll(page)
+    await page.getByRole('button', { name: `Delete ${titles.offline}` }).click()
+    await expect(page.getByRole('dialog', { name: 'Delete this draft?' })).toBeVisible()
+    expect(await koreanOnScreen(page), 'delete sheet').toEqual([])
+    await page.keyboard.press('Escape')
+
+    await openInApp(page, '/')
+    await openInApp(page, '/requests/new')
+    await expect(page.getByRole('link', { name: /Saved drafts: 5/ })).toBeVisible()
+    expect(await koreanOnScreen(page), 'new request').toEqual([])
   })
 
   test('a requester files and checks requests in English', async ({ page }) => {

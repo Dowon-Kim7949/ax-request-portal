@@ -3,18 +3,21 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { useReleases } from '@/api/queries'
+import { refreshOf } from '@/api/refresh'
 import { useDirectory } from '@/app/hooks'
 import { PageHeader } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { ProjectIcon } from '@/components/request/project-icon'
 import { StatusBadge } from '@/components/request/status'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { EmptyState, ErrorState, ListSkeleton } from '@/components/ui/feedback'
+import { HqCalendarNote } from '@/components/ui/date-time'
+import { EmptyState, ListSkeleton } from '@/components/ui/feedback'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { Segmented } from '@/components/ui/segmented'
 import type { ReleaseScheduleItem } from '@/domain/model'
 import { cn } from '@/lib/cn'
-import { addDays, formatDate, toLocalDate } from '@/lib/format'
+import { addDays, formatDate } from '@/lib/format'
+import { hqToday } from '@/lib/time-zone'
 
 function DateGroup({ date, items, today }: { date: string; items: ReleaseScheduleItem[]; today: string }) {
   const { t } = useTranslation()
@@ -32,9 +35,10 @@ function DateGroup({ date, items, today }: { date: string; items: ReleaseSchedul
         {items.map((item) => {
           const project = dir.project(item.projectId)
           return (
+            // Past days sit on the muted tint instead of fading out: faded text loses its contrast.
             <section
               key={item.projectId}
-              className={cn('rounded-(--radius-card) bg-surface p-4 ring-1 ring-line', past && 'opacity-75')}
+              className={cn('rounded-(--radius-card) p-4 ring-1 ring-line', past ? 'bg-muted' : 'bg-surface')}
             >
               <div className="mb-2 flex items-center gap-2.5">
                 <ProjectIcon icon={project?.icon} className="size-8 rounded-lg" />
@@ -48,7 +52,10 @@ function DateGroup({ date, items, today }: { date: string; items: ReleaseSchedul
                   <li key={r.id}>
                     <Link
                       to={`/requests/${r.id}`}
-                      className="-mx-2 flex min-h-11 items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-muted"
+                      className={cn(
+                        '-mx-2 flex min-h-11 items-center gap-2 rounded-lg px-2 py-1.5',
+                        past ? 'hover:bg-surface' : 'hover:bg-muted',
+                      )}
                     >
                       <span className="text-xs text-ink-400">#{r.id}</span>
                       <span className="min-w-0 flex-1 truncate text-[15px]">{r.title}</span>
@@ -69,7 +76,8 @@ export default function SchedulePage() {
   const { t } = useTranslation()
   usePageTitle(t('schedule.title'))
   const dir = useDirectory()
-  const today = toLocalDate()
+  // Release dates are head-office calendar days, so "today" is the head office's.
+  const today = hqToday()
   const [projectId, setProjectId] = useState('all')
   const releases = useReleases(addDays(today, -45), addDays(today, 90))
 
@@ -98,6 +106,7 @@ export default function SchedulePage() {
   return (
     <>
       <PageHeader title={t('schedule.title')} description={t('schedule.subtitle')} />
+      <HqCalendarNote className="-mt-2 mb-4" />
       <Segmented
         className="mb-5"
         label={t('schedule.allProjects')}
@@ -108,16 +117,14 @@ export default function SchedulePage() {
           ...dir.projects.map((p) => ({ value: p.id, label: p.name })),
         ]}
       />
+      <RefreshFailed {...refreshOf(releases)} className="mb-3" />
       {releases.isPending ? (
         <ListSkeleton />
-      ) : releases.isError ? (
-        <ErrorState
-          title={t('common.errorTitle')}
-          action={
-            <Button variant="secondary" onClick={() => void releases.refetch()}>
-              {t('common.retry')}
-            </Button>
-          }
+      ) : releases.isLoadingError ? (
+        <LoadFailed
+          error={releases.error}
+          onRetry={() => void releases.refetch()}
+          retrying={releases.isFetching}
         />
       ) : sections.length ? (
         <div className="flex flex-col gap-8">

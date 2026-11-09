@@ -5,9 +5,10 @@ import { ModelName, TokenLine } from '@/components/ai/ai'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Meter } from '@/components/ui/controls'
+import { DateTimeText } from '@/components/ui/date-time'
 import { overRequestLimit } from '@/domain/ai'
 import type { RequestAiUsage } from '@/domain/model'
-import { formatDateTime, formatKrw, formatSmallKrw } from '@/lib/format'
+import { formatKrw, formatSmallKrw } from '@/lib/format'
 
 export function AiRunLimitReason({ id, reason }: { id: string; reason: string }) {
   return (
@@ -61,7 +62,9 @@ export function AiUsageCard({ usage }: { usage: RequestAiUsage }) {
               <div className="flex flex-wrap items-center gap-x-1.5 text-xs text-ink-600">
                 <ModelName selection={e} />
                 {e.runtime !== 'api' ? <span>· {t(`ai.runtime.${e.runtime}`)}</span> : null}
-                <span className="text-ink-500">· {formatDateTime(e.at)}</span>
+                <span className="text-ink-500">
+                  · <DateTimeText iso={e.at} />
+                </span>
               </div>
               <TokenLine tokens={e.tokens} className="text-xs text-ink-500" />
             </li>

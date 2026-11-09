@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Project, User, WorkRequest } from '../domain/model'
 import { DEFAULT_ROLE_PERMISSIONS } from '../domain/roles'
-import { localDate, MockEngine } from './engine'
+import { businessDate, MockEngine } from './engine'
 import { buildSeedState } from './seed'
 
 const NOW = new Date('2026-11-02T03:00:00.000Z')
@@ -94,7 +94,7 @@ describe('seed data', () => {
 
   it('flags #1017 as delayed and schedules two releases this week', () => {
     const engine = new MockEngine(structuredClone(state), OPTS)
-    const today = localDate(NOW)
+    const today = businessDate(NOW)
     expect(engine.isDelayed(byId(1017), today)).toBe(true)
     const summary = engine.dashboard(
       state.users.find((u) => u.role === 'executive')!,
@@ -116,11 +116,11 @@ describe('seed data', () => {
   it('compares an unfinished month with the same span of the previous one', () => {
     const engine = new MockEngine(structuredClone(state), OPTS)
     const exec = state.users.find((u) => u.role === 'executive')!
-    const today = localDate(NOW) // 2026-11-02 in any timezone east of UTC-3
+    const today = businessDate(NOW) // 2026-11-02 at the head office, wherever the tests run
     const current = engine.dashboard(exec, today.slice(0, 7), NOW)
     const previous = engine.dashboard(exec, '2026-10', NOW)
     const sameSpan = state.requests.filter((r) => {
-      const d = localDate(new Date(r.createdAt))
+      const d = businessDate(r.createdAt)
       return d.startsWith('2026-10') && d.slice(8, 10) <= today.slice(8, 10)
     }).length
     expect(current.receivedPrevMonth).toBe(sameSpan)

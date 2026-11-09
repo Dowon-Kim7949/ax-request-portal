@@ -4,8 +4,8 @@
  * Checks the computed style of every visible interactive element, so a new
  * button that forgets it fails here. Desktop only: touch screens have no cursor.
  */
-import { expect, test, type Page } from '@playwright/test'
-import { loginAs } from './helpers.ts'
+import { expect, test, type Page } from './fixtures.ts'
+import { COLD_START_TIMEOUT, loginAs, openInApp } from './helpers.ts'
 
 async function expectCursorContract(page: Page, where: string) {
   // With a sheet open the page behind it leaves the accessibility tree, so wait on the dialog instead.
@@ -51,6 +51,7 @@ async function expectCursorContract(page: Page, where: string) {
 
 test('login screen', async ({ page }) => {
   await page.goto('/login')
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: COLD_START_TIMEOUT })
   await expectCursorContract(page, '/login')
 })
 
@@ -67,11 +68,11 @@ test('requester screens', async ({ page }) => {
     '/notifications',
     '/settings',
   ]) {
-    await page.goto(route)
+    await openInApp(page, route)
     await expectCursorContract(page, route)
   }
   // Inside the account menu, and with a disabled button on screen (confirm needs every criterion).
-  await page.goto('/requests/1021')
+  await openInApp(page, '/requests/1021')
   await expect(page.getByRole('button', { name: '모두 확인했어요' })).toBeDisabled()
   await page.getByRole('button', { name: '내 계정' }).click()
   await expectCursorContract(page, 'account menu + disabled confirm')
@@ -80,7 +81,7 @@ test('requester screens', async ({ page }) => {
 test('developer screens and sheets', async ({ page }) => {
   await loginAs(page, '담당자')
   for (const route of ['/work', '/work/regression', '/requests/1024', '/requests/1026']) {
-    await page.goto(route)
+    await openInApp(page, route)
     await expectCursorContract(page, route)
   }
   await page.getByRole('button', { name: '작업 수행' }).click()
@@ -90,28 +91,28 @@ test('developer screens and sheets', async ({ page }) => {
 
 test('executive, admin and operator screens', async ({ page }) => {
   await loginAs(page, '경영진')
-  await page.goto('/dashboard')
+  await openInApp(page, '/dashboard')
   await expectCursorContract(page, '/dashboard')
 
   await loginAs(page, '관리자')
   for (const route of ['/admin/projects', '/admin/users']) {
-    await page.goto(route)
+    await openInApp(page, route)
     await expectCursorContract(page, route)
   }
-  await page.goto('/admin/projects')
+  await openInApp(page, '/admin/projects')
   await page.getByRole('button', { name: '프로젝트 추가' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await expectCursorContract(page, 'project sheet')
 
   await loginAs(page, '운영자')
   for (const route of ['/', '/ops/usage', '/ops/agents', '/ops/pricing', '/ops/budget']) {
-    await page.goto(route)
+    await openInApp(page, route)
     await expectCursorContract(page, route)
   }
-  await page.goto('/ops/usage')
+  await openInApp(page, '/ops/usage')
   await page.getByText('표로 보기').click()
   await expectCursorContract(page, 'usage table view')
-  await page.goto('/ops/agents')
+  await openInApp(page, '/ops/agents')
   await page.getByRole('button', { name: 'Anthropic 키 바꾸기' }).click()
   await expect(page.getByRole('dialog')).toBeVisible()
   await expectCursorContract(page, 'provider key sheet')

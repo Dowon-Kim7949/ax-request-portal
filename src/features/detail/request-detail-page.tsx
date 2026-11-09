@@ -3,18 +3,19 @@ import { useTranslation } from 'react-i18next'
 import { useParams } from 'react-router'
 import { ApiError } from '@/api/client'
 import { useRequest } from '@/api/queries'
+import { refreshOf } from '@/api/refresh'
 import { useCan, useCurrentUser, useDirectory } from '@/app/hooks'
 import { PageHeader } from '@/app/page'
 import { NotFoundPage } from '@/app/pages'
 import { usePageTitle } from '@/app/title'
 import { StatusBadge, Stepper } from '@/components/request/status'
 import { Timeline } from '@/components/request/timeline'
-import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
-import { ErrorState, Skeleton } from '@/components/ui/feedback'
+import { DateTimeText } from '@/components/ui/date-time'
+import { Skeleton } from '@/components/ui/feedback'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { appConfig } from '@/config/app.config'
 import { availableEvents, isResponsibleDeveloper, isTerminal } from '@/domain/lifecycle'
-import { formatDate } from '@/lib/format'
 import { AiUsageCard } from './ai-usage-card'
 import { DecisionCard, RegressionChecks, ReleasePanel, ReportPanel, WorkPanel } from './developer-panels'
 import { ReleaseCard, RequestContent } from './request-content'
@@ -50,22 +51,14 @@ export default function RequestDetailPage() {
 
   if (!Number.isInteger(id) || id <= 0) return <NotFoundPage />
   if (query.isPending) return <DetailSkeleton />
-  if (query.isError || !request) {
-    if (query.error instanceof ApiError && query.error.status === 404) return <NotFoundPage />
-    return (
-      <ErrorState
-        title={t('common.errorTitle')}
-        action={
-          <Button variant="secondary" onClick={() => void query.refetch()}>
-            {t('common.retry')}
-          </Button>
-        }
-      />
-    )
+  // Gone, or no longer visible to this person: even over a copy loaded before.
+  if (query.error instanceof ApiError && query.error.status === 404) return <NotFoundPage />
+  // Nothing loaded at all. A failed refresh keeps the request on screen (RefreshFailed below).
+  if (query.isLoadingError || !request) {
+    return <LoadFailed error={query.error} onRetry={() => void query.refetch()} retrying={query.isFetching} />
   }
 
   const project = dir.project(request.projectId)
-  const requester = dir.user(request.requesterId)
   const isRequester = request.requesterId === user.id
   const ctx = { user, request, project, rolePermissions: appConfig.rolePermissions }
   const events = availableEvents(ctx)
@@ -95,19 +88,22 @@ export default function RequestDetailPage() {
         title={request.title}
         description={
           <span className="flex flex-wrap gap-x-2 text-sm">
-            <span>{project?.name}</span>
+            <span>{dir.projectName(request.projectId)}</span>
             <span aria-hidden>·</span>
             <span>{t(`requestType.${request.type}.label`)}</span>
             <span aria-hidden>·</span>
-            <span>{t('detail.requestedBy', { name: requester?.name ?? '' })}</span>
+            <span>{t('detail.requestedBy', { name: dir.userName(request.requesterId) })}</span>
             <span aria-hidden>·</span>
-            <span>
-              {t('detail.filedOn', { date: formatDate(request.createdAt.slice(0, 10), { weekday: false }) })}
-            </span>
+            <DateTimeText
+              iso={request.createdAt}
+              variant="date"
+              sentence={(date) => t('detail.filedOn', { date })}
+            />
           </span>
         }
       />
 
+      <RefreshFailed {...refreshOf(query)} className="mb-4" />
       <Card className="mb-4">
         <Stepper status={request.status} />
       </Card>

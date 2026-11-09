@@ -5,14 +5,15 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAiUsage } from '@/api/queries'
+import { refreshOf } from '@/api/refresh'
 import { useDirectory } from '@/app/hooks'
 import { PageHeader } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Meter } from '@/components/ui/controls'
-import { EmptyState, ErrorState, Skeleton } from '@/components/ui/feedback'
+import { EmptyState, Skeleton } from '@/components/ui/feedback'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { MonthStepper } from '@/components/ui/month-stepper'
 import { StatTile } from '@/components/ui/stat-tile'
 import { addUsage, AI_TASKS, cacheHitRate, ZERO_USAGE } from '@/domain/ai'
@@ -25,15 +26,15 @@ import {
   formatPercent,
   formatSmallKrw,
   formatUsd,
-  toLocalDate,
 } from '@/lib/format'
+import { hqToday } from '@/lib/time-zone'
 import { DailyChart, ModelBars, ProviderLegend, ProviderSplit } from './usage-charts'
 
 export default function UsagePage() {
   const { t } = useTranslation()
   usePageTitle(t('usage.title'))
   const dir = useDirectory()
-  const [month, setMonth] = useState(() => toLocalDate().slice(0, 7))
+  const [month, setMonth] = useState(() => hqToday().slice(0, 7))
   const query = useAiUsage(month)
   const u = query.data
   const stale = query.isFetching && query.isPlaceholderData
@@ -52,21 +53,15 @@ export default function UsagePage() {
       {/* Filters: one row, above everything they scope */}
       <MonthStepper month={month} onChange={setMonth} />
 
+      <RefreshFailed {...refreshOf(query)} className="mb-3" />
       {query.isPending ? (
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {Array.from({ length: 4 }, (_, i) => (
             <Skeleton key={i} className="h-28" />
           ))}
         </div>
-      ) : query.isError || !u ? (
-        <ErrorState
-          title={t('common.errorTitle')}
-          action={
-            <Button variant="secondary" onClick={() => void query.refetch()}>
-              {t('common.retry')}
-            </Button>
-          }
-        />
+      ) : query.isLoadingError || !u ? (
+        <LoadFailed error={query.error} onRetry={() => void query.refetch()} retrying={query.isFetching} />
       ) : (
         <div
           className={cn('flex flex-col gap-4 transition-opacity', stale && 'opacity-60')}

@@ -26,7 +26,8 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "openapi": "tsx scripts/generate-openapi.ts",
-    "verify": "npm run lint && npm run format:check && npm run typecheck && npm run test && vite build"
+    "check:real-build": "node scripts/check-real-build.mjs",
+    "verify": "npm run lint && npm run format:check && npm run typecheck && npm run test && vite build && npm run check:real-build"
   },
   "dependencies": {
     "@hookform/resolvers": "^7.0.1",
@@ -47,6 +48,7 @@
     "zustand": "^5.0.16"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
     "@playwright/test": "^1.64.1",
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",

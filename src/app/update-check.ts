@@ -7,22 +7,31 @@
  * tab compares the two when someone comes back to it, every few minutes, and
  * right away when a page's code fails to load.
  */
+import { timeoutSignal } from '@/lib/abort'
 
 /** The build this tab is running */
 export const BUILD_ID = __BUILD_ID__
 
 export const CHECK_INTERVAL_MS = 5 * 60_000
+/** A check that hangs (captive portal, stalled connection) would hold back every later one. */
+export const FETCH_TIMEOUT_MS = 10_000
 
-/** The id of the deployed build, or null when it cannot be read (offline, dev server). */
+/** The id of the deployed build, or null when it cannot be read in time (offline, dev server). */
 export async function fetchDeployedBuildId(base = import.meta.env.BASE_URL): Promise<string | null> {
+  const deadline = timeoutSignal(FETCH_TIMEOUT_MS)
   try {
     // A unique query gets past CDN caches (GitHub Pages keeps files for 10 minutes).
-    const res = await fetch(`${base}version.json?t=${Date.now()}`, { cache: 'no-store' })
+    const res = await fetch(`${base}version.json?t=${Date.now()}`, {
+      cache: 'no-store',
+      signal: deadline.signal,
+    })
     if (!res.ok) return null
     const data = (await res.json()) as { buildId?: unknown }
     return typeof data.buildId === 'string' ? data.buildId : null
   } catch {
     return null
+  } finally {
+    deadline.clear()
   }
 }
 
@@ -75,6 +84,19 @@ export function watchForUpdates(onUpdate: (deployed: string) => void): () => voi
     window.clearInterval(timer)
     if (checkNow === check) checkNow = undefined
   }
+}
+
+/**
+ * A page's code could not be loaded — after a deployment, the tab's hashed
+ * chunk files are gone. Each browser words a failed dynamic import differently
+ * (Chrome, Firefox, Safari), and Vite reports a failed CSS preload itself.
+ */
+export function isChunkLoadError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  return (
+    error.name === 'ChunkLoadError' ||
+    /dynamically imported module|importing a module script failed|unable to preload css/i.test(error.message)
+  )
 }
 
 /** Called when a page's code fails to load: the usual cause is a deployment. */

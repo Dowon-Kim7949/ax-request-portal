@@ -18,6 +18,15 @@ export const appConfig: AppConfig = AppConfigSchema.parse({
       en: 'From the request form to progress, result checks and release dates, in one place',
     },
   },
+  /**
+   * Head office. Branches elsewhere (e.g. North America) see times in their own
+   * time zone with head-office time next to it; dates and totals follow this one.
+   * Change both fields together: an IANA name and how people call the place.
+   */
+  organization: {
+    timeZone: 'Asia/Seoul',
+    timeZoneLabel: { ko: '한국', en: 'Korea' },
+  },
   locales: ['ko', 'en'],
   defaultLocale: 'ko',
   enabledRoles: ['requester', 'executive', 'developer', 'admin', 'operator'],
@@ -25,6 +34,10 @@ export const appConfig: AppConfig = AppConfigSchema.parse({
   requestTypes: ['new_feature', 'change', 'bug', 'copy_design', 'checklist', 'non_code'],
   workflow: {
     scopeCheck: true,
+  },
+  /** Unsubmitted requests saved to each account, to continue on any device */
+  drafts: {
+    maxPerAccount: 20,
   },
   mock: {
     reportSeconds: 6,

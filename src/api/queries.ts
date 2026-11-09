@@ -10,10 +10,17 @@ import {
   type QueryClient,
 } from '@tanstack/react-query'
 import type { TransitionCommand } from '../domain/lifecycle'
-import type { RequestStatus, WorkRequest } from '../domain/model'
+import type { Notification, RequestStatus, WorkRequest } from '../domain/model'
 import { useSession } from '../stores/session'
-import { call } from './client'
-import { api, type BodyOf, type ParamsOf, type QueryOf } from './contract'
+import { ApiError, call } from './client'
+import {
+  api,
+  type BodyOf,
+  type ParamsOf,
+  type QueryOf,
+  type SavedDraft,
+  type SavedDraftSummary,
+} from './contract'
 
 export const keys = {
   all: ['api'] as const,
@@ -24,6 +31,9 @@ export const keys = {
   requestList: (query: QueryOf<typeof api.listRequests>) => [...keys.requests(), 'list', query] as const,
   request: (id: number) => [...keys.requests(), 'detail', id] as const,
   regression: () => [...keys.requests(), 'regression'] as const,
+  /** The signed-in person's saved drafts; apart from `draft`, so refreshing the list does not re-read an open draft. */
+  drafts: () => [...keys.all, 'drafts', 'list'] as const,
+  draft: (id: string) => [...keys.all, 'drafts', 'detail', id] as const,
   notifications: () => [...keys.all, 'notifications'] as const,
   notificationSettings: () => [...keys.all, 'notification-settings'] as const,
   dashboard: (month?: string) => [...keys.all, 'dashboard', month ?? 'current'] as const,
@@ -84,6 +94,18 @@ export function useRequest(id: number | undefined) {
     enabled: id !== undefined && Number.isInteger(id) && id > 0,
     refetchInterval: (q) =>
       q.state.data && LIVE_STATUSES.includes(q.state.data.status) ? LIVE_POLL_MS : false,
+  })
+}
+
+/**
+ * The signed-in person's saved drafts, most recently changed first.
+ * `enabled: false` for people who may not file requests (the API refuses them).
+ */
+export function useDrafts(options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: keys.drafts(),
+    queryFn: ({ signal }) => call(api.listDrafts, { signal }),
+    enabled: options.enabled ?? true,
   })
 }
 
@@ -160,14 +182,63 @@ export function useAiUsage(month?: string) {
 /* Mutations                                                           */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Stores a copy of a request unless the cache already holds a newer one:
+ * answers can arrive out of order (a slow save after a quick decision, or a
+ * poll that overtook the answer).
+ */
+function storeRequest(qc: QueryClient, req: WorkRequest) {
+  qc.setQueryData<WorkRequest>(keys.request(req.id), (cached) =>
+    cached && Date.parse(cached.updatedAt) > Date.parse(req.updatedAt) ? cached : req,
+  )
+}
+
+/**
+ * Changes to one request run one after another (TanStack mutation scope), so
+ * the server applies them in the order the person made them.
+ */
+const requestScope = (id: number) => ({ id: `request:${id}` })
+
 /** After any change to a request: store the fresh copy, refresh lists and notifications. */
 function onRequestChanged(qc: QueryClient, req: WorkRequest) {
-  qc.setQueryData(keys.request(req.id), req)
+  storeRequest(qc, req)
   void qc.invalidateQueries({ queryKey: [...keys.requests(), 'list'] })
   void qc.invalidateQueries({ queryKey: keys.regression() })
   void qc.invalidateQueries({ queryKey: keys.notifications() })
   void qc.invalidateQueries({ queryKey: [...keys.all, 'dashboard'] })
   void qc.invalidateQueries({ queryKey: [...keys.all, 'releases'] })
+}
+
+/**
+ * Drafts are saved by the draft sync (src/features/drafts/sync-engine.ts), which
+ * sends each draft's saves one after another itself: a mutation scope is fixed
+ * per hook and cannot follow a draft whose id changes when it is first saved.
+ */
+
+/**
+ * After a draft was saved by the draft sync: the open copy is the
+ * answer, and so is its line in the list, at once (the device's own copy may
+ * be deleted in the same moment, and the list must not lose the draft until
+ * it is read again). Then the list is read again.
+ */
+export function storeSavedDraft(qc: QueryClient, draft: SavedDraft) {
+  qc.setQueryData(keys.draft(draft.id), draft)
+  const { content: _content, attachments: _attachments, ...summary } = draft
+  qc.setQueryData<SavedDraftSummary[]>(keys.drafts(), (list) =>
+    list
+      ? [summary, ...list.filter((d) => d.id !== draft.id)].sort(
+          (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
+        )
+      : list,
+  )
+  void qc.invalidateQueries({ queryKey: keys.drafts() })
+}
+
+/** After a draft was deleted or submitted: it leaves the list at once, then the list is read again. */
+export function dropSavedDraft(qc: QueryClient, id: string) {
+  qc.removeQueries({ queryKey: keys.draft(id), exact: true })
+  qc.setQueryData<SavedDraftSummary[]>(keys.drafts(), (list) => list?.filter((d) => d.id !== id))
+  void qc.invalidateQueries({ queryKey: keys.drafts() })
 }
 
 export function useLogin() {
@@ -182,14 +253,19 @@ export function useLogin() {
   })
 }
 
+/**
+ * Signing out on purpose: the login screen then starts fresh, without `next`
+ * (see RequireAuth), and the person's drafts kept on this device are deleted
+ * (see useSession). The shell sends what is waiting first (useSignOut, src/app/sign-out.tsx).
+ */
 export function useLogout() {
   const clear = useSession((s) => s.clear)
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => call(api.logout),
     onSettled: () => {
-      clear()
       qc.clear()
+      clear('signedOut')
     },
   })
 }
@@ -200,11 +276,48 @@ export function usePrecheck() {
   })
 }
 
-export function useCreateRequest() {
+/** Marks request submissions, so a wizard opened while one is on its way can wait for it (useIsMutating). */
+export const CREATE_REQUEST_KEY = ['createRequest'] as const
+
+/**
+ * `onCreated` / `onFailed` run with the hook's own handling, so they run even
+ * when the screen that submitted has been left meanwhile (per-call `mutate`
+ * callbacks are dropped on unmount). The wizard deletes its draft there.
+ */
+export function useCreateRequest(
+  options: {
+    onCreated?: (req: WorkRequest, body: BodyOf<typeof api.createRequest>) => void
+    onFailed?: (error: Error, body: BodyOf<typeof api.createRequest>) => void
+  } = {},
+) {
+  const qc = useQueryClient()
+  const { onCreated, onFailed } = options
+  return useMutation({
+    mutationKey: CREATE_REQUEST_KEY,
+    // With `draftId`, the server deletes that saved draft along with the submission.
+    mutationFn: (body: BodyOf<typeof api.createRequest>) => call(api.createRequest, { body }),
+    onSuccess: (req, body) => {
+      onRequestChanged(qc, req)
+      if (body.draftId) dropSavedDraft(qc, body.draftId)
+      else void qc.invalidateQueries({ queryKey: keys.drafts() })
+      onCreated?.(req, body)
+    },
+    onError: (error, body) => onFailed?.(error, body),
+  })
+}
+
+/** Deletes a saved draft. One that is already gone (404: deleted or submitted elsewhere) counts as deleted. */
+export function useDeleteDraft() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (body: BodyOf<typeof api.createRequest>) => call(api.createRequest, { body }),
-    onSuccess: (req) => onRequestChanged(qc, req),
+    mutationFn: async (id: string): Promise<void> => {
+      try {
+        await call(api.deleteDraft, { params: { id } })
+      } catch (error) {
+        if (!(error instanceof ApiError && error.status === 404)) throw error
+      }
+    },
+    onSuccess: (_void, id) => dropSavedDraft(qc, id),
   })
 }
 
@@ -212,16 +325,41 @@ export function useTransition(id: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: TransitionCommand) => call(api.transitionRequest, { params: { id }, body }),
+    scope: requestScope(id),
     onSuccess: (req) => onRequestChanged(qc, req),
   })
 }
 
+/** The checklist save each request's most recent call got, so earlier answers do not overwrite it */
+let verificationSaves = 0
+const latestVerificationSave = new Map<number, number>()
+
+/**
+ * Saves checklist progress on every tap. Saves run one at a time (shared
+ * request scope) and only the answer to the most recent one is stored, so a
+ * late answer cannot bring back an earlier state of the checklist.
+ */
 export function useSaveVerification(id: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: BodyOf<typeof api.saveVerification>) =>
       call(api.saveVerification, { params: { id }, body }),
-    onSuccess: (req) => qc.setQueryData(keys.request(req.id), req),
+    scope: requestScope(id),
+    onMutate: () => {
+      const seq = ++verificationSaves
+      latestVerificationSave.set(id, seq)
+      return { seq }
+    },
+    onSuccess: (req, _body, ctx) => {
+      if (ctx.seq === latestVerificationSave.get(id)) storeRequest(qc, req)
+    },
+    onSettled: (_req, error, _body, ctx) => {
+      if (ctx?.seq !== latestVerificationSave.get(id)) return
+      latestVerificationSave.delete(id)
+      // Earlier answers were skipped: after a failed last save, read the request again.
+      if (error) void qc.invalidateQueries({ queryKey: keys.request(id) })
+      void qc.invalidateQueries({ queryKey: [...keys.requests(), 'list'] })
+    },
   })
 }
 
@@ -230,6 +368,7 @@ export function usePreviewFeedback(id: number) {
   return useMutation({
     mutationFn: (body: BodyOf<typeof api.sendPreviewFeedback>) =>
       call(api.sendPreviewFeedback, { params: { id }, body }),
+    scope: requestScope(id),
     onSuccess: (req) => onRequestChanged(qc, req),
   })
 }
@@ -239,6 +378,7 @@ export function useUpdateRegression(id: number) {
   return useMutation({
     mutationFn: (body: BodyOf<typeof api.updateRegression>) =>
       call(api.updateRegression, { params: { id }, body }),
+    scope: requestScope(id),
     onSuccess: (req) => onRequestChanged(qc, req),
   })
 }
@@ -247,6 +387,7 @@ export function useUpdateRelease(id: number) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: BodyOf<typeof api.updateRelease>) => call(api.updateRelease, { params: { id }, body }),
+    scope: requestScope(id),
     onSuccess: (req) => onRequestChanged(qc, req),
   })
 }
@@ -277,18 +418,54 @@ export function useUpdateUser() {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: BodyOf<typeof api.updateUser> }) =>
       call(api.updateUser, { params: { id }, body }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.users() }),
+    onSuccess: (_user, { id }) => {
+      void qc.invalidateQueries({ queryKey: keys.users() })
+      // Changing yourself (e.g. a template that lets admins edit their own team): refresh the session's copy.
+      if (id === useSession.getState().user?.id) void qc.invalidateQueries({ queryKey: keys.me() })
+    },
   })
 }
 
-export function useMarkNotificationRead() {
+/**
+ * Marks one notification (or all) as read at once — list and bell badge — and
+ * puts back exactly those it marked if the server refuses. `onError` runs even
+ * after the screen is left (opening a notification navigates away).
+ */
+export function useMarkNotificationRead(options: { onError?: (error: Error) => void } = {}) {
   const qc = useQueryClient()
+  const { onError } = options
   return useMutation({
     mutationFn: async (id: string | 'all'): Promise<void> => {
       if (id === 'all') await call(api.markAllNotificationsRead)
       else await call(api.markNotificationRead, { params: { id } })
     },
-    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.notifications() }),
+    onMutate: async (id) => {
+      // A poll in flight would answer with the old read state.
+      await qc.cancelQueries({ queryKey: keys.notifications() })
+      const marked = new Set<string>()
+      const readAt = new Date().toISOString()
+      qc.setQueryData<Notification[]>(keys.notifications(), (list) =>
+        list?.map((n) => {
+          if (n.readAt || (id !== 'all' && n.id !== id)) return n
+          marked.add(n.id)
+          return { ...n, readAt }
+        }),
+      )
+      return { marked }
+    },
+    onError: (error, _id, ctx) => {
+      if (ctx?.marked.size) {
+        qc.setQueryData<Notification[]>(keys.notifications(), (list) =>
+          list?.map((n) => {
+            if (!ctx.marked.has(n.id)) return n
+            const { readAt: _readAt, ...unread } = n
+            return unread
+          }),
+        )
+      }
+      onError?.(error)
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: keys.notifications() }),
   })
 }
 

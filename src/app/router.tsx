@@ -1,9 +1,9 @@
 import type { ComponentType } from 'react'
-import { createBrowserRouter, Navigate, type RouteObject } from 'react-router'
+import { createBrowserRouter, Navigate, Outlet, type RouteObject } from 'react-router'
 import { env } from '@/config/env'
 import type { Permission } from '@/domain/roles'
 import { BootScreen } from './boot'
-import { RequireAuth, RequirePermission } from './guards'
+import { LOGIN_PATH, RequireAuth, RequirePermission, SessionSync } from './guards'
 import { NotFoundPage, RouteErrorPage } from './pages'
 import { checkForUpdateNow } from './update-check'
 import { AppShell } from './shell'
@@ -11,14 +11,24 @@ import { AppShell } from './shell'
 export interface RouteHandle {
   /** Hide the phone tab bar so a multi-step flow has the whole screen */
   focus?: boolean
+  /**
+   * Needed to open the route. The single source for both the page guard
+   * (`RequirePermission`) and the post-login redirect, which sends a person
+   * home instead of to a page they cannot open.
+   */
+  permission?: Permission
+  /** An old address that forwards here; the post-login redirect follows it */
+  redirectTo?: string
 }
 
-/** Lazy route: the page module loads on first visit, optionally behind a permission. */
+/** Lazy route: the page module loads on first visit, behind `handle.permission` when set. */
 function page(
   load: () => Promise<{ default: ComponentType }>,
-  permission?: Permission,
-): { lazy: () => Promise<{ Component: ComponentType }> } {
+  handle?: RouteHandle,
+): Pick<RouteObject, 'handle' | 'lazy'> {
+  const permission = handle?.permission
   return {
+    handle,
     lazy: async () => {
       const { default: Page } = await load().catch((err: unknown) => {
         // The usual cause is a deployment that removed this tab's chunk: say so next to the error page.
@@ -38,45 +48,95 @@ function page(
   }
 }
 
+/** An old address kept for bookmarks. */
+function moved(to: string): Pick<RouteObject, 'handle' | 'element'> {
+  return { handle: { redirectTo: to } satisfies RouteHandle, element: <Navigate to={to} replace /> }
+}
+
 export const routes: RouteObject[] = [
-  { path: '/login', HydrateFallback: BootScreen, ...page(() => import('@/features/auth/login-page')) },
   {
-    path: '/',
-    HydrateFallback: BootScreen,
+    // Pathless root: every route, the login screen included, gets a friendly error page and the tab sync.
     element: (
-      <RequireAuth>
-        <AppShell />
-      </RequireAuth>
+      <>
+        <SessionSync />
+        <Outlet />
+      </>
     ),
     errorElement: <RouteErrorPage />,
     children: [
-      { index: true, ...page(() => import('@/features/home/home-page')) },
-      { path: 'requests', ...page(() => import('@/features/requests/my-requests-page'), 'request:read:own') },
+      { path: LOGIN_PATH, HydrateFallback: BootScreen, ...page(() => import('@/features/auth/login-page')) },
       {
-        path: 'requests/new',
-        handle: { focus: true } satisfies RouteHandle,
-        ...page(() => import('@/features/wizard/wizard-page'), 'request:create'),
+        path: '/',
+        HydrateFallback: BootScreen,
+        element: (
+          <RequireAuth>
+            <AppShell />
+          </RequireAuth>
+        ),
+        // Errors below the shell stay here, so the root (and the tab sync) keeps running.
+        errorElement: <RouteErrorPage />,
+        children: [
+          { index: true, ...page(() => import('@/features/home/home-page')) },
+          {
+            path: 'requests',
+            ...page(() => import('@/features/requests/my-requests-page'), { permission: 'request:read:own' }),
+          },
+          {
+            path: 'requests/new',
+            ...page(() => import('@/features/wizard/wizard-page'), {
+              permission: 'request:create',
+              focus: true,
+            }),
+          },
+          { path: 'requests/:id', ...page(() => import('@/features/detail/request-detail-page')) },
+          {
+            path: 'schedule',
+            ...page(() => import('@/features/schedule/schedule-page'), { permission: 'schedule:view' }),
+          },
+          {
+            path: 'work',
+            ...page(() => import('@/features/work/assigned-page'), { permission: 'request:review' }),
+          },
+          {
+            path: 'work/regression',
+            ...page(() => import('@/features/work/regression-page'), { permission: 'regression:view' }),
+          },
+          {
+            path: 'dashboard',
+            ...page(() => import('@/features/dashboard/dashboard-page'), { permission: 'dashboard:view' }),
+          },
+          {
+            path: 'admin/projects',
+            ...page(() => import('@/features/admin/projects-page'), { permission: 'project:manage' }),
+          },
+          {
+            path: 'admin/users',
+            ...page(() => import('@/features/admin/users-page'), { permission: 'user:manage' }),
+          },
+          // The AI budget moved to the operator's screens; keep old bookmarks working.
+          { path: 'admin/budget', ...moved('/ops/budget') },
+          {
+            path: 'ops/usage',
+            ...page(() => import('@/features/ops/usage-page'), { permission: 'usage:view' }),
+          },
+          {
+            path: 'ops/agents',
+            ...page(() => import('@/features/ops/agents-page'), { permission: 'agent:manage' }),
+          },
+          {
+            path: 'ops/pricing',
+            ...page(() => import('@/features/ops/pricing-page'), { permission: 'agent:manage' }),
+          },
+          {
+            path: 'ops/budget',
+            ...page(() => import('@/features/ops/budget-page'), { permission: 'budget:manage' }),
+          },
+          { path: 'notifications', ...page(() => import('@/features/notifications/notifications-page')) },
+          { path: 'settings', ...page(() => import('@/features/settings/settings-page')) },
+          { path: 'settings/notifications', ...moved('/settings') },
+          { path: '*', Component: NotFoundPage },
+        ],
       },
-      { path: 'requests/:id', ...page(() => import('@/features/detail/request-detail-page')) },
-      { path: 'schedule', ...page(() => import('@/features/schedule/schedule-page'), 'schedule:view') },
-      { path: 'work', ...page(() => import('@/features/work/assigned-page'), 'request:review') },
-      {
-        path: 'work/regression',
-        ...page(() => import('@/features/work/regression-page'), 'regression:view'),
-      },
-      { path: 'dashboard', ...page(() => import('@/features/dashboard/dashboard-page'), 'dashboard:view') },
-      { path: 'admin/projects', ...page(() => import('@/features/admin/projects-page'), 'project:manage') },
-      { path: 'admin/users', ...page(() => import('@/features/admin/users-page'), 'user:manage') },
-      // The AI budget moved to the operator's screens; keep old bookmarks working.
-      { path: 'admin/budget', element: <Navigate to="/ops/budget" replace /> },
-      { path: 'ops/usage', ...page(() => import('@/features/ops/usage-page'), 'usage:view') },
-      { path: 'ops/agents', ...page(() => import('@/features/ops/agents-page'), 'agent:manage') },
-      { path: 'ops/pricing', ...page(() => import('@/features/ops/pricing-page'), 'agent:manage') },
-      { path: 'ops/budget', ...page(() => import('@/features/ops/budget-page'), 'budget:manage') },
-      { path: 'notifications', ...page(() => import('@/features/notifications/notifications-page')) },
-      { path: 'settings', ...page(() => import('@/features/settings/settings-page')) },
-      { path: 'settings/notifications', element: <Navigate to="/settings" replace /> },
-      { path: '*', Component: NotFoundPage },
     ],
   },
 ]

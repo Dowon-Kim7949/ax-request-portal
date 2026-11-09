@@ -1,10 +1,10 @@
-import { expect, test } from '@playwright/test'
-import { expectNoHorizontalScroll, loginAs, viewportOf } from './helpers.ts'
+import { expect, test } from './fixtures.ts'
+import { COLD_START_TIMEOUT, expectNoHorizontalScroll, loginAs, viewportOf } from './helpers.ts'
 
 test('login screen fits the viewport', async ({ page }) => {
   await page.goto('/')
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: COLD_START_TIMEOUT })
   await expect(page).toHaveURL(/\/login/)
-  await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
   await expectNoHorizontalScroll(page)
 })
 

@@ -1,28 +1,32 @@
 import { Check, CircleAlert, FileText, ImagePlus, Paperclip, Plus, Sparkles, Trash2, X } from 'lucide-react'
-import { useRef, useState, type ReactNode } from 'react'
+import { useContext, useRef, useState, type ReactNode } from 'react'
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { useUploadAttachment } from '@/api/queries'
 import { useDirectory } from '@/app/hooks'
+import { useHqCalendarNote } from '@/app/time-zone'
 import { ProjectIcon } from '@/components/request/project-icon'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/feedback'
 import { Field, Input, Textarea, type Advice } from '@/components/ui/field'
+import { LoadFailed } from '@/components/ui/load-failed'
 import { appConfig } from '@/config/app.config'
 import { ACCEPTANCE_CRITERIA_MAX, CHECKLIST_ITEMS_MAX, type PrecheckIssue } from '@/domain/model'
 import { cn } from '@/lib/cn'
-import { formatBytes, formatDate, toLocalDate } from '@/lib/format'
+import { formatBytes, formatDate } from '@/lib/format'
+import { hqToday } from '@/lib/time-zone'
 import { EMPTY_ROW, parseChecklist, STEPS, stepOfField, type WizardValues } from './schema'
-
-type TFn = ReturnType<typeof useTranslation>['t']
+import { StepNotice } from './step-notice'
 
 export function StepTitle({ children, hint }: { children: ReactNode; hint?: ReactNode }) {
+  const notice = useContext(StepNotice)
   return (
     <div className="mb-6 flex flex-col gap-2">
       <h1
         className="text-[24px] leading-snug font-bold tracking-tight outline-none sm:text-[28px]"
         tabIndex={-1}
+        aria-describedby={notice}
         data-step-title
       >
         {children}
@@ -79,6 +83,27 @@ function OptionCard({
   )
 }
 
+/**
+ * The server refused the submission because it cannot find these attachments
+ * (expired or removed uploads): which ones, and what to do.
+ */
+function MissingAttachments({ names, action }: { names: string[]; action?: ReactNode }) {
+  const { t } = useTranslation()
+  if (!names.length) return null
+  return (
+    <div role="alert" className="flex gap-3 rounded-2xl bg-danger-50 px-4 py-3.5 text-sm">
+      <CircleAlert className="mt-0.5 size-5 shrink-0 text-danger-fg" aria-hidden />
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <p className="font-bold text-danger-fg">{t('wizard.missingAttachments.title')}</p>
+        <p className="[overflow-wrap:anywhere] text-ink-700">
+          {t('wizard.missingAttachments.body', { names: names.join(', ') })}
+        </p>
+        {action}
+      </div>
+    </div>
+  )
+}
+
 /* 1 ---------------------------------------------------------------- */
 
 export function ProjectStep({ onPicked }: { onPicked: () => void }) {
@@ -90,6 +115,9 @@ export function ProjectStep({ onPicked }: { onPicked: () => void }) {
   return (
     <>
       <StepTitle hint={t('wizard.project.hint')}>{t('wizard.project.title')}</StepTitle>
+      {dir.projectsError ? (
+        <LoadFailed compact error={dir.projectsError} onRetry={dir.retry} retrying={dir.retrying} />
+      ) : null}
       <div role="radiogroup" aria-label={t('wizard.field.projectId')} className="flex flex-col gap-3">
         {dir.loading ? <Spinner label={t('common.loading')} /> : null}
         {dir.projects
@@ -469,12 +497,21 @@ function CriteriaList({ advice }: { advice: Map<string, PrecheckIssue[]> }) {
 
 /* 6 ---------------------------------------------------------------- */
 
-export function ExtraStep({ advice }: { advice: Map<string, PrecheckIssue[]> }) {
+export function ExtraStep({
+  advice,
+  missing,
+}: {
+  advice: Map<string, PrecheckIssue[]>
+  /** Ids of attachments the server could not find when the request was submitted */
+  missing: ReadonlySet<string>
+}) {
   const { t } = useTranslation()
   const { control, register, setValue } = useFormContext<WizardValues>()
   const [attachments, desiredDate] = useWatch({ control, name: ['attachments', 'desiredDate'] })
+  const missingNames = attachments.filter((a) => missing.has(a.id)).map((a) => a.name)
   const upload = useUploadAttachment()
   const fileInput = useRef<HTMLInputElement>(null)
+  const hqDateNote = useHqCalendarNote('today')
 
   const onFiles = async (files: FileList | null) => {
     if (!files) return
@@ -520,10 +557,17 @@ export function ExtraStep({ advice }: { advice: Map<string, PrecheckIssue[]> }) 
             {t('wizard.extra.attachments')}
             <span className="ml-1.5 text-xs font-medium text-ink-400">{t('common.optional')}</span>
           </p>
+          <MissingAttachments names={missingNames} />
           {attachments.length ? (
             <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               {attachments.map((a) => (
-                <li key={a.id} className="flex items-center gap-3 rounded-xl bg-surface p-2 ring-1 ring-line">
+                <li
+                  key={a.id}
+                  className={cn(
+                    'flex items-center gap-3 rounded-xl bg-surface p-2 ring-1',
+                    missing.has(a.id) ? 'ring-2 ring-danger-600' : 'ring-line',
+                  )}
+                >
                   {a.mimeType.startsWith('image/') ? (
                     <img src={a.url} alt="" className="size-12 rounded-lg object-cover" />
                   ) : (
@@ -533,7 +577,13 @@ export function ExtraStep({ advice }: { advice: Map<string, PrecheckIssue[]> }) 
                   )}
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-sm font-semibold">{a.name}</span>
-                    <span className="text-xs text-ink-400">{formatBytes(a.size)}</span>
+                    {missing.has(a.id) ? (
+                      <span className="text-xs font-semibold text-danger-fg">
+                        {t('wizard.missingAttachments.item')}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-ink-400">{formatBytes(a.size)}</span>
+                    )}
                   </span>
                   <Button
                     variant="ghost"
@@ -583,9 +633,10 @@ export function ExtraStep({ advice }: { advice: Map<string, PrecheckIssue[]> }) 
             label={t('wizard.extra.desiredDate')}
             optional
             optionalLabel={t('common.optional')}
+            hint={hqDateNote}
             advice={advice.get('desiredDate')}
           >
-            {(p) => <Input type="date" min={toLocalDate()} {...p} {...register('desiredDate')} />}
+            {(p) => <Input type="date" min={hqToday()} {...p} {...register('desiredDate')} />}
           </Field>
           {desiredDate ? (
             <Field label={t('wizard.extra.desiredDateReason')} advice={advice.get('desiredDateReason')}>
@@ -606,28 +657,24 @@ export function ExtraStep({ advice }: { advice: Map<string, PrecheckIssue[]> }) 
 
 /* 7 ---------------------------------------------------------------- */
 
-function ReviewRow({
-  label,
-  children,
-  onEdit,
-  t,
-}: {
-  label: string
-  children: ReactNode
-  onEdit: () => void
-  t: TFn
-}) {
+// Reads `t` itself: passing it as a prop (typed from useTranslation) runs into
+// TypeScript's instantiation depth limit once the dictionary grows (TS2589).
+function ReviewRow({ label, children, onEdit }: { label: string; children: ReactNode; onEdit: () => void }) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-start gap-3 py-3.5">
       <dt className="w-24 shrink-0 pt-0.5 text-[13px] font-semibold text-ink-500 sm:w-32">{label}</dt>
-      <dd className="min-w-0 flex-1 text-[15px] whitespace-pre-line text-ink-900">{children}</dd>
-      <button
-        type="button"
-        onClick={onEdit}
-        className="-my-1.5 h-9 shrink-0 rounded-lg px-2.5 text-sm font-semibold text-accent hover:bg-brand-50"
-      >
-        {t('common.edit')}
-      </button>
+      {/* The edit button sits in the <dd>: a <dl> group holds only <dt> and <dd>. */}
+      <dd className="flex min-w-0 flex-1 items-start gap-3">
+        <div className="min-w-0 flex-1 text-[15px] whitespace-pre-line text-ink-900">{children}</div>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="-my-1.5 h-9 shrink-0 rounded-lg px-2.5 text-sm font-semibold text-accent hover:bg-brand-50"
+        >
+          {t('common.edit')}
+        </button>
+      </dd>
     </div>
   )
 }
@@ -636,12 +683,18 @@ export function ReviewStep({
   issues,
   checking,
   checkFailed,
+  onRecheck,
   goTo,
+  missing,
 }: {
   issues: PrecheckIssue[]
   checking: boolean
+  /** The check could not run; submitting is still allowed (it is advisory) */
   checkFailed: boolean
+  onRecheck: () => void
   goTo: (step: number) => void
+  /** Ids of attachments the server could not find when the request was submitted */
+  missing: ReadonlySet<string>
 }) {
   const { t } = useTranslation()
   const dir = useDirectory()
@@ -652,30 +705,59 @@ export function ReviewStep({
   if (v.targetOther.trim()) targets.push(v.targetOther.trim())
   const step = (key: (typeof STEPS)[number]['key']) => STEPS.findIndex((s) => s.key === key)
   const none = <span className="text-ink-400">{t('common.none')}</span>
+  const missingNames = v.attachments.filter((a) => missing.has(a.id)).map((a) => a.name)
 
   return (
     <>
       <StepTitle>{t('wizard.review.title')}</StepTitle>
 
+      {missingNames.length ? (
+        <div className="mb-5">
+          <MissingAttachments
+            names={missingNames}
+            action={
+              <Button variant="secondary" className="w-fit" onClick={() => goTo(step('extra'))}>
+                {t('wizard.missingAttachments.fix')}
+              </Button>
+            }
+          />
+        </div>
+      ) : null}
+
       <div
         className={cn(
           'mb-5 flex gap-3 rounded-2xl px-4 py-3.5',
-          checking ? 'bg-ai-50' : issues.length ? 'bg-warning-50' : 'bg-success-50',
+          checking
+            ? 'bg-ai-50'
+            : checkFailed
+              ? 'bg-muted ring-1 ring-line'
+              : issues.length
+                ? 'bg-warning-50'
+                : 'bg-success-50',
         )}
         aria-live="polite"
       >
-        <Sparkles
-          className={cn(
-            'mt-0.5 size-5 shrink-0',
-            checking ? 'animate-pulse text-ai-600' : issues.length ? 'text-warning-fg' : 'text-success-fg',
-          )}
-          aria-hidden
-        />
+        {checkFailed && !checking ? (
+          <CircleAlert className="mt-0.5 size-5 shrink-0 text-ink-500" aria-hidden />
+        ) : (
+          <Sparkles
+            className={cn(
+              'mt-0.5 size-5 shrink-0',
+              checking ? 'animate-pulse text-ai-600' : issues.length ? 'text-warning-fg' : 'text-success-fg',
+            )}
+            aria-hidden
+          />
+        )}
         <div className="flex flex-col gap-1.5 text-sm">
           {checking ? (
             <p className="font-semibold text-ai-700">{t('wizard.review.checking')}</p>
           ) : checkFailed ? (
-            <p className="font-semibold text-ink-700">{t('wizard.review.checkFailed')}</p>
+            <>
+              <p className="font-semibold text-ink-700">{t('wizard.review.checkFailed')}</p>
+              <Button variant="secondary" className="w-fit" onClick={onRecheck}>
+                {t('wizard.review.recheck')}
+              </Button>
+            </>
           ) : issues.length ? (
             <>
               <p className="font-bold text-warning-fg">
@@ -714,26 +796,26 @@ export function ReviewStep({
       ) : null}
 
       <dl className="divide-y divide-line rounded-2xl bg-surface px-4 ring-1 ring-line">
-        <ReviewRow t={t} label={t('wizard.field.projectId')} onEdit={() => goTo(step('project'))}>
+        <ReviewRow label={t('wizard.field.projectId')} onEdit={() => goTo(step('project'))}>
           {project?.name ?? none}
         </ReviewRow>
-        <ReviewRow t={t} label={t('wizard.field.type')} onEdit={() => goTo(step('type'))}>
+        <ReviewRow label={t('wizard.field.type')} onEdit={() => goTo(step('type'))}>
           {v.type ? t(`requestType.${v.type}.label`) : none}
         </ReviewRow>
-        <ReviewRow t={t} label={t('wizard.field.targetIds')} onEdit={() => goTo(step('targets'))}>
+        <ReviewRow label={t('wizard.field.targetIds')} onEdit={() => goTo(step('targets'))}>
           {targets.length ? targets.join(', ') : none}
         </ReviewRow>
-        <ReviewRow t={t} label={t('wizard.field.title')} onEdit={() => goTo(step('describe'))}>
+        <ReviewRow label={t('wizard.field.title')} onEdit={() => goTo(step('describe'))}>
           {v.title || none}
         </ReviewRow>
-        <ReviewRow t={t} label={t('wizard.field.currentBehavior')} onEdit={() => goTo(step('describe'))}>
+        <ReviewRow label={t('wizard.field.currentBehavior')} onEdit={() => goTo(step('describe'))}>
           {v.currentBehavior.trim() || none}
         </ReviewRow>
-        <ReviewRow t={t} label={t('wizard.field.desiredBehavior')} onEdit={() => goTo(step('describe'))}>
+        <ReviewRow label={t('wizard.field.desiredBehavior')} onEdit={() => goTo(step('describe'))}>
           {v.desiredBehavior || none}
         </ReviewRow>
         {v.type === 'checklist' ? (
-          <ReviewRow t={t} label={t('wizard.field.checklist')} onEdit={() => goTo(step('criteria'))}>
+          <ReviewRow label={t('wizard.field.checklist')} onEdit={() => goTo(step('criteria'))}>
             {v.checklistSource.trim() ? (
               <p className="mb-1 text-ink-600">{v.checklistSource.trim()}</p>
             ) : null}
@@ -748,7 +830,7 @@ export function ReviewStep({
             </ol>
           </ReviewRow>
         ) : (
-          <ReviewRow t={t} label={t('wizard.field.acceptanceCriteria')} onEdit={() => goTo(step('criteria'))}>
+          <ReviewRow label={t('wizard.field.acceptanceCriteria')} onEdit={() => goTo(step('criteria'))}>
             <ol className="flex list-decimal flex-col gap-1 pl-4">
               {v.acceptanceCriteria
                 .filter((c) => c.text.trim())
@@ -758,10 +840,10 @@ export function ReviewStep({
             </ol>
           </ReviewRow>
         )}
-        <ReviewRow t={t} label={t('wizard.field.outOfScope')} onEdit={() => goTo(step('extra'))}>
+        <ReviewRow label={t('wizard.field.outOfScope')} onEdit={() => goTo(step('extra'))}>
           {v.outOfScope.trim() || none}
         </ReviewRow>
-        <ReviewRow t={t} label={t('wizard.field.attachmentIds')} onEdit={() => goTo(step('extra'))}>
+        <ReviewRow label={t('wizard.field.attachmentIds')} onEdit={() => goTo(step('extra'))}>
           {v.attachments.length ? (
             <span className="inline-flex items-center gap-1">
               <Paperclip className="size-4 text-ink-400" aria-hidden />
@@ -771,7 +853,7 @@ export function ReviewStep({
             none
           )}
         </ReviewRow>
-        <ReviewRow t={t} label={t('wizard.field.desiredDate')} onEdit={() => goTo(step('extra'))}>
+        <ReviewRow label={t('wizard.field.desiredDate')} onEdit={() => goTo(step('extra'))}>
           {v.desiredDate
             ? `${formatDate(v.desiredDate)}${v.desiredDateReason ? ` · ${v.desiredDateReason}` : ''}`
             : none}

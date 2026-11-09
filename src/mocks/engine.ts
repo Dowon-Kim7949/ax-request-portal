@@ -9,11 +9,17 @@
  */
 import type {
   AiSettingsInput,
+  ApiErrorBody,
+  DraftContent,
   PreviewFeedbackInput,
   ProjectInput,
   RegressionQueue,
   RequestScope,
+  RequestSubmission,
+  SavedDraft,
+  SavedDraftSummary,
 } from '../api/contract'
+import { appConfig } from '../config/app.config'
 import {
   addUsage,
   AI_PROVIDERS,
@@ -66,6 +72,7 @@ import type {
 } from '../domain/model'
 import { precheckDraft } from '../domain/precheck'
 import { hasPermission, type Permission, type RolePermissions } from '../domain/roles'
+import { addCalendarDays, dateInTimeZone, hqTimeZone } from '../lib/time-zone'
 import { finishWork, generateReport, generateScope, phaseAt, simulateUsage, type UsageShape } from './ai'
 import { renderNotification, type ErrorKey, type NotificationKey, type ServerLanguage } from './copy'
 
@@ -74,7 +81,10 @@ import { renderNotification, type ErrorKey, type NotificationKey, type ServerLan
 /* ------------------------------------------------------------------ */
 
 /** Bump when the stored shape changes: older demo data is discarded and reseeded. */
-export const STATE_VERSION = 4
+export const STATE_VERSION = 6
+
+/** Notifications kept per person; older ones are dropped as new ones arrive. */
+export const NOTIFICATIONS_PER_USER_MAX = 200
 
 /** What the operator configures. Keys are never stored, only their last four characters. */
 export interface AiOperations {
@@ -94,8 +104,35 @@ export interface StoredNotification {
   readAt?: string
 }
 
+/** An upload as the mock keeps it: the API never returns who uploaded it. */
+export interface StoredAttachment extends Attachment {
+  /** Only the uploader can attach it to a request */
+  ownerId: string
+}
+
+function publicAttachment({ ownerId: _owner, ...attachment }: StoredAttachment): Attachment {
+  return attachment
+}
+
+/** A saved draft as the mock keeps it: only its owner can read, change or delete it. */
+export interface StoredDraft {
+  id: string
+  ownerId: string
+  /** The client's own id for it, so a create repeated after a lost answer makes no second draft */
+  clientId?: string
+  /** Wizard step the person was last on */
+  step: number
+  content: DraftContent
+  /** 1 when created, one more on every update */
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
 export interface MockState {
   version: typeof STATE_VERSION
+  /** Counts saves, so a tab can tell that another tab has saved since it last read (see store.ts) */
+  revision: number
   seededAt: string
   /** Language the demo data was written in */
   language: ServerLanguage
@@ -112,7 +149,9 @@ export interface MockState {
   ai: AiOperations
   /** Usage ledger: one entry per model call or agent run, priced when booked */
   aiUsage: AiUsageEntry[]
-  attachments: Attachment[]
+  attachments: StoredAttachment[]
+  /** Unsubmitted requests, saved per person; the most recently changed last */
+  drafts: StoredDraft[]
 }
 
 export interface EngineOptions {
@@ -121,6 +160,14 @@ export interface EngineOptions {
   rolePermissions: RolePermissions
   /** Ask the requester to confirm the AI's reading before a developer reviews it (default on) */
   scopeCheck?: boolean
+  /**
+   * The business calendar: "today" for desired and release dates, delays, and
+   * daily/monthly totals. Defaults to the head office (appConfig.organization.timeZone);
+   * a real backend must use the same setting.
+   */
+  timeZone?: string
+  /** Saved drafts one person may keep. Defaults to appConfig.drafts.maxPerAccount. */
+  draftsPerAccount?: number
 }
 
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
@@ -133,21 +180,24 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
 /** Thrown by engine operations; the MSW layer renders `key` in the request's language. */
 export class HttpError extends Error {
   readonly status: number
-  readonly code:
-    'bad_request' | 'unauthorized' | 'forbidden' | 'not_found' | 'invalid_transition' | 'guard_failed'
+  readonly code: Exclude<ApiErrorBody['code'], 'internal'>
   readonly key: ErrorKey
   readonly params: Record<string, string | number>
+  /** Body fields the error is about (`issues[].path`), e.g. `attachmentIds.1` */
+  readonly paths: string[]
   constructor(
     status: number,
     code: HttpError['code'],
     key: ErrorKey,
     params: Record<string, string | number> = {},
+    paths: string[] = [],
   ) {
     super(key)
     this.status = status
     this.code = code
     this.key = key
     this.params = params
+    this.paths = paths
   }
 }
 
@@ -159,21 +209,20 @@ const GUARD_ERRORS: Record<GuardName, ErrorKey> = {
   assumptionsUnchecked: 'assumptionsUnchecked',
   scopeUnanswered: 'scopeUnanswered',
   scopeRevisionsUsed: 'scopeRevisionsUsed',
+  releaseUnscheduled: 'releaseUnscheduled',
 }
 
-export function toDate(iso: string): string {
-  return iso.slice(0, 10)
+/**
+ * Calendar date (YYYY-MM-DD) of an instant on the business calendar: what the
+ * company means by "today", wherever the server or the viewer is.
+ */
+export function businessDate(at: Date | string, timeZone = hqTimeZone()): string {
+  return dateInTimeZone(at, timeZone)
 }
 
-/** Local calendar date (YYYY-MM-DD) — what a person means by "today". */
-export function localDate(d: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-}
-
+/** Calendar arithmetic on YYYY-MM-DD; no time zone involved. */
 export function addDays(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00Z`)
-  return new Date(d.getTime() + days * DAY).toISOString().slice(0, 10)
+  return addCalendarDays(date, days)
 }
 
 /* ------------------------------------------------------------------ */
@@ -190,6 +239,16 @@ export class MockEngine {
   }
 
   /* ---------- helpers ---------- */
+
+  /** Business-calendar date of an instant (see EngineOptions.timeZone). */
+  dateOf(at: Date | string): string {
+    return businessDate(at, this.opts.timeZone)
+  }
+
+  /** "Today" on the business calendar. */
+  today(now: Date): string {
+    return this.dateOf(now)
+  }
 
   newId(prefix: string): string {
     this.state.seq += 1
@@ -329,7 +388,18 @@ export class MockEngine {
         params,
         createdAt: now.toISOString(),
       })
+      this.trimNotifications(userId)
     }
+  }
+
+  /** Keeps a person's newest notifications, so the stored demo data stops growing. */
+  private trimNotifications(userId: string): void {
+    const mine = this.state.notifications.map((n, i) => ({ n, i })).filter(({ n }) => n.userId === userId)
+    if (mine.length <= NOTIFICATIONS_PER_USER_MAX) return
+    // Newest first; of two at the same moment, the one added later.
+    mine.sort((a, b) => b.n.createdAt.localeCompare(a.n.createdAt) || b.i - a.i)
+    const drop = new Set(mine.slice(NOTIFICATIONS_PER_USER_MAX).map(({ n }) => n))
+    this.state.notifications = this.state.notifications.filter((n) => !drop.has(n))
   }
 
   private notifyStatus(req: WorkRequest, now: Date, actorId?: string): void {
@@ -516,21 +586,20 @@ export class MockEngine {
       }
       this.bookAi('precheck', this.selectionFor(draft.projectId, 'precheck'), shape, now.toISOString())
     }
-    return precheckDraft(draft, localDate(now), lang)
+    return precheckDraft(draft, this.today(now), lang)
   }
 
-  createRequest(user: User, draft: RequestDraft, now: Date, lang: ServerLanguage): WorkRequest {
+  createRequest(user: User, draft: RequestSubmission, now: Date, lang: ServerLanguage): WorkRequest {
     this.require(user, 'request:create')
     const project = this.project(draft.projectId)
     if (!project || !project.active) throw new HttpError(400, 'bad_request', 'projectNotFound')
     const unknownTarget = draft.targetIds.find((t) => !project.targets.some((pt) => pt.id === t))
     if (unknownTarget) throw new HttpError(400, 'bad_request', 'unknownTarget', { target: unknownTarget })
 
+    this.requireAttachments(user, draft.attachmentIds, 'attachmentIds')
+    const attachments = this.attachmentsOf(user.id, draft.attachmentIds)
     const at = now.toISOString()
     const id = this.state.nextRequestId++
-    const attachments = draft.attachmentIds
-      .map((aid) => this.state.attachments.find((a) => a.id === aid))
-      .filter((a): a is Attachment => Boolean(a))
 
     // A checklist request is checked item by item: every finding becomes an acceptance criterion.
     const checklist =
@@ -572,7 +641,7 @@ export class MockEngine {
       status: 'submitted',
       createdAt: at,
       updatedAt: at,
-      precheck: precheckDraft(draft, localDate(now), lang),
+      precheck: precheckDraft(draft, this.today(now), lang),
       regression: [],
       verification: [],
       timeline: [
@@ -587,6 +656,10 @@ export class MockEngine {
     }
     req = this.apply(req, { event: 'startReport' }, { type: 'system' }, now)
     this.state.requests.push(req)
+    // The draft it was written in has done its job. Someone else's, or one already gone, is ignored.
+    if (draft.draftId) {
+      this.state.drafts = this.state.drafts.filter((d) => d.id !== draft.draftId || d.ownerId !== user.id)
+    }
     return req
   }
 
@@ -738,6 +811,7 @@ export class MockEngine {
   ): WorkRequest {
     const req = this.getRequest(user, id)
     if (!this.isResponsible(user, req)) throw new HttpError(403, 'forbidden', 'developerOnlyRegression')
+    if (isTerminal(req.status)) throw new HttpError(409, 'invalid_transition', 'requestClosed')
     const byId = new Map(checks.map((c) => [c.id, c.result]))
     return this.replace({
       ...req,
@@ -756,6 +830,16 @@ export class MockEngine {
     if (!this.isResponsible(user, req)) throw new HttpError(403, 'forbidden', 'developerOnlySchedule')
     if (!['code_review', 'verification', 'changes_requested', 'release_scheduled'].includes(req.status)) {
       throw new HttpError(409, 'invalid_transition', 'cannotScheduleNow')
+    }
+    // A new date cannot be in the past on the business calendar. Re-sending the
+    // date already set (only the note changes) stays possible after it has passed.
+    const today = this.today(now)
+    if (
+      input.scheduledDate &&
+      input.scheduledDate !== req.release?.scheduledDate &&
+      input.scheduledDate < today
+    ) {
+      throw new HttpError(400, 'bad_request', 'releaseDateInPast', { today })
     }
     const at = now.toISOString()
     const next = this.replace({
@@ -801,17 +885,149 @@ export class MockEngine {
       }))
   }
 
+  /** The person's own upload of that id. Ids are easy to guess: someone else's counts as missing. */
+  private ownAttachment(ownerId: string, id: string): StoredAttachment | undefined {
+    const stored = this.state.attachments.find((a) => a.id === id)
+    return stored && stored.ownerId === ownerId ? stored : undefined
+  }
+
+  /**
+   * Refuses ids that are not the person's uploads, naming each by its place
+   * (issues[].path = <field>.<index>) so the form can say which to upload again.
+   */
+  private requireAttachments(user: User, ids: readonly string[], field: string): void {
+    const missing = ids.flatMap((id, i) => (this.ownAttachment(user.id, id) ? [] : [`${field}.${i}`]))
+    if (missing.length) throw new HttpError(400, 'bad_request', 'attachmentNotFound', {}, missing)
+  }
+
+  /** The owner's uploads among `ids`, each once, in order; ids that resolve to nothing are skipped. */
+  private attachmentsOf(ownerId: string, ids: readonly string[]): Attachment[] {
+    return [...new Set(ids)].flatMap((id) => {
+      const stored = this.ownAttachment(ownerId, id)
+      return stored ? [publicAttachment(stored)] : []
+    })
+  }
+
   addAttachment(user: User, file: { name: string; size: number; type: string; url: string }): Attachment {
     this.require(user, 'request:create')
-    const attachment: Attachment = {
+    const stored: StoredAttachment = {
       id: this.newId('att'),
       name: file.name,
       size: file.size,
       mimeType: file.type || 'application/octet-stream',
       url: file.url,
+      ownerId: user.id,
     }
-    this.state.attachments.push(attachment)
-    return attachment
+    this.state.attachments.push(stored)
+    return publicAttachment(stored)
+  }
+
+  /* ---------- saved drafts ---------- */
+
+  /** A draft of the person's own; anyone else's is "not found", like one that never existed. */
+  private findDraft(user: User, id: string): StoredDraft {
+    const draft = this.state.drafts.find((d) => d.id === id && d.ownerId === user.id)
+    if (!draft) throw new HttpError(404, 'not_found', 'draftNotFound')
+    return draft
+  }
+
+  private presentDraft(draft: StoredDraft): SavedDraft {
+    const attachments = this.attachmentsOf(draft.ownerId, draft.content.attachmentIds ?? [])
+    return { ...this.summarizeDraft(draft, attachments.length), content: draft.content, attachments }
+  }
+
+  private summarizeDraft(draft: StoredDraft, attachmentCount: number): SavedDraftSummary {
+    const { projectId, type } = draft.content
+    return {
+      id: draft.id,
+      title: draft.content.title?.trim() ?? '',
+      ...(projectId ? { projectId } : {}),
+      ...(type ? { type } : {}),
+      step: draft.step,
+      attachmentCount,
+      version: draft.version,
+      createdAt: draft.createdAt,
+      updatedAt: draft.updatedAt,
+    }
+  }
+
+  listDrafts(user: User): SavedDraftSummary[] {
+    this.require(user, 'request:create')
+    // Most recently changed first; of two changed in the same moment, the later change (stored last).
+    return this.state.drafts
+      .map((draft, i) => ({ draft, i }))
+      .filter(({ draft }) => draft.ownerId === user.id)
+      .sort((a, b) => b.draft.updatedAt.localeCompare(a.draft.updatedAt) || b.i - a.i)
+      .map(({ draft }) =>
+        this.summarizeDraft(
+          draft,
+          this.attachmentsOf(draft.ownerId, draft.content.attachmentIds ?? []).length,
+        ),
+      )
+  }
+
+  getDraft(user: User, id: string): SavedDraft {
+    this.require(user, 'request:create')
+    return this.presentDraft(this.findDraft(user, id))
+  }
+
+  createDraft(
+    user: User,
+    input: { step: number; content: DraftContent; clientId?: string | undefined },
+    now: Date,
+  ): SavedDraft {
+    this.require(user, 'request:create')
+    // Made already, and the answer was lost: the same draft, as it is now.
+    const made = input.clientId
+      ? this.state.drafts.find((d) => d.ownerId === user.id && d.clientId === input.clientId)
+      : undefined
+    if (made) return this.presentDraft(made)
+    const limit = this.opts.draftsPerAccount ?? appConfig.drafts.maxPerAccount
+    if (this.state.drafts.filter((d) => d.ownerId === user.id).length >= limit) {
+      throw new HttpError(409, 'limit_reached', 'draftLimit', { limit })
+    }
+    this.requireAttachments(user, input.content.attachmentIds ?? [], 'content.attachmentIds')
+    const at = now.toISOString()
+    const draft: StoredDraft = {
+      id: this.newId('draft'),
+      ownerId: user.id,
+      ...(input.clientId ? { clientId: input.clientId } : {}),
+      step: input.step,
+      content: input.content,
+      version: 1,
+      createdAt: at,
+      updatedAt: at,
+    }
+    this.state.drafts.push(draft)
+    return this.presentDraft(draft)
+  }
+
+  /** Replaces step and content, but only over the version the change was based on. */
+  updateDraft(
+    user: User,
+    id: string,
+    input: { baseVersion: number; step: number; content: DraftContent },
+    now: Date,
+  ): SavedDraft {
+    this.require(user, 'request:create')
+    const current = this.findDraft(user, id)
+    if (input.baseVersion !== current.version) throw new HttpError(409, 'conflict', 'draftConflict')
+    this.requireAttachments(user, input.content.attachmentIds ?? [], 'content.attachmentIds')
+    const next: StoredDraft = {
+      ...current,
+      step: input.step,
+      content: input.content,
+      version: current.version + 1,
+      updatedAt: now.toISOString(),
+    }
+    this.state.drafts = [...this.state.drafts.filter((d) => d !== current), next]
+    return this.presentDraft(next)
+  }
+
+  deleteDraft(user: User, id: string): void {
+    this.require(user, 'request:create')
+    const draft = this.findDraft(user, id)
+    this.state.drafts = this.state.drafts.filter((d) => d !== draft)
   }
 
   /* ---------- users & projects ---------- */
@@ -868,6 +1084,11 @@ export class MockEngine {
   }
 
   /* ---------- notifications ---------- */
+
+  /** A person who never saved settings (e.g. invited later) gets the defaults. */
+  notificationSettings(user: User): NotificationSettings {
+    return this.state.notificationSettings[user.id] ?? { ...DEFAULT_NOTIFICATION_SETTINGS }
+  }
 
   notificationsFor(user: User, lang: ServerLanguage): Notification[] {
     return this.state.notifications
@@ -983,7 +1204,7 @@ export class MockEngine {
     const byProvider = group((e) => e.provider)
     const byModel = group((e) => `${e.provider}/${e.model}`)
     const byTask = group((e) => e.task)
-    const daily = group((e) => `${localDate(new Date(e.at))}/${e.provider}`)
+    const daily = group((e) => `${this.dateOf(e.at)}/${e.provider}`)
     const byRequest = group((e) => e.requestId ?? 0)
     byRequest.delete(0)
     return {
@@ -1036,7 +1257,7 @@ export class MockEngine {
   /* ---------- insights ---------- */
 
   private usageIn(month: string): AiUsageEntry[] {
-    return this.state.aiUsage.filter((e) => localDate(new Date(e.at)).startsWith(month))
+    return this.state.aiUsage.filter((e) => this.dateOf(e.at).startsWith(month))
   }
 
   budget(month: string): Budget {
@@ -1066,7 +1287,7 @@ export class MockEngine {
 
   dashboard(user: User, month: string, now: Date): DashboardSummary {
     this.require(user, 'dashboard:view')
-    const today = localDate(now)
+    const today = this.today(now)
     const prev = (() => {
       const [y, m] = month.split('-').map(Number) as [number, number]
       return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`
@@ -1075,13 +1296,14 @@ export class MockEngine {
     // While a month is in progress, compare it with the same span of the previous month,
     // not the whole of it — otherwise every month looks like a collapse on day 2.
     const lastDay = month === today.slice(0, 7) ? today.slice(8, 10) : '31'
-    const filed = (r: WorkRequest) => localDate(new Date(r.createdAt))
+    const filed = (r: WorkRequest) => this.dateOf(r.createdAt)
     const receivedPrevMonth = reqs.filter((r) => {
       const d = filed(r)
       return d.startsWith(prev) && d.slice(8, 10) <= lastDay
     }).length
     const open = reqs.filter((r) => !isTerminal(r.status))
-    const doneInMonth = reqs.filter((r) => r.status === 'done' && r.release?.releasedAt?.startsWith(month))
+    const released = (r: WorkRequest) => (r.release?.releasedAt ? this.dateOf(r.release.releasedAt) : '')
+    const doneInMonth = reqs.filter((r) => r.status === 'done' && released(r).startsWith(month))
     const leads = doneInMonth.map((r) => (Date.parse(r.release!.releasedAt!) - Date.parse(r.createdAt)) / DAY)
     const delayed = open.filter((r) => this.isDelayed(r, today))
     const weekEnd = addDays(today, 7)
@@ -1128,9 +1350,7 @@ export class MockEngine {
     // The schedule is company-wide on purpose: "when does it ship?" is the question sales asks most.
     for (const r of this.state.requests) {
       if (r.status === 'cancelled' || r.status === 'rejected') continue
-      const date = r.release?.releasedAt
-        ? localDate(new Date(r.release.releasedAt))
-        : r.release?.scheduledDate
+      const date = r.release?.releasedAt ? this.dateOf(r.release.releasedAt) : r.release?.scheduledDate
       if (!date || (from && date < from) || (to && date > to)) continue
       const key = `${date}|${r.projectId}`
       const item = groups.get(key) ?? { date, projectId: r.projectId, requests: [] }

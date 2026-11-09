@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test'
-import { addDaysIso, expectNoHorizontalScroll, loginAs } from './helpers.ts'
+import { expect, test } from './fixtures.ts'
+import { addDaysIso, expectNoHorizontalScroll, loginAs, openInApp } from './helpers.ts'
 
 test('developer runs AI work from the report and approves the merge request', async ({ page }) => {
   test.setTimeout(90_000)
@@ -7,7 +7,7 @@ test('developer runs AI work from the report and approves the merge request', as
   await expect(page.getByRole('heading', { name: /내 차례인 요청/ })).toBeVisible()
   await expectNoHorizontalScroll(page)
 
-  await page.goto('/requests/1026')
+  await openInApp(page, '/requests/1026')
   await expect(page.getByRole('heading', { name: '구현 확인 보고서' })).toBeVisible()
   await expect(page.getByText('조건부 가능').first()).toBeVisible()
   // What the AI could not confirm, and the project rule the plan breaks
@@ -50,7 +50,7 @@ test('developer runs AI work from the report and approves the merge request', as
 
 test('developer asks the requester the report’s open question', async ({ page }) => {
   await loginAs(page, '담당자')
-  await page.goto('/requests/1026')
+  await openInApp(page, '/requests/1026')
   await page.getByRole('button', { name: /요청자에게 묻기/ }).click()
   const ask = page.getByRole('dialog', { name: '요청자에게 무엇을 물을까요?' })
   await expect(ask.getByLabel('질문 1')).toHaveValue(/약관 전문 팝업/)
@@ -60,7 +60,7 @@ test('developer asks the requester the report’s open question', async ({ page 
 
 test('developer sends the AI back with a revision note', async ({ page }) => {
   await loginAs(page, '담당자')
-  await page.goto('/requests/1024')
+  await openInApp(page, '/requests/1024')
   await expect(page.getByText('MR !57')).toBeVisible()
   await expect(page.getByText('기존 테스트 128/128 통과')).toBeVisible()
   // The preview the requester sees, and whether they have reacted yet
@@ -76,7 +76,7 @@ test('developer sends the AI back with a revision note', async ({ page }) => {
 
 test('developer marks a scheduled request as released', async ({ page }) => {
   await loginAs(page, '담당자')
-  await page.goto('/requests/1019')
+  await openInApp(page, '/requests/1019')
   await page.getByRole('button', { name: '배포 완료' }).click()
   await page
     .getByRole('dialog', { name: '실제 서비스에 반영됐나요?' })
@@ -87,14 +87,14 @@ test('developer marks a scheduled request as released', async ({ page }) => {
 
 test('assigned list and regression queue fit the screen', async ({ page }) => {
   await loginAs(page, '담당자')
-  await page.goto('/work')
+  await openInApp(page, '/work')
   await expect(page.getByRole('heading', { level: 1, name: '배정된 요청' })).toBeVisible()
   await expect(page.getByRole('link', { name: /#1024/ })).toBeVisible()
   await expectNoHorizontalScroll(page)
   await page.getByRole('radio', { name: /요청자 확인 대기/ }).click()
   await expect(page.getByRole('link', { name: /#1021/ })).toBeVisible()
 
-  await page.goto('/work/regression')
+  await openInApp(page, '/work/regression')
   await expect(page.getByRole('heading', { level: 1, name: '회귀 테스트' })).toBeVisible()
   await expect(page.getByRole('link', { name: '로그인 5회 실패 시 안내 문구 추가' })).toBeVisible()
   await expectNoHorizontalScroll(page)

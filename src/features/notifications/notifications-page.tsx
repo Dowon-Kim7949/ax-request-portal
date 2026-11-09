@@ -1,21 +1,29 @@
 import { BellOff, CheckCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
+import { toast } from 'sonner'
+import { errorText } from '@/api/error-text'
 import { useMarkNotificationRead, useNotifications } from '@/api/queries'
+import { refreshOf } from '@/api/refresh'
 import { PageHeader } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { Button } from '@/components/ui/button'
-import { EmptyState, ErrorState, ListSkeleton } from '@/components/ui/feedback'
+import { EmptyState, ListSkeleton } from '@/components/ui/feedback'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import type { Notification } from '@/domain/model'
 import { cn } from '@/lib/cn'
-import { formatRelative } from '@/lib/format'
+import { describeDateTime, formatRelative } from '@/lib/format'
 
 export default function NotificationsPage() {
   const { t } = useTranslation()
   usePageTitle(t('notifications.title'))
   const navigate = useNavigate()
   const list = useNotifications()
-  const mark = useMarkNotificationRead()
+  // Marked as read at once; if the server refuses, the dot comes back and this says why.
+  const mark = useMarkNotificationRead({
+    onError: (e) =>
+      toast.error(t('notifications.markFailed'), { description: errorText(e, t('errors.generic')) }),
+  })
   const unread = list.data?.filter((n) => !n.readAt).length ?? 0
 
   const open = (n: Notification) => {
@@ -40,17 +48,11 @@ export default function NotificationsPage() {
           ) : null
         }
       />
+      <RefreshFailed {...refreshOf(list)} className="mb-3" />
       {list.isPending ? (
         <ListSkeleton />
-      ) : list.isError ? (
-        <ErrorState
-          title={t('common.errorTitle')}
-          action={
-            <Button variant="secondary" onClick={() => void list.refetch()}>
-              {t('common.retry')}
-            </Button>
-          }
-        />
+      ) : list.isLoadingError ? (
+        <LoadFailed error={list.error} onRetry={() => void list.refetch()} retrying={list.isFetching} />
       ) : list.data.length ? (
         <ul className="flex flex-col overflow-hidden rounded-(--radius-card) bg-surface ring-1 ring-line">
           {list.data.map((n) => (
@@ -76,7 +78,11 @@ export default function NotificationsPage() {
                     {n.readAt ? null : <span className="sr-only"> ({t('notifications.unread')})</span>}
                   </span>
                   <span className="line-clamp-2 text-sm text-ink-500">{n.body}</span>
-                  <time dateTime={n.createdAt} className="text-xs text-ink-400">
+                  <time
+                    dateTime={n.createdAt}
+                    title={describeDateTime(n.createdAt).text}
+                    className="text-xs text-ink-400"
+                  >
                     {formatRelative(n.createdAt)}
                   </time>
                 </span>

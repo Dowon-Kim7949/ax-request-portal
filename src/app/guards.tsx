@@ -7,11 +7,19 @@ import { ErrorState } from '@/components/ui/feedback'
 import type { Permission } from '@/domain/roles'
 import { useSession } from '@/stores/session'
 import { useCan } from './hooks'
+import { useSessionSync } from './session-sync'
 
-/** Sends signed-out visitors to /login and keeps the stored user fresh. */
+export const LOGIN_PATH = '/login'
+
+/**
+ * Sends signed-out visitors to /login and keeps the stored user fresh.
+ * The login screen gets `next` (this page) unless the person signed out on
+ * purpose: then the next sign-in, possibly by someone else, starts at home.
+ */
 export function RequireAuth({ children }: { children: ReactNode }) {
   const token = useSession((s) => s.token)
   const user = useSession((s) => s.user)
+  const signedOut = useSession((s) => s.ended?.reason === 'signedOut')
   const setUser = useSession((s) => s.setUser)
   const location = useLocation()
   const me = useMe()
@@ -21,10 +29,17 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   }, [me.data, setUser])
 
   if (!token || !user) {
-    const next = location.pathname + location.search
-    return <Navigate to={next === '/' ? '/login' : `/login?next=${encodeURIComponent(next)}`} replace />
+    const next = location.pathname + location.search + location.hash
+    const keepNext = !signedOut && next !== '/'
+    return <Navigate to={keepNext ? `${LOGIN_PATH}?next=${encodeURIComponent(next)}` : LOGIN_PATH} replace />
   }
   return <>{children}</>
+}
+
+/** Follows sign-ins and sign-outs made in other tabs (see useSessionSync). Rendered once, at the root route. */
+export function SessionSync() {
+  useSessionSync()
+  return null
 }
 
 /** Renders a friendly "not allowed" page instead of the route when a permission is missing. */

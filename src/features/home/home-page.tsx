@@ -1,7 +1,18 @@
-import { Bot, ChartColumn, ChartPie, ChevronRight, FolderGit2, Tags, Users, Wallet } from 'lucide-react'
+import {
+  Bot,
+  ChartColumn,
+  ChartPie,
+  ChevronRight,
+  CircleAlert,
+  FolderGit2,
+  Tags,
+  Users,
+  Wallet,
+} from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { useAiUsage, useRequests } from '@/api/queries'
+import { refreshOf } from '@/api/refresh'
 import { useCan, useCurrentUser, useDirectory } from '@/app/hooks'
 import { usePageTitle } from '@/app/title'
 import { ProjectIcon } from '@/components/request/project-icon'
@@ -10,7 +21,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Meter } from '@/components/ui/controls'
 import { EmptyState, ListSkeleton, Skeleton } from '@/components/ui/feedback'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { isTerminal, turnOf } from '@/domain/lifecycle'
+import { DraftsSection } from '@/features/drafts/drafts-section'
 import { formatKrw, formatMonth } from '@/lib/format'
 
 function RequesterSection() {
@@ -20,9 +33,21 @@ function RequesterSection() {
   const open = mine.data?.filter((r) => !isTerminal(r.status)) ?? []
   const myTurn = open.filter((r) => turnOf(r.status) === 'requester')
   const projects = dir.projects.filter((p) => p.active)
+  // Nothing loaded: say so. (A failed refresh keeps showing what was loaded before, and says that.)
+  const failed = mine.isError && !mine.data
+  const mineRefresh = refreshOf(mine)
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <RefreshFailed
+        failed={mineRefresh.failed || dir.projectsStale}
+        retrying={mineRefresh.retrying || (dir.projectsStale && dir.retrying)}
+        onRetry={() => {
+          mineRefresh.onRetry()
+          if (dir.projectsStale) dir.retry()
+        }}
+        className="lg:col-span-2"
+      />
       <div className="flex flex-col gap-4">
         <Link
           to="/requests"
@@ -31,6 +56,9 @@ function RequesterSection() {
           <span className="font-bold text-ink-900">
             {mine.isPending ? (
               <Skeleton className="h-5 w-32" />
+            ) : failed ? (
+              // A failed load is not "0 in progress": just link to the list.
+              t('nav.myRequests')
             ) : (
               t('home.inProgress', { count: open.length })
             )}
@@ -47,6 +75,13 @@ function RequesterSection() {
           </h2>
           {mine.isPending ? (
             <ListSkeleton rows={2} />
+          ) : failed ? (
+            <LoadFailed
+              compact
+              error={mine.error}
+              onRetry={() => void mine.refetch()}
+              retrying={mine.isFetching}
+            />
           ) : myTurn.length ? (
             myTurn.map((r) => <RequestCard key={r.id} request={r} myTurn />)
           ) : (
@@ -55,6 +90,8 @@ function RequesterSection() {
             </p>
           )}
         </section>
+
+        <DraftsSection variant="home" />
       </div>
 
       <Card aria-labelledby="pick-service">
@@ -63,6 +100,8 @@ function RequesterSection() {
         </CardHeader>
         {dir.loading ? (
           <ListSkeleton rows={3} />
+        ) : dir.projectsError ? (
+          <LoadFailed compact error={dir.projectsError} onRetry={dir.retry} retrying={dir.retrying} />
         ) : (
           <ul className="flex flex-col gap-2">
             {projects.map((p) => (
@@ -105,8 +144,16 @@ function DeveloperSection() {
           {t('common.seeAll')}
         </Link>
       </div>
+      <RefreshFailed {...refreshOf(assigned)} />
       {assigned.isPending ? (
         <ListSkeleton rows={3} />
+      ) : assigned.isError && !assigned.data ? (
+        <LoadFailed
+          compact
+          error={assigned.error}
+          onRetry={() => void assigned.refetch()}
+          retrying={assigned.isFetching}
+        />
       ) : queue.length ? (
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {queue.slice(0, 6).map((r) => (
@@ -169,37 +216,46 @@ function AiSpendSummary() {
   const u = usage.data
   const pct = u && u.monthlyLimitKrw ? (u.totalKrw / u.monthlyLimitKrw) * 100 : 0
   return (
-    <Link
-      to="/ops/usage"
-      className="flex flex-col gap-2 rounded-2xl bg-surface px-4 py-4 ring-1 ring-line hover:ring-field"
-    >
-      <span className="flex items-center justify-between gap-3">
-        <span className="text-sm font-semibold text-ink-500">
-          {u ? t('home.opsSpend', { month: formatMonth(u.month) }) : t('nav.aiUsage')}
-        </span>
-        <span className="flex items-center text-sm font-semibold text-accent">
-          {t('home.view')}
-          <ChevronRight className="size-4" aria-hidden />
-        </span>
-      </span>
-      {u ? (
-        <>
-          <span className="text-[28px] leading-tight font-bold tracking-tight text-ink-900">
-            {formatKrw(u.totalKrw)}
+    <>
+      <RefreshFailed {...refreshOf(usage)} />
+      <Link
+        to="/ops/usage"
+        className="flex flex-col gap-2 rounded-2xl bg-surface px-4 py-4 ring-1 ring-line hover:ring-field"
+      >
+        <span className="flex items-center justify-between gap-3">
+          <span className="text-sm font-semibold text-ink-500">
+            {u ? t('home.opsSpend', { month: formatMonth(u.month) }) : t('nav.aiUsage')}
           </span>
-          {u.monthlyLimitKrw ? (
-            <>
-              <span className="text-sm text-ink-500">
-                {t('budget.of', { limit: formatKrw(u.monthlyLimitKrw) })} · {Math.round(pct)}%
-              </span>
-              <Meter value={pct} warnAt={u.alertThresholdPct} label={t('nav.aiUsage')} />
-            </>
-          ) : null}
-        </>
-      ) : (
-        <Skeleton className="h-16" />
-      )}
-    </Link>
+          <span className="flex items-center text-sm font-semibold text-accent">
+            {t('home.view')}
+            <ChevronRight className="size-4" aria-hidden />
+          </span>
+        </span>
+        {u ? (
+          <>
+            <span className="text-[28px] leading-tight font-bold tracking-tight text-ink-900">
+              {formatKrw(u.totalKrw)}
+            </span>
+            {u.monthlyLimitKrw ? (
+              <>
+                <span className="text-sm text-ink-500">
+                  {t('budget.of', { limit: formatKrw(u.monthlyLimitKrw) })} · {Math.round(pct)}%
+                </span>
+                <Meter value={pct} warnAt={u.alertThresholdPct} label={t('nav.aiUsage')} />
+              </>
+            ) : null}
+          </>
+        ) : usage.isError ? (
+          // No retry button inside the link: the usage screen offers one.
+          <span className="flex items-center gap-2 text-sm text-ink-500">
+            <CircleAlert className="size-4 shrink-0 text-danger-fg" aria-hidden />
+            {t('loadError.title')}
+          </span>
+        ) : (
+          <Skeleton className="h-16" />
+        )}
+      </Link>
+    </>
   )
 }
 
@@ -252,7 +308,13 @@ export default function HomePage() {
         </Link>
       ) : null}
 
-      {reviewer ? <DeveloperSection /> : null}
+      {reviewer ? (
+        <>
+          <DeveloperSection />
+          {/* Reviewers file requests too: their drafts show here (only when there are any). */}
+          <DraftsSection variant="home" />
+        </>
+      ) : null}
       {can('request:create') && !reviewer ? <RequesterSection /> : null}
       {admin ? <AdminSection /> : null}
       {ops ? <OpsSection /> : null}

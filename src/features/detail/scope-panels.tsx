@@ -3,18 +3,16 @@ import { Check, Minus } from 'lucide-react'
 import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { ApiError } from '@/api/client'
+import { errorText } from '@/api/error-text'
 import { useTransition } from '@/api/queries'
 import { useDirectory } from '@/app/hooks'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { DateTimeText } from '@/components/ui/date-time'
 import { Field, Textarea } from '@/components/ui/field'
 import { scopeRevisionsLeft, unansweredScopeQuestions } from '@/domain/lifecycle'
 import type { ScopeProposal, WorkRequest } from '@/domain/model'
-import { formatDateTime } from '@/lib/format'
-
-const errorText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback)
 
 /** Summary, what changes and what does not: the part both cards share. */
 function ScopeBody({ proposal }: { proposal: ScopeProposal }) {
@@ -221,10 +219,11 @@ export function ScopeSummaryCard({ request }: { request: WorkRequest }) {
           </CardTitle>
           {decision ? (
             <p className="mt-0.5 text-xs text-ink-500">
-              {t('detail.scope.confirmedBy', {
-                name: dir.user(decision.by)?.name ?? decision.by,
-                time: formatDateTime(decision.at),
-              })}
+              <DateTimeText
+                iso={decision.at}
+                variant="full"
+                sentence={(time) => t('detail.scope.confirmedBy', { name: dir.userName(decision.by), time })}
+              />
             </p>
           ) : null}
         </div>

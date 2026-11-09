@@ -2,8 +2,9 @@ import { delay, http, HttpResponse, type HttpHandler, type PathParams } from 'ms
 import type * as z from 'zod'
 import { api, type ApiErrorBody, type EndpointSpec } from '../api/contract'
 import type { User } from '../domain/model'
+import { isSafeUrl, opensInline } from '../domain/url'
 import { errorText, serverLanguage, type ErrorKey, type ServerLanguage } from './copy'
-import { HttpError, localDate } from './engine'
+import { HttpError } from './engine'
 import { DEMO_PASSWORD } from './seed'
 import type { MockStore } from './store'
 
@@ -88,11 +89,15 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
 
     const answer = async (request: Request, params: PathParams): Promise<Response> => {
       if (maxLatency > 0) await delay(minLatency + Math.random() * (maxLatency - minLatency))
-      const now = store.now()
-      const engine = store.engine
       const lang = serverLanguage(request.headers.get('Accept-Language'))
+      // Read the body first: nothing may be awaited between taking up another tab's
+      // save and saving this change, or one of the two would be lost.
+      const json: unknown = spec.body ? await request.json().catch(() => undefined) : undefined
 
       try {
+        store.sync()
+        const now = store.now()
+        const engine = store.engine
         let me: User | undefined
         const header = request.headers.get('Authorization') ?? ''
         if (header.startsWith(`Bearer ${TOKEN_PREFIX}`)) {
@@ -112,7 +117,6 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
         }
         let body: unknown
         if (spec.body) {
-          const json = await request.json().catch(() => undefined)
           const parsed = spec.body.safeParse(json)
           if (!parsed.success) {
             return errorResponse(lang, 400, 'bad_request', 'checkInput', {}, zodIssues(parsed.error))
@@ -139,7 +143,11 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
         if (spec.response === null) return new HttpResponse(null, { status: 204 })
         return HttpResponse.json(result as never, { status: spec.status ?? 200 })
       } catch (err) {
-        if (err instanceof HttpError) return errorResponse(lang, err.status, err.code, err.key, err.params)
+        if (err instanceof HttpError) {
+          const message = errorText(lang, err.key, err.params)
+          const issues = err.paths.length ? err.paths.map((path) => ({ path, message })) : undefined
+          return errorResponse(lang, err.status, err.code, err.key, err.params, issues)
+        }
         console.error('[mock api]', err)
         return errorResponse(lang, 500, 'internal', 'unknown')
       }
@@ -152,9 +160,12 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
     })
   }
 
-  /** A change a person makes to the demo data */
+  /**
+   * A change a person makes to the demo data (uploads, saved drafts and read marks included:
+   * a language switch must not drop them)
+   */
   const edit: RouteOptions = { edits: true }
-  /** State changes that are not edits (reading notifications, form checks) */
+  /** State changes that are not edits (form checks) */
   const touch: RouteOptions = { mutates: true }
 
   return [
@@ -238,32 +249,41 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
       async ({ store, me, request }) => {
         const form = await request.formData().catch(() => null)
         const file = form?.get('file')
-        if (!(file instanceof File)) throw new HttpError(400, 'bad_request', 'pickFile')
+        // A form entry is a string or a file; `instanceof File` would also refuse a file from another realm.
+        if (!file || typeof file === 'string') throw new HttpError(400, 'bad_request', 'pickFile')
         if (file.size > MAX_UPLOAD_BYTES) throw new HttpError(400, 'bad_request', 'fileTooLarge')
-        // Small files are inlined so they survive a reload; large ones live for this session only.
-        const url =
-          file.size <= INLINE_UPLOAD_BYTES
-            ? `data:${file.type || 'application/octet-stream'};base64,${toBase64(await file.arrayBuffer())}`
-            : URL.createObjectURL(file)
+        const url = await fileUrl(file)
+        store.sync() // the file was read asynchronously; another tab may have saved meanwhile
         return store.engine.addAttachment(me, { name: file.name, size: file.size, type: file.type, url })
       },
-      touch,
+      edit,
     ),
     route(api.regressionQueue, ({ store, me }) => store.engine.regressionQueue(me)),
+
+    /* saved drafts */
+    route(api.listDrafts, ({ store, me }) => store.engine.listDrafts(me)),
+    route(api.createDraft, ({ store, me, body, now }) => store.engine.createDraft(me, body, now), edit),
+    route(api.getDraft, ({ store, me, params }) => store.engine.getDraft(me, params.id)),
+    route(
+      api.updateDraft,
+      ({ store, me, params, body, now }) => store.engine.updateDraft(me, params.id, body, now),
+      edit,
+    ),
+    route(api.deleteDraft, ({ store, me, params }) => store.engine.deleteDraft(me, params.id), edit),
 
     /* notifications */
     route(api.listNotifications, ({ store, me, lang }) => store.engine.notificationsFor(me, lang)),
     route(
       api.markAllNotificationsRead,
       ({ store, me, now, lang }) => void store.engine.markRead(me, 'all', now, lang),
-      touch,
+      edit,
     ),
     route(
       api.markNotificationRead,
       ({ store, me, params, now, lang }) => store.engine.markRead(me, params.id, now, lang),
-      touch,
+      edit,
     ),
-    route(api.getNotificationSettings, ({ store, me }) => store.engine.state.notificationSettings[me.id]),
+    route(api.getNotificationSettings, ({ store, me }) => store.engine.notificationSettings(me)),
     route(
       api.updateNotificationSettings,
       ({ store, me, body }) => {
@@ -275,19 +295,19 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
 
     /* insights */
     route(api.dashboard, ({ store, me, query, now }) =>
-      store.engine.dashboard(me, query.month ?? localDate(now).slice(0, 7), now),
+      store.engine.dashboard(me, query.month ?? store.engine.today(now).slice(0, 7), now),
     ),
     route(api.releases, ({ store, me, query }) => store.engine.releases(me, query.from, query.to)),
     route(api.getBudget, ({ store, me, now }) => {
       store.engine.require(me, 'budget:manage')
-      return store.engine.budget(localDate(now).slice(0, 7))
+      return store.engine.budget(store.engine.today(now).slice(0, 7))
     }),
     route(
       api.updateBudget,
       ({ store, me, body, now }) => {
         store.engine.require(me, 'budget:manage')
         store.engine.state.budget = body
-        return store.engine.budget(localDate(now).slice(0, 7))
+        return store.engine.budget(store.engine.today(now).slice(0, 7))
       },
       edit,
     ),
@@ -309,9 +329,25 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
     route(api.getAiPricing, ({ store, me }) => store.engine.aiPricing(me)),
     route(api.updateAiPricing, ({ store, me, body }) => store.engine.updateAiPricing(me, body), edit),
     route(api.aiUsage, ({ store, me, query, now }) =>
-      store.engine.aiUsageReport(me, query.month ?? localDate(now).slice(0, 7)),
+      store.engine.aiUsageReport(me, query.month ?? store.engine.today(now).slice(0, 7)),
     ),
   ]
+}
+
+/**
+ * Where the demo keeps an upload. Small images and PDFs are inlined as data:
+ * URLs so they survive a reload; anything else lives in the browser for this
+ * session as a blob: URL. A blob of any type a browser could run as a page
+ * (HTML, SVG…) holds plain bytes, so even "open in new tab" downloads it.
+ */
+async function fileUrl(file: File): Promise<string> {
+  const type = file.type || 'application/octet-stream'
+  if (file.size <= INLINE_UPLOAD_BYTES) {
+    const inline = `data:${type};base64,${toBase64(await file.arrayBuffer())}`
+    if (isSafeUrl(inline, 'file')) return inline
+  }
+  const blob = opensInline(type) ? file : new Blob([file], { type: 'application/octet-stream' })
+  return URL.createObjectURL(blob)
 }
 
 function toBase64(buffer: ArrayBuffer): string {

@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/controls'
 import { ListSkeleton } from '@/components/ui/feedback'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { Field, Input } from '@/components/ui/field'
 import { Sheet } from '@/components/ui/sheet'
 import { appConfig } from '@/config/app.config'
@@ -161,8 +162,11 @@ export default function UsersPage() {
           </Button>
         }
       />
+      <RefreshFailed failed={dir.usersStale} onRetry={dir.retry} retrying={dir.retrying} className="mb-3" />
       {dir.loading ? (
         <ListSkeleton />
+      ) : dir.usersError ? (
+        <LoadFailed error={dir.usersError} onRetry={dir.retry} retrying={dir.retrying} />
       ) : (
         <ul className="flex flex-col gap-2">
           {dir.users.map((u) => (

@@ -1,3 +1,5 @@
+// Before any Zod schema is built: no eval probe under the strict CSP (deploy/nginx.conf).
+import './config/zod-jitless'
 // i18n first: the language decides the mock seed and every text below.
 import i18n, { currentLocale } from './i18n'
 import { QueryClientProvider } from '@tanstack/react-query'
@@ -7,8 +9,8 @@ import { configureClient, type ClientHooks } from './api/client'
 import { createQueryClient } from './api/query-client'
 import App from './App.tsx'
 import { BootError } from './app/boot'
+import { expireSession } from './app/session-sync'
 import { startThemeSync } from './app/theme'
-import { env } from './config/env'
 import './index.css'
 import { useSession } from './stores/session'
 
@@ -56,21 +58,24 @@ async function bootstrap() {
   if (!container) throw new Error('#root element is missing from index.html')
   const root = createRoot(container)
   startThemeSync()
+  const queryClient = createQueryClient()
 
   const clientHooks: ClientHooks = {
     getToken: () => useSession.getState().token,
-    onUnauthorized: () => useSession.getState().clear(),
+    // The server refused the token: drop the session and the cached data; the login screen keeps `next`.
+    onUnauthorized: (token) => expireSession(queryClient, token),
     getLanguage: currentLocale,
     messages: {
       network: () => i18n.t('errors.network'),
+      timeout: () => i18n.t('errors.timeout'),
       http: (status) => i18n.t('errors.http', { status }),
       contract: () => i18n.t('errors.contract'),
     },
   }
   configureClient(clientHooks)
 
-  if (env.apiMock) {
-    // Loaded only in mock mode, so a production build against a real backend ships no mock code paths.
+  // `__API_MOCK__` is a literal: a real-backend build drops this branch and ships no mock code.
+  if (__API_MOCK__) {
     try {
       configureClient({ ...clientHooks, recover: await startMockOrRecover() })
     } catch (err) {
@@ -82,7 +87,7 @@ async function bootstrap() {
 
   root.render(
     <StrictMode>
-      <QueryClientProvider client={createQueryClient()}>
+      <QueryClientProvider client={queryClient}>
         <App />
       </QueryClientProvider>
     </StrictMode>,

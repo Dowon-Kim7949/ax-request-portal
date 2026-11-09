@@ -2,11 +2,11 @@
 title: LLM-WIKI README
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: wiki_readme
 project: ax-request-portal
-last_updated: 2026-11-03
+last_updated: 2026-11-05
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -50,7 +50,7 @@ Use the short `npx llm-wiki` only after `npm ci`; without the local install it w
 
 ## Files the tool manages
 
-`CLAUDE.md` (the adapter block), `.claude/skills/llm-wiki-*`, `.llm-wiki/prompts/` and `llm-wiki.config.json` are written by the CLI and excluded from Prettier so the two do not fight.
+`CLAUDE.md` (the adapter block), `.claude/skills/llm-wiki-*`, `.llm-wiki/prompts/` and `llm-wiki.config.json` are written by the CLI and excluded from Prettier so the two do not fight. `.claude/worktrees/` (other checkouts that agent workflows create inside this one) is excluded too, so `npm run verify` checks only this checkout.
 
 ## Citing without false alarms
 
@@ -60,4 +60,4 @@ A file listed in `source_files` is watched as a whole: once a document is `verif
 
 - `.github/workflows/llm-wiki.yml#L42-L46` — the CI steps: locked CLI version, frontmatter, strict validation, the undocumented-change gate.
 - `llm-wiki.config.json` — governance mode and the `impact.source_changed` rule.
-- `.prettierignore`, `CLAUDE.md` — tool-managed files kept out of Prettier; the agent adapter.
+- `.prettierignore`, `CLAUDE.md` — tool-managed files and agent worktrees kept out of Prettier; the agent adapter.

@@ -30,6 +30,7 @@ A responsive React template for an **AI-assisted work request portal**. People w
 - **A request lifecycle you can trust.** One transition table decides who can move a request where. The UI shows buttons from it, the mock API enforces it, and a backend can port it as-is.
 - **One API contract, three consumers.** `src/api/contract.ts` produces the typed client, the mock API handlers and [`docs/openapi.json`](docs/openapi.json). The client validates every response, so a drifting backend fails loudly.
 - **Works with no backend.** An in-browser mock API (MSW) with fictional demo data and a simulated AI that writes reports and opens merge requests in seconds. Progress survives reloads.
+- **Drafts that follow the person.** The request wizard keeps what is typed on the device at once and saves it to the account a second later, so a request half-written on a phone continues on a laptop, after a reload or without a connection. Saved drafts are listed on the home screen and under My requests. A version saved elsewhere in the meantime is never overwritten silently: the wizard asks which one to keep. Signing out asks before deleting drafts that never reached the account.
 - **AI usage you can account for, on Claude and GPT.** An operator picks the model for each AI task (Claude or GPT through their APIs; a Claude agent built on the Claude Agent SDK, or Codex, for AI work), per project if needed, and keeps the price table and exchange rate. Every AI call is booked from the provider's own token report, normalized (Claude and OpenAI count cached tokens differently) and priced once. Developers see what each request cost and why a run is blocked at its limit; the operator gets a usage dashboard by provider, day, model, task and request. Costs are estimates; the bill is in each provider's console. Provider keys are write-only.
 - **Plain language for non-developers.** Requesters see "checking / needs your answer / please check the result". Developers see the precise state. All copy lives in one dictionary per language.
 - **English and Korean.** The language follows the browser until the user picks one. Dates and amounts follow it too. Every API call sends `Accept-Language`, and the mock API answers in it the way a real backend should: errors, notifications and the simulated AI's reports come back in the user's language. The type checker fails if the two dictionaries drift apart.
@@ -88,13 +89,13 @@ npm run dev
 
 Open the printed URL and pick a demo account. Node 22.22.2+, 24.15+ or 26+ is required (`.nvmrc` pins 24; React Router 8 and jsdom 30 set that floor). CI checks the floor of each line: 22.22.2, 24.15.0 and 26.0.0.
 
-| Script             | What it does                                                         |
-| ------------------ | -------------------------------------------------------------------- |
-| `npm run dev`      | Dev server with the mock API                                         |
-| `npm run build`    | Production build into `dist/`                                        |
-| `npm run verify`   | oxlint, Prettier check, typecheck, unit tests, build (what CI runs)  |
-| `npm run test:e2e` | Playwright on phone (WebKit), tablet (WebKit) and desktop (Chromium) |
-| `npm run openapi`  | Regenerate `docs/openapi.json` after changing the contract           |
+| Script             | What it does                                                                                  |
+| ------------------ | --------------------------------------------------------------------------------------------- |
+| `npm run dev`      | Dev server with the mock API                                                                  |
+| `npm run build`    | Production build into `dist/`                                                                 |
+| `npm run verify`   | oxlint, Prettier check, typecheck, unit tests, build, real-backend build check (what CI runs) |
+| `npm run test:e2e` | Playwright on phone (WebKit), tablet (WebKit) and desktop (Chromium)                          |
+| `npm run openapi`  | Regenerate `docs/openapi.json` after changing the contract                                    |
 
 ## Make it yours
 
@@ -115,9 +116,25 @@ Open the printed URL and pick a demo account. Node 22.22.2+, 24.15+ or 26+ is re
 
 The mock backend's own texts (errors, notifications, simulated AI reports, demo data, the submission check) exist in English and Korean only, and fall back to Korean for other languages. A real backend replaces all of them.
 
+## Environment variables
+
+Set at build time, in the environment or in `.env.local` (copy [`.env.example`](.env.example)).
+
+| Variable            | Default    | Meaning                                                                                                 |
+| ------------------- | ---------- | ------------------------------------------------------------------------------------------------------- |
+| `VITE_BASE`         | `/`        | Public path the app is served from, e.g. `/ax/` for `https://host/ax/`                                  |
+| `VITE_API_MOCK`     | `true`     | `true` or unset: demo mode on the in-browser mock API. `false`: call the backend at `VITE_API_BASE_URL` |
+| `VITE_API_BASE_URL` | none       | Required when `VITE_API_MOCK=false`: a same-origin path such as `/api`, or a full `https://` URL        |
+| `VITE_BUILD_ID`     | the commit | Written to `version.json`; open tabs offer a reload when the deployed id changes                        |
+
+- **Demo mode is visible.** With the mock API, whatever people enter stays in their own browser. The login screen and every signed-in screen show a small "Demo mode · Data stays in this browser only" banner that cannot be closed, so a demo build deployed by mistake is obvious. A real-backend build never shows it.
+- **Bad settings fail the build.** `vite build` stops with a message when `VITE_API_MOCK` is anything but `true`, `false` or unset, or when `VITE_API_MOCK=false` comes without a usable `VITE_API_BASE_URL` (missing, not a URL or path, credentials, a query string, `.` or `..` path segments, the path the app itself is served from, or the `.env.example` placeholder). A fresh clone still builds as is, in demo mode. The dev server prints the same findings as warnings. The rules live in [`src/config/env-check.ts`](src/config/env-check.ts).
+- **A real-backend build ships no mock:** neither `mockServiceWorker.js` nor the mock API and its demo data (accounts, password) end up in `dist/`. `npm run verify` builds one and checks ([`scripts/check-real-build.mjs`](scripts/check-real-build.mjs)).
+- **A backend on another origin** (`VITE_API_BASE_URL=https://api.your-company.com`) must also be allowed by the page: add its origin to `connect-src` in the Content-Security-Policy in [`deploy/nginx.conf`](deploy/nginx.conf) (and to `img-src` if it serves attachments or preview screenshots), and allow the app's origin in the backend's CORS settings. The build prints this reminder. A same-origin `/api` needs neither.
+
 ## Connect a real backend
 
-1. Implement the endpoints in [`docs/openapi.json`](docs/openapi.json). Requests carry `Authorization: Bearer <token>` from `POST /auth/login`. Errors use the `ApiError` body (`code`, `message`, optional `issues`). A transition that doesn't fit the current status is a `409`. Requests also carry `Accept-Language`: write error messages, notifications and AI text in that language.
+1. Implement the endpoints in [`docs/openapi.json`](docs/openapi.json). Requests carry `Authorization: Bearer <token>` from `POST /auth/login`. Errors use the `ApiError` body (`code`, `message`, optional `issues`). A transition that doesn't fit the current status is a `409`. Saved drafts (`/drafts`) belong to the person who wrote them: an update over an old `baseVersion` is `409 conflict`, a create beyond `drafts.maxPerAccount` in [`src/config/app.config.ts`](src/config/app.config.ts) is `409 limit_reached`, and a request created with a `draftId` deletes that draft. Requests also carry `Accept-Language`: write error messages, notifications and AI text in that language.
 2. Enforce the lifecycle on the server. [`src/domain/lifecycle.ts`](src/domain/lifecycle.ts) and [`src/domain/report.ts`](src/domain/report.ts) are plain TypeScript with no browser dependency. Port them or import them.
 3. Run the two AI jobs server-side: the feasibility report (read-only access to the code and wiki) and the work run (branch → tests → merge request). The UI polls a request while its status is `submitted`, `reporting` or `in_progress`.
 4. Build against it:
@@ -126,7 +143,7 @@ The mock backend's own texts (errors, notifications, simulated AI reports, demo 
    VITE_API_MOCK=false VITE_API_BASE_URL=/api npm run build
    ```
 
-With `VITE_API_MOCK=false` the mock code is never loaded. See [`.env.example`](.env.example).
+With `VITE_API_MOCK=false` the mock code is not in the build and the demo banner is gone. See [Environment variables](#environment-variables).
 
 ## Deploy with nginx
 
@@ -137,14 +154,21 @@ cp deploy/nginx.conf /etc/nginx/conf.d/ax-request-portal.conf   # set server_nam
 nginx -t && nginx -s reload
 ```
 
-[`deploy/nginx.conf`](deploy/nginx.conf) does four things:
+[`deploy/nginx.conf`](deploy/nginx.conf):
 
 - sends unknown paths to `index.html` so deep links work;
 - caches `/assets/*` for a year (file names are content-hashed);
-- never caches `index.html` or the service worker;
-- answers a missing asset with `404` instead of HTML.
+- never caches `index.html`, `version.json` or the service worker;
+- answers a missing asset with `404` instead of HTML, and doesn't let that `404` be cached;
+- sends security headers on every response: a Content-Security-Policy, `Permissions-Policy`, `Cross-Origin-Opener-Policy: same-origin`, `X-Content-Type-Options`, `X-Frame-Options` and `Referrer-Policy`.
 
-It also has a commented `/api` reverse proxy and a sub-path variant (build with `VITE_BASE=/ax/`). The CI `nginx` job serves the build with this exact file in `nginx:stable-alpine` and checks all of the above with [`deploy/check-nginx.sh`](deploy/check-nginx.sh).
+The Content-Security-Policy allows the app's own files, the Pretendard web font from `cdn.jsdelivr.net`, and the one inline script in `index.html` (it applies the saved theme before the first paint) by its SHA-256 hash. `npm run preview` sends the same policy, read from this file, so every E2E test runs under it and `e2e/csp.spec.ts` fails on any violation. Three things to keep in step with it:
+
+- **Changing that inline script** changes its hash. Print the new one with `node deploy/csp-hashes.mjs index.html` and replace it in `script-src`. The unit tests and the nginx check fail until you do.
+- **A backend on another origin** goes into `connect-src`, e.g. `connect-src 'self' https://api.your-company.com`.
+- **Images from another origin** go into `img-src`: attachment thumbnails and preview screenshots are shown from the URLs the API returns, so add the backend, file store or preview hosts that serve them, e.g. `img-src 'self' data: blob: https://api.your-company.com`. The demo keeps them in the browser (`data:`, `blob:`), so it needs nothing more.
+
+`Strict-Transport-Security` is left as a commented example: set it where TLS terminates (nginx itself or the load balancer in front of it). The file also has a commented `/api` reverse proxy and a complete sub-path variant (build with `VITE_BASE=/ax/`). The CI `nginx` job serves a demo build and then a real-backend build with this exact file in `nginx:stable-alpine` and checks all of the above with [`deploy/check-nginx.sh`](deploy/check-nginx.sh); run the same script against your own deployment, sub-path included (`bash deploy/check-nginx.sh https://host/ax`). CI does not exercise the sub-path variant itself.
 
 Vendor code is split into stable chunks (`vendor-react`, `vendor-router`, …), so an app-only release changes about 15 KB gzip and browsers keep the rest cached. UI copy for both languages has its own `messages` chunk (12 KB gzip), so a wording change doesn't invalidate app code either.
 
@@ -175,8 +199,8 @@ docs/          openapi.json, README images, llm-wiki/ (agent knowledge base)
 
 ## Quality gates
 
-- `npm run verify`: oxlint with warnings as errors, Prettier, strict TypeScript (`noUncheckedIndexedAccess`), 158 unit tests (including WCAG contrast in both themes and dictionary parity), production build.
-- E2E: 104 tests on phone, tablet and desktop, including the skip link and reduced motion. Every flow runs on all three. Every main screen of every role is checked at 320 px (in both languages) and on a landscape tablet. Separate runs walk each role's screens in English, failing on any leftover Korean, and in dark mode. Horizontal overflow is checked after data has loaded.
+- `npm run verify`: oxlint with warnings as errors, Prettier, strict TypeScript (`noUncheckedIndexedAccess`), 612 unit tests (including WCAG contrast in both themes and dictionary parity), production build.
+- E2E: 253 tests on phone, tablet and desktop, including the skip link and reduced motion. Every flow runs on all three. Every main screen of every role is checked at 320 px (in both languages) and on a landscape tablet. Separate runs walk each role's screens in English, failing on any leftover Korean, and in dark mode. Horizontal overflow is checked after data has loaded.
 - CI runs verify, e2e, the nginx check and the LLM-WIKI checks on every push and pull request. Dependabot keeps dependencies and actions current.
 
 ## Known limits

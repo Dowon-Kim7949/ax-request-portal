@@ -11,5 +11,7 @@ docs/openapi.json
 docs/llm-wiki
 .llm-wiki
 .claude/skills/llm-wiki-*
+# Other checkouts of this repository, made by agent workflows
+.claude/worktrees/
 CLAUDE.md
 llm-wiki.config.json

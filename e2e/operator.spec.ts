@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test'
-import { expectNoHorizontalScroll, loginAs } from './helpers.ts'
+import { expect, test } from './fixtures.ts'
+import { expectNoHorizontalScroll, loginAs, openInApp } from './helpers.ts'
 
 test('operator connects a provider, picks models, edits prices and reads usage', async ({ page }) => {
   test.setTimeout(90_000)
@@ -9,7 +9,7 @@ test('operator connects a provider, picks models, edits prices and reads usage',
   await expectNoHorizontalScroll(page)
 
   // A key is write-only: only its last four characters come back.
-  await page.goto('/ops/agents')
+  await openInApp(page, '/ops/agents')
   await expect(page.getByRole('heading', { level: 1, name: 'AI 에이전트' })).toBeVisible()
   await page.getByRole('button', { name: 'Anthropic 키 바꾸기' }).click()
   const keySheet = page.getByRole('dialog', { name: 'Anthropic API 키' })
@@ -39,7 +39,7 @@ test('operator connects a provider, picks models, edits prices and reads usage',
   await expectNoHorizontalScroll(page)
 
   // Prices: a model in use cannot be removed; a new rate applies from now on.
-  await page.goto('/ops/pricing')
+  await openInApp(page, '/ops/pricing')
   await expect(page.getByRole('button', { name: 'Claude Opus 5.5 빼기' })).toBeDisabled()
   await page.getByLabel('환율 (원/달러)').fill('1500')
   await page.getByRole('button', { name: '저장' }).click()
@@ -47,7 +47,7 @@ test('operator connects a provider, picks models, edits prices and reads usage',
   await expectNoHorizontalScroll(page)
 
   // Usage: Claude next to GPT, a daily chart with a table behind it, the new rate.
-  await page.goto('/ops/usage')
+  await openInApp(page, '/ops/usage')
   await expect(page.getByRole('heading', { level: 1, name: 'AI 사용량' })).toBeVisible()
   await expect(page.getByText('1,500원/달러')).toBeVisible()
   await expect(page.getByRole('img', { name: /^Claude \d+%, GPT \d+%$/ })).toBeVisible()
@@ -56,7 +56,7 @@ test('operator connects a provider, picks models, edits prices and reads usage',
   await expectNoHorizontalScroll(page)
 
   // The budget moved from the admin screens; the old address still leads to it.
-  await page.goto('/admin/budget')
+  await openInApp(page, '/admin/budget')
   await expect(page).toHaveURL(/\/ops\/budget$/)
   await expect(page.getByRole('meter')).toBeVisible()
   await page.getByLabel('월 한도 (원)').fill('300000')
@@ -68,7 +68,7 @@ test('operator connects a provider, picks models, edits prices and reads usage',
 
   // The developer sees what the request cost and why the run button is off.
   await loginAs(page, '담당자')
-  await page.goto('/requests/1026')
+  await openInApp(page, '/requests/1026')
   await expect(page.getByRole('heading', { name: 'AI 사용량' })).toBeVisible()
   await expect(page.getByText('Claude Opus 5.5').first()).toBeVisible()
   await expect(page.getByRole('button', { name: '작업 수행' })).toBeDisabled()

@@ -10,13 +10,15 @@ import { toast } from 'sonner'
 import * as z from 'zod'
 import { ApiError } from '@/api/client'
 import { useAiPricing, useAiSettings, useUpdateAiPricing } from '@/api/queries'
+import { refreshOf } from '@/api/refresh'
 import { PageHeader } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { ProviderSwatch } from '@/components/ai/ai'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
-import { ErrorState, Skeleton } from '@/components/ui/feedback'
+import { Skeleton } from '@/components/ui/feedback'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { Field, Input } from '@/components/ui/field'
 import {
   AI_PROVIDERS,
@@ -269,21 +271,13 @@ export default function PricingPage() {
 
   const body = () => {
     if (pricing.isPending || settings.isPending) return <Skeleton className="h-96" />
-    if (pricing.isError || settings.isError || !pricing.data || !settings.data) {
+    if (pricing.isLoadingError || settings.isLoadingError || !pricing.data || !settings.data) {
+      const failed = [pricing, settings].filter((q) => q.isError)
       return (
-        <ErrorState
-          title={t('common.errorTitle')}
-          action={
-            <Button
-              variant="secondary"
-              onClick={() => {
-                void pricing.refetch()
-                void settings.refetch()
-              }}
-            >
-              {t('common.retry')}
-            </Button>
-          }
+        <LoadFailed
+          error={failed[0]?.error}
+          onRetry={() => failed.forEach((q) => void q.refetch())}
+          retrying={failed.some((q) => q.isFetching)}
         />
       )
     }
@@ -294,6 +288,7 @@ export default function PricingPage() {
   return (
     <>
       <PageHeader title={t('pricing.title')} description={t('pricing.subtitle')} />
+      <RefreshFailed {...refreshOf(pricing, settings)} className="mb-3" />
       {body()}
     </>
   )

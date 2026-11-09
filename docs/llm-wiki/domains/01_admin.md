@@ -2,11 +2,11 @@
 title: Admin
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-04
+last_updated: 2026-11-05
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -20,6 +20,9 @@ evidence:
   - src/mocks/engine.ts#symbol:createUser
   - src/mocks/engine.ts#symbol:updateUser
   - src/domain/roles.ts#symbol:DEFAULT_ROLE_PERMISSIONS
+  - src/api/queries.ts#symbol:useUpdateUser
+  - src/app/hooks.ts#symbol:useDirectory
+  - src/domain/url.ts#symbol:WebUrl
 related:
   - docs/llm-wiki/domains/00_overview.md
   - docs/llm-wiki/domains/03_dashboard.md
@@ -44,7 +47,8 @@ Administration of the organization's side of the workflow: projects (repositorie
 
 ## Workflows
 
-- **Projects**: list plus an edit sheet (`editing` is a project, `'new'` or `null`). Fields: name, description, icon, repository (`provider` + URL), wiki path (default `docs/llm-wiki`), owners, targets (name + wiki document), rules to keep (`constraints`: text + optional source such as "Security policy 3.2", at most 20) and an active switch. The AI checks every rule in its report and the work instructions carry them, so requesters never have to repeat them. Owner candidates are active developers and admins only. The provider decides whether review links say MR (GitLab) or PR (GitHub).
+- **Projects**: list plus an edit sheet (`editing` is a project, `'new'` or `null`). Fields: name, description, icon, repository (`provider` + URL), wiki path (default `docs/llm-wiki`), owners, targets (name + wiki document), rules to keep (`constraints`: text + optional source such as "Security policy 3.2", at most 20) and an active switch. The AI checks every rule in its report and the work instructions carry them, so requesters never have to repeat them. Owner candidates are active developers and admins only. The provider decides whether review links say MR (GitLab) or PR (GitHub). The repository URL must be an absolute `http(s)` URL (`WebUrl`), in the form and in the contract. Each project card lists repository and owners as a `<dl>`; the target and rule counts sit outside it, because a `<dl>` holds only term–description pairs.
+- Both screens show `LoadFailed` with a retry when their list cannot be loaded (never an empty list), and keep the list with a `RefreshFailed` line when a refresh fails (`useDirectory().projectsError` / `usersError`, `projectsStale` / `usersStale`).
 - **Users**: one row per user with a role select and an active toggle; invitations open a sheet. The select offers `appConfig.enabledRoles` minus `operator`. An admin cannot change their own role or deactivate themselves, and cannot change an operator's row: the controls are disabled with a `title`, an operator row also says so in visible text, and the server rejects both.
 
 ## API Services
@@ -54,7 +58,7 @@ Administration of the organization's side of the workflow: projects (repositorie
 | `useDirectory` (`useProjects`, `useUsers`) | `GET /projects`, `GET /users` | → `Project[]`, `User[]` | 60 s stale time; shared with every page that shows names. |
 | `useSaveProject` | `POST /projects` or `PUT /projects/{id}` (chosen by presence of `id`) | `ProjectInput` (name 1–60, description ≤ 300, repository, ≥ 1 owner, targets with optional id, constraints with optional id) → `Project` | Server: owners must be developers/admins (`ownersMustBeDevelopers`, 400), unknown id 404, missing target and constraint ids are generated; an empty rule text is 400. Invalidates projects. |
 | `useCreateUser` | `POST /users` | `UserCreate { name, email, role, team? }` → `User` | Duplicate e-mail → 400 `emailTaken`. Invalidates users. |
-| `useUpdateUser` | `PATCH /users/{id}` | `UserPatch { role?, team?, active? }` → `User` | Self-change → 400 `cannotChangeSelf`. Invalidates users. |
+| `useUpdateUser` | `PATCH /users/{id}` | `UserPatch { role?, team?, active? }` → `User` | Self-change → 400 `cannotChangeSelf`. Invalidates users, and `GET /auth/me` too when the changed user is the one signed in. |
 
 Creating a user with the `operator` role, or changing an operator, is refused with 403 `operatorProvisioned` (`createUser`, `updateUser`).
 
@@ -68,7 +72,9 @@ All calls carry the bearer token; mutation failures show `toast.error` with the 
 ## Evidence
 
 - `src/features/admin/projects-page.tsx#symbol:ProjectsPage`, `src/features/admin/users-page.tsx#symbol:UsersPage` — the two screens; `ASSIGNABLE_ROLES` in the users page leaves out `operator`.
-- `src/api/queries.ts#symbol:useSaveProject` — create-or-update.
+- `src/api/queries.ts#symbol:useSaveProject`, `src/api/queries.ts#symbol:useUpdateUser` — create-or-update; refreshing the signed-in user.
+- `src/app/hooks.ts#symbol:useDirectory` — shared lists with their load and refresh failures.
+- `src/domain/url.ts#symbol:WebUrl` — repository URL rule.
 - `src/mocks/engine.ts#symbol:saveProject`, `src/mocks/engine.ts#symbol:createUser`, `src/mocks/engine.ts#symbol:updateUser` — server-side rules, including the `operatorProvisioned` refusal.
 - `src/domain/roles.ts#symbol:DEFAULT_ROLE_PERMISSIONS` — `admin` holds every permission except `OPERATOR_PERMISSIONS`.
 

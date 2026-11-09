@@ -13,28 +13,42 @@ import { Fragment, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, NavLink, Outlet, ScrollRestoration, useMatches } from 'react-router'
 import { toast } from 'sonner'
-import { useLogout, useNotifications } from '@/api/queries'
+import { useNotifications } from '@/api/queries'
 import { Sheet } from '@/components/ui/sheet'
 import { env } from '@/config/env'
+import { useDraftSync } from '@/features/drafts/hooks'
 import { currentLocale } from '@/i18n'
 import { cn } from '@/lib/cn'
 import { useBrand } from './brand'
 import { resetDemoData } from './demo'
+import { DemoBanner } from './demo-banner'
 import { useCan, useCurrentUser } from './hooks'
 import { phoneTabs, visibleNav, type NavItem } from './nav'
 import type { RouteHandle } from './router'
+import { useSignOut } from './sign-out'
 
 /* ------------------------------------------------------------------ */
 /* Small pieces                                                        */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Text drawn by CSS (initials, a counter) inside a control whose name already
+ * says it. As DOM text it would be part of the control's visible label, and a
+ * visible label must be contained in the accessible name (WCAG 2.5.3): "AX",
+ * "11" or "김" are not words of "AX 업무 요청", "알림 (11)" or "내 계정 김기획".
+ */
+function Glyph({ text, className }: { text: string; className?: string }) {
+  return <span aria-hidden data-glyph={text} className={cn('before:content-[attr(data-glyph)]', className)} />
+}
+
 function BrandMark({ compact }: { compact?: boolean }) {
   const brand = useBrand()
   return (
     <Link to="/" className="flex items-center gap-2.5 rounded-lg" aria-label={brand.name}>
-      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-inverse text-[13px] font-black tracking-tight text-on-inverse">
-        {brand.shortName}
-      </span>
+      <Glyph
+        text={brand.shortName}
+        className="grid size-9 shrink-0 place-items-center rounded-xl bg-inverse text-[13px] font-black tracking-tight text-on-inverse"
+      />
       {compact ? null : <span className="text-[15px] font-bold text-ink-900">{brand.name}</span>}
     </Link>
   )
@@ -56,20 +70,23 @@ function NotificationBell() {
     >
       <Bell className="size-5.5" aria-hidden />
       {unread ? (
-        <span className="absolute top-1.5 right-1.5 grid min-w-4.5 place-items-center rounded-full bg-danger-600 px-1 text-[10px] leading-4.5 font-bold text-white">
-          {unread > 99 ? '99+' : unread}
-        </span>
+        <Glyph
+          text={unread > 99 ? '99+' : String(unread)}
+          className="absolute top-1.5 right-1.5 grid min-w-4.5 place-items-center rounded-full bg-danger-600 px-1 text-[10px] leading-4.5 font-bold text-white"
+        />
       ) : null}
     </Link>
   )
 }
 
 function useAccountActions() {
-  const logout = useLogout()
+  const signOut = useSignOut()
   const qc = useQueryClient()
   const { t } = useTranslation()
   return {
-    logout: () => logout.mutate(),
+    logout: signOut.signOut,
+    /** Asks before signing out deletes drafts that never reached the account; render it once per caller */
+    signOutDialog: signOut.dialog,
     resetDemo: env.apiMock
       ? async () => {
           await resetDemoData(currentLocale())
@@ -124,13 +141,15 @@ function AccountMenu() {
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
-        aria-label={t('nav.account')}
         onClick={() => setOpen((o) => !o)}
         className="flex h-11 items-center gap-2 rounded-full pr-3 pl-1.5 text-sm font-semibold text-ink-700 hover:bg-muted"
       >
-        <span className="grid size-8 place-items-center rounded-full bg-brand-100 text-[13px] font-bold text-accent-strong">
-          {user.name.slice(0, 1)}
-        </span>
+        <Glyph
+          text={user.name.slice(0, 1)}
+          className="grid size-8 place-items-center rounded-full bg-brand-100 text-[13px] font-bold text-accent-strong"
+        />
+        {/* Named "내 계정", plus the user's name where it shows (the words a voice user would say). */}
+        <span className="sr-only">{t('nav.account')}</span>{' '}
         <span className="hidden lg:inline">{user.name}</span>
       </button>
       {open ? (
@@ -166,6 +185,8 @@ function AccountMenu() {
             type="button"
             className={item}
             onClick={() => {
+              // The panel goes: a sign-out the person is asked about gives focus back to the account button.
+              triggerRef.current?.focus()
               close()
               actions.logout()
             }}
@@ -175,6 +196,7 @@ function AccountMenu() {
           </button>
         </div>
       ) : null}
+      {actions.signOutDialog}
     </div>
   )
 }
@@ -393,7 +415,10 @@ function BottomNav({ items }: { items: NavItem[] }) {
           <li>
             <button
               type="button"
-              onClick={actions.logout}
+              onClick={() => {
+                close()
+                actions.logout()
+              }}
               className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-[15px] font-semibold text-danger-fg hover:bg-danger-50"
             >
               <LogOut className="size-5" aria-hidden />
@@ -402,6 +427,7 @@ function BottomNav({ items }: { items: NavItem[] }) {
           </li>
         </ul>
       </Sheet>
+      {actions.signOutDialog}
     </>
   )
 }
@@ -432,6 +458,8 @@ function SkipLink() {
 }
 
 export function AppShell() {
+  // Drafts reach the account from any screen, not only the wizard's.
+  useDraftSync()
   const can = useCan()
   const items = visibleNav(can)
   const focus = useMatches().some((m) => (m.handle as RouteHandle | undefined)?.focus)
@@ -441,7 +469,25 @@ export function AppShell() {
       <SkipLink />
       <Sidebar items={items} />
       <div className="md:pl-[76px] xl:pl-64">
-        <header className="sticky top-0 z-20 border-b border-line/70 bg-canvas/90 pt-safe backdrop-blur">
+        <DemoBanner />
+        {/*
+          The notch inset (an iOS home-screen app draws under the status bar) is padded once: by the
+          demo banner when there is one, otherwise by the header. With the banner, the header sticks
+          just below the inset once the banner has scrolled away, and this strip keeps the page from
+          showing through under the status bar.
+        */}
+        {env.apiMock ? (
+          <div
+            aria-hidden
+            className="pointer-events-none fixed inset-x-0 top-0 z-30 h-[env(safe-area-inset-top)] bg-canvas/90 backdrop-blur md:left-[76px] xl:left-64"
+          />
+        ) : null}
+        <header
+          className={cn(
+            'sticky z-20 border-b border-line/70 bg-canvas/90 backdrop-blur',
+            env.apiMock ? 'top-[env(safe-area-inset-top)]' : 'top-0 pt-safe',
+          )}
+        >
           <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-4 sm:px-6 md:h-16">
             <div className="md:invisible">
               <BrandMark />

@@ -35,6 +35,11 @@ const en: Messages = {
     unknownUser: 'Unknown user',
     justNow: 'just now',
   },
+  loadError: {
+    title: 'Could not load this',
+    body: 'Please try again in a moment.',
+    stale: 'Could not load the latest information. This is what was loaded last.',
+  },
   boot: {
     loading: 'Loading',
     title: 'The app could not start',
@@ -45,6 +50,14 @@ const en: Messages = {
     title: 'A new version is available',
     body: 'Reload to start using it.',
     reload: 'Reload',
+  },
+  routeError: {
+    chunkTitle: 'This screen could not be loaded',
+    chunkBody: 'A new version may have been deployed, or the connection dropped for a moment. Please reload.',
+    chunkOffline: 'You seem to be offline. Check the connection, then reload.',
+    body: 'Load the screen again, or go back to the home screen. If it keeps happening, let your administrator know.',
+    reload: 'Load again',
+    detail: 'Details for developers',
   },
   nav: {
     skipToContent: 'Skip to main content',
@@ -72,6 +85,11 @@ const en: Messages = {
     collapse: 'Collapse menu',
     expand: 'Expand menu',
     resetDemo: 'Reset demo data',
+    signOutSaving: 'Saving your drafts to your account…',
+    signOutConfirm: {
+      title: 'Sign out?',
+      body: 'Drafts saved only on this device: {{count}}. Signing out deletes them from this device.',
+    },
     resetDemoDone: 'Demo data has been reset.',
   },
   role: {
@@ -80,6 +98,11 @@ const en: Messages = {
     developer: 'Developer',
     admin: 'Admin',
     operator: 'Operator',
+  },
+  /** Mock-mode notice on every screen (src/app/demo-banner.tsx) */
+  demoBanner: {
+    label: 'Demo mode',
+    detail: 'Data stays in this browser only',
   },
   auth: {
     title: 'Sign in',
@@ -92,7 +115,8 @@ const en: Messages = {
     demoTitle: 'Explore with a demo account',
     demoHint: 'Runs on a mock API. The password is {{password}}.',
     demoAs: 'Sign in as {{role}}',
-    sessionExpired: 'Please sign in again.',
+    sessionExpired: 'Your session expired. Sign in again to return to where you were.',
+    switchedAccount: 'Signed in as {{name}} in another tab, so this tab moved to the home screen.',
     language: 'Language',
     toDark: 'Use dark mode',
     toLight: 'Use light mode',
@@ -212,14 +236,75 @@ const en: Messages = {
   wizard: {
     title: 'New request',
     step: '{{current}}/{{total}}',
-    draftRestored: 'We restored the request you were writing.',
-    discard: 'Start over',
+    draftNotSaved:
+      'There is not enough storage to keep a draft on this device. Please keep this screen open until it is saved to your account.',
+    draftWithoutAttachments:
+      'There is not enough storage on this device, so its copy leaves out the attachments. Your account keeps them.',
+    draftAttachmentsDropped:
+      'Some attachments in your draft could not be restored. Please upload them again: {{names}}',
+    draftAttachmentsMissing:
+      'Attachments in your draft that could not be found: {{count}}. Please upload them again.',
+    loadingDraft: 'Opening your draft…',
+    draftGone:
+      'This draft was deleted or submitted somewhere else. What is on this screen will be saved as a new draft.',
+    notFound: {
+      title: 'Draft not found',
+      body: 'It may have been deleted on another device, or already submitted.',
+      drafts: 'Open saved drafts',
+      newRequest: 'Write a new request',
+    },
+    save: {
+      saving: 'Saving…',
+      saved: 'Saved to your account',
+      local: 'Saved on this device only · uploads once you are online',
+      limited: 'Saved on this device only',
+      unsaved: 'Not saved · keep this screen open',
+      conflict: 'Save conflict',
+    },
+    conflict: {
+      title: 'This draft was saved somewhere else first',
+      body: 'What is on this screen is still here. Choose which to keep.',
+      keepMine: 'Save what is on this screen',
+      loadSaved: 'Load the saved version',
+      keptMine: 'Saving what is on this screen.',
+      loaded: 'Loaded the saved version.',
+    },
+    limit: {
+      body: 'Your saved drafts are full (up to {{max}}). Delete another draft and this one will be saved to your account.',
+      drafts: 'Saved drafts',
+    },
+    discardDraft: {
+      button: 'Delete draft',
+      done: 'Draft deleted.',
+      failed:
+        'The draft in your account could not be deleted. Please delete it again from your saved drafts.',
+    },
+    sendingEarlier: {
+      title: 'Sending the request you submitted earlier…',
+      body: 'You can start a new request once it has gone through.',
+    },
+    missingAttachments: {
+      toast: 'Not submitted. These attachments could not be found: {{names}}',
+      title: 'Some attachments could not be found',
+      body: 'Remove the marked attachments, upload them again, then submit: {{names}}',
+      fix: 'Fix attachments',
+      item: 'Upload again',
+    },
+    leave: {
+      title: 'Leave this request for now?',
+      unsaved:
+        'The draft could not be saved on this device or to your account, so leaving will lose what you have written.',
+      stay: 'Keep writing',
+      go: 'Leave',
+    },
     project: {
+      name: 'Service',
       title: 'Which service is this about?',
       hint: 'This sets the developer in charge and the wiki to use.',
     },
-    type: { title: 'What kind of request is it?' },
+    type: { name: 'Request type', title: 'What kind of request is it?' },
     targets: {
+      name: 'Screens',
       title: 'Which screen or feature?',
       hint: 'Pick as many as apply. If it is not listed, describe it under Other.',
       other: 'Other (not in the list)',
@@ -227,6 +312,7 @@ const en: Messages = {
       nonCode: 'No code is involved, so you can skip this.',
     },
     describe: {
+      name: 'Details',
       title: 'What happens now, and what should happen?',
       titleLabel: 'Request title',
       titlePlaceholder: 'e.g. Show a message after 5 failed sign-ins',
@@ -239,6 +325,7 @@ const en: Messages = {
       desiredPlaceholder: 'e.g. After 5 failures, a message says to try again later.',
     },
     criteria: {
+      name: 'Acceptance criteria',
       title: 'What does done look like?',
       hint: 'Write 1 to 5 checks in the form "when X, Y happens". The AI works to them, and you will check them yourself later.',
       placeholder: 'e.g. When the password is wrong 5 times, "Try again in 10 minutes" is shown',
@@ -251,6 +338,7 @@ const en: Messages = {
       label: 'Acceptance criterion {{n}}',
     },
     checklist: {
+      name: 'Audit findings',
       title: 'List the findings, one item each',
       hint: 'Each item becomes an acceptance criterion, and you check later that each one is fixed.',
       source: 'Where do the findings come from?',
@@ -272,6 +360,7 @@ const en: Messages = {
       count: '{{count}} item(s)',
     },
     extra: {
+      name: 'Other details',
       title: 'Anything else we should know?',
       outOfScope: 'Must not change',
       outOfScopePlaceholder: 'e.g. Do not change the password rules (length, characters).',
@@ -285,12 +374,14 @@ const en: Messages = {
       desiredDateReasonPlaceholder: 'e.g. Customer security audit',
     },
     review: {
+      name: 'Review',
       title: 'Ready to submit?',
       checking: 'The AI is checking for anything missing…',
       clean: 'Nothing seems to be missing.',
       issues: 'Worth a look: {{count}}',
       issuesHint: 'You can submit without changing anything.',
-      checkFailed: 'The check could not run. You can still submit.',
+      checkFailed: 'The check could not run. Run it again, or submit as is.',
+      recheck: 'Check again',
       submit: 'Submit request',
       submitting: 'Submitting…',
       submitted: 'Request received. The AI is writing a feasibility report.',
@@ -321,6 +412,31 @@ const en: Messages = {
       tooLarge: 'Files must be 10 MB or smaller.',
     },
   },
+  drafts: {
+    title: 'Saved drafts',
+    count: '{{count}}/{{max}}',
+    countLabel: 'Saved to your account: {{count}} of {{max}}',
+    untitled: 'Untitled draft',
+    stepLabel: 'Step {{current}} of {{total}}',
+    savedAt: 'Saved {{time}}',
+    localOnly: 'This device only',
+    conflict: 'Conflict',
+    continue: 'Continue',
+    delete: 'Delete {{title}}',
+    showAll: 'Show all {{count}}',
+    showLess: 'Show fewer',
+    seeAll: 'See all saved drafts',
+    notice: 'Saved drafts: {{count}}',
+    noticeAction: 'Continue',
+    deleteConfirm: {
+      title: 'Delete this draft?',
+      body: 'It will be deleted from this device and your account, and cannot be brought back.',
+      bodyLocal: 'It will be deleted from this device and cannot be brought back.',
+      confirm: 'Delete',
+    },
+    deleted: 'Draft deleted.',
+    deleteFailed: 'The draft could not be deleted.',
+  },
   requests: {
     title: 'My requests',
     search: 'Search by title or number',
@@ -348,6 +464,11 @@ const en: Messages = {
     expected: 'Fixed when',
     outOfScope: 'Must not change',
     attachments: 'Attachments',
+    attachment: {
+      newTab: 'opens in a new tab',
+      download: 'downloads',
+      blocked: 'Cannot be opened',
+    },
     desiredDate: 'Wanted by',
     timeline: 'Activity',
     progress: 'Progress',
@@ -562,6 +683,7 @@ const en: Messages = {
     releasedTitle: 'Is it live?',
     releasedBody: 'The requester will be told that it is live.',
     released: 'Marked as released.',
+    needDate: 'Save a release date before marking it as released.',
   },
   dashboard: {
     title: 'Overview',
@@ -651,6 +773,17 @@ const en: Messages = {
     alertHint: 'Spending past this share of the limit is flagged.',
     saved: 'Limits saved.',
     over: 'Past the alert threshold',
+    noLimitHint: '0 means no limit.',
+    error: {
+      amount: 'Enter a whole number of won, 0 or more.',
+      tooLarge: 'Enter {{max}} or less.',
+      overMonthly: 'The per-request limit cannot be higher than the monthly limit.',
+    },
+  },
+  demoStorage: {
+    full: 'Demo data storage is full',
+    fullHint:
+      'Your latest changes may be lost when the page reloads. Make room with “{{action}}” in the account menu (More on a phone).',
   },
   ai: {
     provider: { anthropic: 'Claude', openai: 'GPT' },
@@ -779,6 +912,7 @@ const en: Messages = {
     markAll: 'Mark all as read',
     empty: 'No new notifications.',
     unread: 'unread',
+    markFailed: 'Could not mark as read.',
   },
   settings: {
     title: 'Settings',
@@ -803,8 +937,37 @@ const en: Messages = {
     notificationsSaved: 'Notification settings saved.',
     channelNote: 'The backend sends email and messenger notifications. This screen only stores your choice.',
   },
+  time: {
+    withZone: '{{time}} ({{zone}})',
+    atHq: '{{place}} {{time}}',
+    pair: '{{local}} · {{hq}}',
+    hqCalendar: 'Dates and monthly totals follow head-office time ({{place}}).',
+    hqToday: 'Dates follow the head office ({{place}}), where today is {{date}}.',
+    settings: {
+      title: 'Time zone',
+      hint: 'Times show in the time zone of this device. When its clock differs from the head office ({{place}}), detail screens add head-office time.',
+      mode: 'How to set the time zone',
+      auto: 'Automatic',
+      autoHint: 'This device: {{zone}}',
+      manual: 'Pick one',
+      manualHint: 'Keep one time zone while you travel',
+      zone: 'Time zone',
+      search: 'Find a time zone',
+      searchPlaceholder: 'City or region (e.g. Los Angeles, Pacific)',
+      matches: 'Time zones found: {{count}}',
+      noMatch: 'No time zone matches. Try another name.',
+      showHq: 'Show head-office time too',
+      showHqHint:
+        'When your clock differs from {{place}}, detail screens and the progress log add {{place}} time.',
+      preview: 'Preview',
+      previewList: 'Lists',
+      previewDetail: 'Details',
+      sameAsHq: 'This time zone reads the same clock as the head office, so nothing is added.',
+    },
+  },
   errors: {
     network: 'Cannot reach the server. Check your connection.',
+    timeout: 'The server is taking too long to answer. Please try again in a moment.',
     forbidden: 'You do not have permission to do this.',
     generic: 'Something went wrong. Please try again shortly.',
     http: 'The request could not be completed. (HTTP {{status}})',

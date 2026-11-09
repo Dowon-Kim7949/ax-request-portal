@@ -1,6 +1,6 @@
 import { X } from 'lucide-react'
 import { Dialog } from 'radix-ui'
-import type { ReactNode } from 'react'
+import { useLayoutEffect, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/cn'
 
@@ -17,9 +17,19 @@ interface SheetProps {
    */
   side?: 'bottom' | 'left'
   closeLabel?: string
+  /**
+   * Called as the sheet closes, before focus goes back to what had it when
+   * the sheet opened; `preventDefault()` and move focus yourself when that is
+   * gone (a deleted row, a closed menu).
+   */
+  onCloseAutoFocus?: (event: Event) => void
 }
 
-/** Bottom sheet on phones, dialog on larger screens. Focus-trapped and escape-closable (Radix). */
+/**
+ * Bottom sheet on phones, dialog on larger screens. Focus-trapped and
+ * escape-closable (Radix). Opened from state rather than a Radix trigger, so
+ * the sheet itself remembers what had focus and gives it back on closing.
+ */
 export function Sheet({
   open,
   onOpenChange,
@@ -29,9 +39,24 @@ export function Sheet({
   footer,
   side = 'bottom',
   closeLabel,
+  onCloseAutoFocus,
 }: SheetProps) {
   const { t } = useTranslation()
   closeLabel ??= t('common.close')
+  // Before Radix moves focus into the sheet (its own effect runs after this one).
+  const opener = useRef<HTMLElement | null>(null)
+  useLayoutEffect(() => {
+    if (open) opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  }, [open])
+  const restoreFocus = (event: Event) => {
+    onCloseAutoFocus?.(event)
+    const target = opener.current
+    opener.current = null
+    if (event.defaultPrevented) return
+    // Radix would focus its trigger, and there is none.
+    event.preventDefault()
+    if (target?.isConnected) target.focus()
+  }
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
@@ -44,6 +69,7 @@ export function Sheet({
             side === 'left' && 'inset-y-0 left-0 w-[min(20rem,85vw)] animate-slide-left pt-safe pb-safe',
           )}
           {...(description ? {} : { 'aria-describedby': undefined })}
+          onCloseAutoFocus={restoreFocus}
         >
           {side === 'bottom' ? (
             <div className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-field sm:hidden" aria-hidden />

@@ -2,7 +2,7 @@
  * Regenerates the screenshots in docs/images used by the README.
  * Run: README_IMAGES=1 npx playwright test e2e/readme-images.spec.ts
  */
-import { test, type Page } from '@playwright/test'
+import { test, type Page } from './fixtures.ts'
 import { loginAs, loginAsEnglish } from './helpers.ts'
 
 test.skip(!process.env.README_IMAGES, 'set README_IMAGES=1 to regenerate docs/images')

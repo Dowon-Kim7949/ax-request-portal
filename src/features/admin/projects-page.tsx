@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SwitchRow } from '@/components/ui/controls'
 import { ListSkeleton } from '@/components/ui/feedback'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { Field, Input, Label, Textarea } from '@/components/ui/field'
 import { Sheet } from '@/components/ui/sheet'
 import { PROJECT_CONSTRAINTS_MAX, ProjectIcon as ProjectIconSchema, type Project } from '@/domain/model'
@@ -311,8 +312,16 @@ export default function ProjectsPage() {
           </Button>
         }
       />
+      <RefreshFailed
+        failed={dir.projectsStale}
+        onRetry={dir.retry}
+        retrying={dir.retrying}
+        className="mb-3"
+      />
       {dir.loading ? (
         <ListSkeleton />
+      ) : dir.projectsError ? (
+        <LoadFailed error={dir.projectsError} onRetry={dir.retry} retrying={dir.retrying} />
       ) : (
         <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           {dir.projects.map((p) => (
@@ -338,26 +347,29 @@ export default function ProjectsPage() {
                   <Pencil aria-hidden />
                 </Button>
               </div>
-              <dl className="grid grid-cols-1 gap-1.5 text-sm">
-                <div className="flex gap-2">
-                  <dt className="w-16 shrink-0 text-ink-500">{t('projects.repository')}</dt>
-                  <dd className="flex min-w-0 items-center gap-1 font-mono text-[13px]">
-                    <GitBranch className="size-3.5 shrink-0 text-ink-400" aria-hidden />
-                    <span className="truncate">{p.repository.url.replace(/^https?:\/\//, '')}</span>
-                  </dd>
-                </div>
-                <div className="flex gap-2">
-                  <dt className="w-16 shrink-0 text-ink-500">{t('projects.owners')}</dt>
-                  <dd>{p.ownerIds.map((id) => dir.user(id)?.name ?? id).join(', ')}</dd>
-                </div>
-                <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1 text-[13px] text-ink-500">
+              <div className="flex flex-col gap-1.5 text-sm">
+                <dl className="grid grid-cols-1 gap-1.5">
+                  <div className="flex gap-2">
+                    <dt className="w-16 shrink-0 text-ink-500">{t('projects.repository')}</dt>
+                    <dd className="flex min-w-0 items-center gap-1 font-mono text-[13px]">
+                      <GitBranch className="size-3.5 shrink-0 text-ink-400" aria-hidden />
+                      <span className="truncate">{p.repository.url.replace(/^https?:\/\//, '')}</span>
+                    </dd>
+                  </div>
+                  <div className="flex gap-2">
+                    <dt className="w-16 shrink-0 text-ink-500">{t('projects.owners')}</dt>
+                    <dd>{p.ownerIds.map((id) => dir.user(id)?.name ?? id).join(', ')}</dd>
+                  </div>
+                </dl>
+                {/* Counts, not term–description pairs: outside the <dl>. */}
+                <p className="flex flex-wrap gap-x-3 gap-y-1 pt-1 text-[13px] text-ink-500">
                   <span>
                     {t('projects.wiki', { verified: p.wikiStats.verifiedDocs, total: p.wikiStats.totalDocs })}
                   </span>
                   <span>{t('projects.targets', { count: p.targets.length })}</span>
                   <span>{t('projects.constraints', { count: p.constraints.length })}</span>
-                </div>
-              </dl>
+                </p>
+              </div>
             </li>
           ))}
         </ul>

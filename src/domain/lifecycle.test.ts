@@ -7,6 +7,7 @@ import {
   isAuthorized,
   isTerminal,
   LifecycleError,
+  releaseDateMissing,
   requesterStatusOf,
   scopeRevisionsLeft,
   stageOf,
@@ -185,9 +186,12 @@ describe('applyTransition', () => {
       opts(people.requester),
     )
     expect(r.status).toBe('release_scheduled')
+    // The developer sets the date (PUT /requests/{id}/release) before marking it released.
+    r = { ...r, release: { ...r.release, scheduledDate: '2026-10-30' } }
     r = applyTransition(r, { event: 'markReleased' }, opts(people.owner))
 
     expect(r.status).toBe('done')
+    expect(r.release).toMatchObject({ scheduledDate: '2026-10-30' })
     expect(r.release?.releasedAt).toBeDefined()
     expect(r.timeline.map((t) => `${t.from}>${t.to}`)).toEqual([
       'submitted>reporting',
@@ -363,6 +367,27 @@ describe('applyTransition', () => {
     expect(() =>
       applyTransition(r, { event: 'reviseScope', note: '한 번 더' }, opts(people.requester)),
     ).toThrow(expect.objectContaining({ guard: 'scopeRevisionsUsed' }))
+  })
+
+  it('marks a request released only once a release date is planned', () => {
+    const unscheduled = request('release_scheduled')
+    expect(releaseDateMissing(unscheduled)).toBe(true)
+    expect(() => applyTransition(unscheduled, { event: 'markReleased' }, opts(people.owner))).toThrow(
+      expect.objectContaining({ code: 'guard_failed', guard: 'releaseUnscheduled' }),
+    )
+    // A note alone is not a date.
+    const noted = request('release_scheduled', { release: { note: '야간 배포' } })
+    expect(() => applyTransition(noted, { event: 'markReleased' }, opts(people.owner))).toThrow(
+      expect.objectContaining({ guard: 'releaseUnscheduled' }),
+    )
+
+    const scheduled = request('release_scheduled', {
+      release: { scheduledDate: '2026-10-30', note: '야간 배포' },
+    })
+    expect(releaseDateMissing(scheduled)).toBe(false)
+    const done = applyTransition(scheduled, { event: 'markReleased' }, opts(people.owner))
+    expect(done.status).toBe('done')
+    expect(done.release).toMatchObject({ scheduledDate: '2026-10-30', note: '야간 배포' })
   })
 
   it('does not mutate the input request', () => {

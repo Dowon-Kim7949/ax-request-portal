@@ -2,11 +2,11 @@
 title: Domain Overview
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain_overview
 project: ax-request-portal
-last_updated: 2026-11-04
+last_updated: 2026-11-09
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -21,6 +21,7 @@ evidence:
   - src/domain/lifecycle.ts#symbol:turnOf
   - src/domain/lifecycle.ts#symbol:STAGES
   - src/domain/lifecycle.ts#symbol:TERMINAL_STATUSES
+  - src/domain/lifecycle.ts#symbol:releaseDateMissing
   - src/domain/model.ts#symbol:RequestStatus
   - src/app/router.tsx#symbol:routes
 related:
@@ -76,7 +77,7 @@ Thirteen statuses (`RequestStatus`) and sixteen events (`TRANSITIONS` in `src/do
 - Terminal statuses: `done`, `rejected`, `cancelled`.
 - `turnOf(status)` says whose move it is (requester, developer, ai, none); lists and the home page use it for "your turn".
 - `STAGES` folds the statuses into seven progress stages for the stepper; exceptions stay on the stage where they happened.
-- Guards (`LifecycleError.guard` names the rule): `confirmResult` needs every acceptance criterion passed, `reportIssue` at least one failed; `approveScope` needs a valid choice for every scope question; `reviseScope` is allowed `SCOPE_REVISIONS_MAX` (2) times per request; `runWork` from `review` needs every report assumption confirmed (`uncheckedAssumptions`), and a re-run after `changes_requested` keeps the earlier confirmation.
+- Guards (`LifecycleError.guard` names the rule): `confirmResult` needs every acceptance criterion passed, `reportIssue` at least one failed; `approveScope` needs a valid choice for every scope question; `reviseScope` is allowed `SCOPE_REVISIONS_MAX` (2) times per request; `runWork` from `review` needs every report assumption confirmed (`uncheckedAssumptions`), and a re-run after `changes_requested` keeps the earlier confirmation; `markReleased` needs a saved scheduled date (`releaseUnscheduled`, `releaseDateMissing`).
 - `scope_check` is the requester's turn and sits on the `review` stage; its requester label is `confirm_scope`.
 - Only the twelve human events can be sent by the client (`TransitionCommand`); `ai` and `system` events happen on the server (in the template, on a timer in the mock). The mock chooses `scopeReady` or `reportReady` when the report is done.
 - Preview feedback in `code_review` is not a transition: it is advisory and recorded on the work run (see [Request Detail](04_detail.md)).
@@ -101,15 +102,15 @@ Thirteen statuses (`RequestStatus`) and sixteen events (`TRANSITIONS` in `src/do
 
 ## API Services
 
-All 35 endpoints are declared once in `src/api/contract.ts` and published as `docs/openapi.json`; each domain document lists the ones it uses. Cross-domain cache rule: every mutation that changes a request calls `onRequestChanged`, which replaces that request in the cache and invalidates request lists, the regression queue, notifications, the dashboard and the release schedule. See [Architecture Conventions](../ARCHITECTURE_CONVENTIONS.md).
+All 41 endpoints are declared once in `src/api/contract.ts` and published as `docs/openapi.json`; each domain document lists the ones it uses. Cross-domain cache rule: every mutation that changes a request calls `onRequestChanged`, which replaces that request in the cache and invalidates request lists, the regression queue, notifications, the dashboard and the release schedule. See [Architecture Conventions](../ARCHITECTURE_CONVENTIONS.md).
 
 ## Evidence
 
 - `src/domain/lifecycle.ts#symbol:TRANSITIONS` — the transition table above.
-- `src/domain/lifecycle.ts#symbol:scopeRevisionsLeft`, `src/domain/lifecycle.ts#symbol:uncheckedAssumptions` — the scope and assumption guards.
+- `src/domain/lifecycle.ts#symbol:scopeRevisionsLeft`, `src/domain/lifecycle.ts#symbol:uncheckedAssumptions`, `src/domain/lifecycle.ts#symbol:releaseDateMissing` — the scope, assumption and release guards.
 - `src/domain/lifecycle.ts#symbol:turnOf`, `src/domain/lifecycle.ts#symbol:STAGES`, `src/domain/lifecycle.ts#symbol:TERMINAL_STATUSES` — turn, stage and terminal rules.
 - `src/domain/model.ts#symbol:RequestStatus` — the thirteen statuses.
-- `src/app/router.tsx#symbol:routes` — routes and permissions.
+- `src/app/router.tsx#symbol:routes` — routes and their `handle.permission` (all under one pathless root route, see [Auth](02_auth.md)).
 
 ## Review Notes
 

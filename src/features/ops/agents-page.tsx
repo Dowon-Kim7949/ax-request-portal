@@ -6,8 +6,9 @@ import { Plus, Trash2 } from 'lucide-react'
 import { useId, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-import { ApiError } from '@/api/client'
 import type { AiSettingsInput } from '@/api/contract'
+import { errorText } from '@/api/error-text'
+import { refreshOf } from '@/api/refresh'
 import {
   useAiPricing,
   useAiSettings,
@@ -23,7 +24,9 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select } from '@/components/ui/controls'
-import { ErrorState, Skeleton } from '@/components/ui/feedback'
+import { DateTimeText } from '@/components/ui/date-time'
+import { Skeleton } from '@/components/ui/feedback'
+import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { Field, Input } from '@/components/ui/field'
 import { Sheet } from '@/components/ui/sheet'
 import {
@@ -37,9 +40,7 @@ import {
   type AiSettings,
   type AiTask,
 } from '@/domain/ai'
-import { formatDateTime, formatUsd } from '@/lib/format'
-
-const errorText = (e: unknown, fallback: string) => (e instanceof ApiError ? e.message : fallback)
+import { formatUsd } from '@/lib/format'
 
 const keyOf = (sel: AiSelection) => `${sel.provider}/${sel.model}`
 
@@ -112,9 +113,12 @@ function Providers({ settings }: { settings: AiSettings }) {
                   {c?.connected && c.keyHint ? (
                     <p className="text-[13px] text-ink-500 tabular-nums">
                       {t('agents.keyHint', { hint: c.keyHint })}
-                      {c.updatedAt
-                        ? ` · ${t('agents.keyUpdated', { time: formatDateTime(c.updatedAt) })}`
-                        : ''}
+                      {c.updatedAt ? (
+                        <DateTimeText
+                          iso={c.updatedAt}
+                          sentence={(time) => ` · ${t('agents.keyUpdated', { time })}`}
+                        />
+                      ) : null}
                     </p>
                   ) : null}
                 </div>
@@ -490,21 +494,13 @@ export default function AgentsPage() {
 
   const body = () => {
     if (settings.isPending || pricing.isPending) return <Skeleton className="h-96" />
-    if (settings.isError || pricing.isError || !settings.data || !pricing.data) {
+    if (settings.isLoadingError || pricing.isLoadingError || !settings.data || !pricing.data) {
+      const failed = [settings, pricing].filter((q) => q.isError)
       return (
-        <ErrorState
-          title={t('common.errorTitle')}
-          action={
-            <Button
-              variant="secondary"
-              onClick={() => {
-                void settings.refetch()
-                void pricing.refetch()
-              }}
-            >
-              {t('common.retry')}
-            </Button>
-          }
+        <LoadFailed
+          error={failed[0]?.error}
+          onRetry={() => failed.forEach((q) => void q.refetch())}
+          retrying={failed.some((q) => q.isFetching)}
         />
       )
     }
@@ -519,6 +515,7 @@ export default function AgentsPage() {
   return (
     <>
       <PageHeader title={t('agents.title')} description={t('agents.subtitle')} />
+      <RefreshFailed {...refreshOf(settings, pricing)} className="mb-3" />
       {body()}
     </>
   )
