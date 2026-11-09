@@ -68,6 +68,23 @@ describe('saved drafts on the home screen', () => {
     await waitFor(() => expect(qc.getQueryState(keys.drafts())?.status).toBe('success'))
     expect(screen.queryByRole('region', { name: '임시 저장' })).toBeNull()
   })
+
+  it('shows a developer their drafts under their queue, and nothing when there are none', async () => {
+    await signInAs('u-choi') // a developer: files requests, but sees the review queue at home
+    const qc = testQueryClient()
+    const { unmount } = renderHome(qc)
+    expect(await screen.findByRole('region', { name: /내 차례인 요청/ })).toBeInTheDocument()
+    await waitFor(() => expect(qc.getQueryState(keys.drafts())?.status).toBe('success'))
+    expect(screen.queryByRole('region', { name: '임시 저장' })).toBeNull()
+    unmount()
+
+    await call(api.createDraft, { body: { step: 1, content: { title: '배포 알림 문구 정리' } } })
+    renderHome()
+    const drafts = await screen.findByRole('region', { name: '임시 저장' })
+    expect(await within(drafts).findByText('배포 알림 문구 정리')).toBeInTheDocument()
+    for (const draft of await call(api.listDrafts)) await call(api.deleteDraft, { params: { id: draft.id } })
+    clearDrafts('u-choi')
+  })
 })
 
 describe('home screen when loading fails', () => {

@@ -308,7 +308,13 @@ export default function HomePage() {
         </Link>
       ) : null}
 
-      {reviewer ? <DeveloperSection /> : null}
+      {reviewer ? (
+        <>
+          <DeveloperSection />
+          {/* Reviewers file requests too: their drafts show here (only when there are any). */}
+          <DraftsSection variant="home" />
+        </>
+      ) : null}
       {can('request:create') && !reviewer ? <RequesterSection /> : null}
       {admin ? <AdminSection /> : null}
       {ops ? <OpsSection /> : null}
