@@ -266,6 +266,8 @@ const en: Messages = {
       body: 'What is on this screen is still here. Choose which to keep.',
       keepMine: 'Save what is on this screen',
       loadSaved: 'Load the saved version',
+      keptMine: 'Saving what is on this screen.',
+      loaded: 'Loaded the saved version.',
     },
     limit: {
       body: 'Your saved drafts are full (up to {{max}}). Delete another draft and this one will be saved to your account.',

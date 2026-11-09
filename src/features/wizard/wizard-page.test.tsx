@@ -3,6 +3,7 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router'
+import { toast } from 'sonner'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import '@/i18n'
 import { call } from '@/api/client'
@@ -359,27 +360,55 @@ describe('the draft in the account', () => {
   })
 
   describe('saved elsewhere meanwhile', () => {
-    async function openConflict() {
+    async function openConflict(
+      saved: { values: WizardValues; step: number } = {
+        values: { ...READY, title: '다른 기기에서 고친 제목' },
+        step: 3,
+      },
+      step = 3,
+    ) {
       const draft = await saveToAccount(READY)
       await call(api.updateDraft, {
         params: { id: draft.id },
-        body: {
-          baseVersion: 1,
-          step: 3,
-          content: toDraftContent({ ...READY, title: '다른 기기에서 고친 제목' }),
-        },
+        body: { baseVersion: 1, step: saved.step, content: toDraftContent(saved.values) },
       })
       keepLocal(
         { ...READY, title: '이 기기에서 고친 제목' },
-        { localId: draft.id, draftId: draft.id, baseVersion: 1 },
+        { localId: draft.id, draftId: draft.id, baseVersion: 1, step },
       )
-      const router = renderWizard(`/requests/new?draft=${draft.id}&step=3`)
+      const router = renderWizard(`/requests/new?draft=${draft.id}&step=${step}`)
       expect(await screen.findByText('다른 곳에서 이 초안이 먼저 저장됐어요')).toBeInTheDocument()
       // Nothing on screen is lost while the person decides.
-      expect(screen.getByLabelText('요청 제목')).toHaveValue('이 기기에서 고친 제목')
+      if (step === 3) expect(screen.getByLabelText('요청 제목')).toHaveValue('이 기기에서 고친 제목')
       expect(screen.getByText('저장 충돌', STATUS)).toBeInTheDocument()
       return { draft, router }
     }
+
+    it('loading the saved version goes back to the first step it leaves incomplete', async () => {
+      const { router } = await openConflict({ values: { ...READY, title: '' }, step: 6 }, 6)
+      expect(screen.getByRole('heading', { name: '이대로 제출할까요?' })).toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: '저장된 내용 불러오기' }))
+      // Not left on the review step with an empty title and the earlier check's advice.
+      expect(
+        await screen.findByRole('heading', { name: '지금은 어떻고, 어떻게 바뀌면 좋을까요?' }),
+      ).toBeInTheDocument()
+      expect(new URLSearchParams(router.state.location.search).get('step')).toBe('3')
+      expect(screen.getByLabelText('요청 제목')).toHaveValue('')
+    })
+
+    it('and checks it again when it is complete and the person is on the review step', async () => {
+      let checks = 0
+      t.server.use(
+        http.post('*/api/requests/precheck', () => {
+          checks += 1
+        }),
+      )
+      await openConflict({ values: { ...READY, title: '다른 기기에서 고친 제목' }, step: 6 }, 6)
+      await waitFor(() => expect(checks).toBe(1))
+      await userEvent.click(screen.getByRole('button', { name: '저장된 내용 불러오기' }))
+      await waitFor(() => expect(checks).toBe(2))
+      expect(screen.getByRole('heading', { name: '이대로 제출할까요?' })).toBeInTheDocument()
+    })
 
     it('tells a screen reader about it from the heading that takes focus as the draft opens', async () => {
       await openConflict()
@@ -396,7 +425,11 @@ describe('the draft in the account', () => {
 
     it('keeps what is on screen, saved over the newer version', async () => {
       const { draft } = await openConflict()
+      const success = vi.spyOn(toast, 'success')
       await userEvent.click(screen.getByRole('button', { name: '이 화면 내용으로 저장' }))
+      // The button goes with the notice: focus moves to the step's heading, and the choice is told.
+      await waitFor(() => expect(screen.getByRole('heading', { level: 1 })).toHaveFocus())
+      expect(success).toHaveBeenCalledWith('이 화면 내용으로 저장할게요.')
       await waitFor(async () =>
         expect(await call(api.getDraft, { params: { id: draft.id } })).toMatchObject({
           title: '이 기기에서 고친 제목',
@@ -409,8 +442,11 @@ describe('the draft in the account', () => {
 
     it('or loads the saved version in place of what is on screen', async () => {
       const { draft } = await openConflict()
+      const success = vi.spyOn(toast, 'success')
       await userEvent.click(screen.getByRole('button', { name: '저장된 내용 불러오기' }))
       await waitFor(() => expect(screen.getByLabelText('요청 제목')).toHaveValue('다른 기기에서 고친 제목'))
+      expect(screen.getByRole('heading', { level: 1 })).toHaveFocus()
+      expect(success).toHaveBeenCalledWith('저장된 내용을 불러왔어요.')
       expect(screen.queryByText('다른 곳에서 이 초안이 먼저 저장됐어요')).toBeNull()
       expect(getLocalDraft(USER, draft.id)).toBeUndefined()
       expect(await call(api.getDraft, { params: { id: draft.id } })).toMatchObject({ version: 2 })

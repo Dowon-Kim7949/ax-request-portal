@@ -566,6 +566,24 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
     setOnServer(false)
     toast.info(t('wizard.draftGone'))
     void engine.sync('manual', key)
+    focusTitle()
+  }
+  /**
+   * Chosen: the notice and the button that was pressed go, so focus moves to
+   * the step's heading (not the page), and what happened is said.
+   */
+  const resolved = (kept: 'keep' | 'load') => {
+    focusTitle()
+    toast.success(t(kept === 'keep' ? 'wizard.conflict.keptMine' : 'wizard.conflict.loaded'))
+  }
+  /**
+   * The form holds other words now: go to the step they were saved on, but no
+   * further than they are complete, and check them again on the review step.
+   */
+  const followWords = (values: WizardValues, savedStep: number) => {
+    const target = Math.min(savedStep, firstInvalidStep(values))
+    if (target !== stepRef.current) goTo(target, true)
+    else if (STEPS[target]?.key === 'review') runPrecheck()
   }
   const keepMine = async () => {
     if (tabConflict) {
@@ -575,7 +593,7 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
       const key = keyRef.current
       if (key && !getLocalDraft(userId, key)?.conflict) {
         void engine.sync('manual', key)
-        return
+        return resolved('keep')
       }
     }
     const key = keyRef.current
@@ -592,6 +610,7 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
       })
       serverRef.current = { id: latest.id, version: latest.version, baseline: '' }
       void engine.sync('manual', key)
+      resolved('keep')
     } catch (error) {
       toast.error(errorText(error, t('errors.generic')))
     } finally {
@@ -603,7 +622,10 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
       // The other tab's words, while this device still holds them; once sent, the account's.
       const entry = keyRef.current ? getLocalDraft(userId, keyRef.current) : undefined
       if (entry) take(entry)
-      if (entry && !entry.conflict) return
+      if (entry && !entry.conflict) {
+        followWords(form.getValues(), entry.step)
+        return resolved('load')
+      }
       setTabConflict(false)
     }
     const key = keyRef.current
@@ -619,10 +641,12 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
       serverRef.current = {
         id: latest.id,
         version: latest.version,
-        baseline: baselineOf(stepRef.current, restored.values),
+        baseline: baselineOf(latest.step, restored.values),
       }
       setOnServer(true)
       form.reset(restored.values)
+      followWords(restored.values, latest.step)
+      resolved('load')
       if (restored.missingAttachments) {
         toast.warning(t('wizard.draftAttachmentsMissing', { count: restored.missingAttachments }))
       }
@@ -664,6 +688,9 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
     window.scrollTo({ top: 0 })
     titleRef.current?.querySelector<HTMLElement>('[data-step-title]')?.focus({ preventScroll: true })
   }, [step])
+  function focusTitle() {
+    titleRef.current?.querySelector<HTMLElement>('[data-step-title]')?.focus()
+  }
 
   /* ---- submission check on the review step ---- */
   const precheck = usePrecheck()
@@ -726,6 +753,13 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
   const submitting = preparing || create.isPending
   const submit = async () => {
     if (submitting) return
+    // Words loaded from elsewhere may leave an earlier step incomplete: finish that first.
+    const incomplete = firstInvalidStep(form.getValues())
+    if (incomplete < LAST) {
+      goTo(incomplete)
+      void form.trigger([...STEPS[incomplete]!.fields] as Array<keyof WizardValues>)
+      return
+    }
     setPreparing(true)
     draftSaver.flush()
     let key = keyRef.current
