@@ -338,6 +338,7 @@ const en: Messages = {
       label: 'Acceptance criterion {{n}}',
     },
     checklist: {
+      name: 'Audit findings',
       title: 'List the findings, one item each',
       hint: 'Each item becomes an acceptance criterion, and you check later that each one is fixed.',
       source: 'Where do the findings come from?',

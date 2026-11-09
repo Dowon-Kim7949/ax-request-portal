@@ -153,6 +153,19 @@ describe('the saved drafts on the requests page', () => {
     expect(within(section).getByText('계정에 저장된 초안 2개, 최대 20개')).toBeInTheDocument()
   })
 
+  it('names the criteria step after the request type, as the wizard does', async () => {
+    await saveToAccount({ title: '보안 점검 지적 조치', type: 'checklist' }, 4)
+    keepLocal('local-b', { title: '현장평가 후속', type: 'checklist' })
+    renderDrafts('page')
+
+    const section = await region()
+    await waitFor(() => expect(items(section)).toHaveLength(2))
+    for (const item of items(section)) {
+      expect(item).toHaveTextContent('지적 항목')
+      expect(item).not.toHaveTextContent('완료 기준')
+    }
+  })
+
   it('shows this device’s newer words for a draft in the account, and a conflict as one', async () => {
     const saved = await saveToAccount({ title: '예전 제목' })
     keepLocal(saved.id, { title: '고친 제목' }, { draftId: saved.id, baseVersion: 1, conflict: true })

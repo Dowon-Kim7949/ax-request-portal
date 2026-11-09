@@ -23,6 +23,8 @@ export interface DraftRow {
   /** Its title without surrounding spaces; empty when there is none */
   title: string
   projectId?: string
+  /** Request type, when chosen: the criteria step is named after it ("findings" for a checklist) */
+  type?: SavedDraftSummary['type']
   /** Wizard step the person was last on, within the wizard's steps */
   step: number
   updatedAt: string
@@ -62,6 +64,7 @@ export function localRow(entry: LocalDraft, send: SendState): DraftRow | null {
     id: entry.localId,
     title: (content.title ?? '').trim(),
     ...(content.projectId ? { projectId: content.projectId } : {}),
+    ...(content.type ? { type: content.type } : {}),
     step: clampStep(entry.step),
     updatedAt: entry.updatedAt,
     state,
@@ -91,6 +94,7 @@ export function mergeDraftRows(
       id: d.id,
       title: d.title,
       ...(d.projectId ? { projectId: d.projectId } : {}),
+      ...(d.type ? { type: d.type } : {}),
       step: clampStep(d.step),
       updatedAt: d.updatedAt,
       state: 'saved',

@@ -251,6 +251,11 @@ function DraftItem({ row, onDelete }: { row: DraftRow; onDelete: (title: string)
   const title = row.title || t('drafts.untitled')
   const project = dir.project(row.projectId)
   const step = STEPS[row.step] ?? STEPS[0]
+  // A checklist request's criteria step asks for the audit findings, and is named so on screen.
+  const stepName =
+    step.key === 'criteria' && row.type === 'checklist'
+      ? t('wizard.checklist.name')
+      : t(`wizard.${step.key}.name`)
   /** When it was last written; shown in one of two places, by screen width (the other is display:none). */
   const saved = (className: string) => (
     <DateTimeText
@@ -289,7 +294,7 @@ function DraftItem({ row, onDelete }: { row: DraftRow; onDelete: (title: string)
             </span>
           </span>
           <span aria-hidden>·</span>
-          <span>{t(`wizard.${step.key}.name`)}</span>
+          <span>{stepName}</span>
           {project ? (
             <>
               <span aria-hidden>·</span>
