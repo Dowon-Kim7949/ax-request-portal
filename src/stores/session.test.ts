@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { User } from '../domain/model'
-import { draftsKey, legacyDraftKey } from './draft'
+import { draftCountKey, draftsKey, legacyDraftKey } from './draft'
 import { SESSION_STORAGE_KEY, sessionChangeFrom, useSession } from './session'
 
 const kim: User = {
@@ -93,17 +93,20 @@ describe('the persisted session', () => {
     const fill = () => {
       localStorage.setItem(draftsKey(kim.id), '{"v":1,"entries":{}}')
       localStorage.setItem(legacyDraftKey(kim.id), '{"title":"검색"}')
+      localStorage.setItem(draftCountKey(kim.id), '2')
     }
     fill()
     useSession.getState().setSession({ token: 'token-1', user: kim })
     useSession.getState().clear('expired')
     expect(localStorage.getItem(draftsKey(kim.id))).not.toBeNull()
     expect(localStorage.getItem(legacyDraftKey(kim.id))).not.toBeNull()
+    expect(localStorage.getItem(draftCountKey(kim.id))).toBe('2')
 
     useSession.getState().setSession({ token: 'token-2', user: kim })
     useSession.getState().clear('signedOut')
     expect(localStorage.getItem(draftsKey(kim.id))).toBeNull()
     expect(localStorage.getItem(legacyDraftKey(kim.id))).toBeNull()
+    expect(localStorage.getItem(draftCountKey(kim.id))).toBeNull()
   })
 
   it('still deletes them when the sign-out comes right after an expiry', () => {

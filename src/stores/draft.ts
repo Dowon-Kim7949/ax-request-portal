@@ -20,6 +20,13 @@ export const legacyDraftKey = (userId: string) => `ax-request-portal:draft:${use
 
 const DRAFTS_KEY_PREFIX = 'ax-request-portal:drafts:'
 
+/**
+ * localStorage key of how many drafts `userId` had when a list last showed
+ * them: a list opened before the account answers holds that much room, so
+ * nothing jumps when the drafts arrive. Only a number; deleted with the drafts.
+ */
+export const draftCountKey = (userId: string) => `ax-request-portal:drafts-seen:${userId}`
+
 /** Id of a draft the server has not seen yet. A server id never starts with it. */
 export const LOCAL_ID_PREFIX = 'local-'
 export const isLocalId = (id: string) => id.startsWith(LOCAL_ID_PREFIX)
@@ -331,10 +338,30 @@ export function clearDrafts(userId: string): void {
   try {
     localStorage.removeItem(draftsKey(userId))
     localStorage.removeItem(legacyDraftKey(userId))
+    localStorage.removeItem(draftCountKey(userId))
   } catch {
     // Storage blocked: nothing was kept there.
   }
   notify(userId)
+}
+
+/** How many drafts `userId` had when a list last showed them; 0 when unknown. */
+export function lastDraftCount(userId: string): number {
+  try {
+    const count = Number(localStorage.getItem(draftCountKey(userId)))
+    return Number.isInteger(count) && count > 0 ? count : 0
+  } catch {
+    return 0
+  }
+}
+
+export function rememberDraftCount(userId: string, count: number): void {
+  try {
+    if (count > 0) localStorage.setItem(draftCountKey(userId), String(count))
+    else localStorage.removeItem(draftCountKey(userId))
+  } catch {
+    // Storage blocked or full: the next list just shows up when it is read.
+  }
 }
 
 /* ---------- the draft from before drafts were saved to the account ---------- */

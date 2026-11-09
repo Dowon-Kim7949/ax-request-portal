@@ -5,22 +5,24 @@
  * a one-line pointer on a new, empty request.
  */
 import { ChevronDown, ChevronRight, FileClock, Smartphone, Trash2, TriangleAlert } from 'lucide-react'
-import { useId, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useLocation } from 'react-router'
 import { toast } from 'sonner'
 import { errorText } from '@/api/error-text'
 import { refreshOf } from '@/api/refresh'
-import { useCan, useDirectory } from '@/app/hooks'
+import { useCan, useCurrentUser, useDirectory } from '@/app/hooks'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DateTimeText } from '@/components/ui/date-time'
+import { Skeleton } from '@/components/ui/feedback'
 import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { Sheet } from '@/components/ui/sheet'
 import { appConfig } from '@/config/app.config'
 import { DRAFTS_LIST_PATH, DRAFTS_SECTION_ID as SECTION_ID } from '@/features/wizard/draft-status'
 import { STEPS } from '@/features/wizard/schema'
 import { cn } from '@/lib/cn'
+import { lastDraftCount, rememberDraftCount } from '@/stores/draft'
 import { useDiscardDraft, useDraftRows } from './hooks'
 import { continuePath, DRAFTS_SHOWN, type DraftRow } from './rows'
 
@@ -33,7 +35,8 @@ interface DraftsSectionProps {
 /**
  * The "saved drafts" section, for people who may file requests. Shown only
  * when there is a draft (or the account's could not be read, which is not
- * "none"); while the account's are read, only this device's show.
+ * "none"); while the account's are read, only this device's show, or, when
+ * there are none, room for as many as the list held last time.
  */
 export function DraftsSection(props: DraftsSectionProps) {
   const can = useCan()
@@ -42,6 +45,7 @@ export function DraftsSection(props: DraftsSectionProps) {
 
 function Drafts({ variant, className }: DraftsSectionProps) {
   const { t } = useTranslation()
+  const user = useCurrentUser()
   const { rows, query, saved } = useDraftRows()
   const headingId = useId()
   const listId = useId()
@@ -49,7 +53,13 @@ function Drafts({ variant, className }: DraftsSectionProps) {
   const headingRef = useRef<HTMLHeadingElement>(null)
   const [expanded, setExpanded] = useState(false)
   const failed = query.isError && !query.data
-  const shown = rows.length > 0 || failed
+  // Read once: what the list held last time, for the room it takes while the account is read.
+  const [expected] = useState(() => lastDraftCount(user.id))
+  const holding = query.isPending && !rows.length && expected > 0
+  useEffect(() => {
+    if (query.data) rememberDraftCount(user.id, rows.length)
+  }, [query.data, rows.length, user.id])
+  const shown = rows.length > 0 || failed || holding
   const visible = variant === 'page' && expanded ? rows : rows.slice(0, DRAFTS_SHOWN)
   const more = variant === 'page' && rows.length > DRAFTS_SHOWN
 
@@ -128,6 +138,12 @@ function Drafts({ variant, className }: DraftsSectionProps) {
               retrying={query.isFetching}
             />
           ) : null}
+          {holding ? (
+            <DraftsPlaceholder
+              rows={Math.min(expected, DRAFTS_SHOWN)}
+              more={variant === 'page' && expected > DRAFTS_SHOWN}
+            />
+          ) : null}
           {rows.length ? (
             <div className="overflow-hidden rounded-(--radius-card) bg-surface ring-1 ring-line">
               <ul id={listId} className="divide-y divide-line">
@@ -198,6 +214,33 @@ function Drafts({ variant, className }: DraftsSectionProps) {
         }
       />
     </>
+  )
+}
+
+/** The list's room while the account's drafts are read: rows shaped like DraftItem's, and the "show all" bar. */
+function DraftsPlaceholder({ rows, more }: { rows: number; more: boolean }) {
+  return (
+    <div
+      className="overflow-hidden rounded-(--radius-card) bg-surface ring-1 ring-line"
+      data-testid="drafts-placeholder"
+      aria-hidden
+    >
+      <div className="divide-y divide-line">
+        {Array.from({ length: rows }, (_, i) => (
+          <div
+            key={i}
+            className="flex flex-col gap-2 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-4 sm:px-5"
+          >
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <Skeleton className="h-5 w-3/5" />
+              <Skeleton className="h-4 w-2/5" />
+            </div>
+            <Skeleton className="h-11 w-full sm:w-36" />
+          </div>
+        ))}
+      </div>
+      {more ? <div className="h-11 border-t border-line" /> : null}
+    </div>
   )
 }
 

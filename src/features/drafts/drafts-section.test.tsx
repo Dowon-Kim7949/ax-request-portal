@@ -1,5 +1,5 @@
 import { QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router'
@@ -60,10 +60,61 @@ function renderDrafts(variant: 'page' | 'home', qc = testQueryClient()) {
 }
 
 const region = () => screen.findByRole('region', { name: '임시 저장' })
+
+/** A promise the test opens when a held-back answer may go out. */
+function gate() {
+  let open!: () => void
+  const closed = new Promise<void>((resolve) => (open = resolve))
+  return { closed, open }
+}
 // Hidden too: an open sheet hides the page behind it from the accessibility tree.
 const items = (section: HTMLElement) => within(section).getAllByRole('listitem', { hidden: true })
 
 describe('the saved drafts on the requests page', () => {
+  it('holds as much room as the list took last time while the account’s drafts are read', async () => {
+    await saveToAccount({ title: '하나' })
+    await saveToAccount({ title: '둘' })
+    const first = render(
+      <QueryClientProvider client={testQueryClient()}>
+        <MemoryRouter initialEntries={['/requests']}>
+          <DraftsSection variant="page" />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    )
+    await waitFor(async () => expect(items(await region())).toHaveLength(2))
+    first.unmount()
+
+    // Opened again, fresh: the answer is slow.
+    const answer = gate()
+    t.server.use(
+      http.get('*/api/drafts', async () => {
+        await answer.closed
+      }),
+    )
+    renderDrafts('page')
+    const section = await region()
+    const placeholder = within(section).getByTestId('drafts-placeholder')
+    expect(placeholder.children[0]!.children).toHaveLength(2)
+    expect(within(section).queryAllByRole('listitem')).toHaveLength(0)
+
+    answer.open()
+    await waitFor(() => expect(items(section)).toHaveLength(2))
+    expect(within(section).queryByTestId('drafts-placeholder')).toBeNull()
+  })
+
+  it('holds no room for someone whose list was empty last time', async () => {
+    const answer = gate()
+    t.server.use(
+      http.get('*/api/drafts', async () => {
+        await answer.closed
+      }),
+    )
+    renderDrafts('page')
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)))
+    expect(screen.queryByRole('region')).toBeNull()
+    answer.open()
+  })
+
   it('shows nothing when there are no drafts', async () => {
     const qc = renderDrafts('page')
     await waitFor(() => expect(qc.getQueryState(keys.drafts())?.status).toBe('success'))
