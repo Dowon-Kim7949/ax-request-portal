@@ -3,12 +3,23 @@ import { renderHook, waitFor } from '@testing-library/react'
 import { delay, http, HttpResponse } from 'msw'
 import type { ReactNode } from 'react'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CriterionCheck, Notification, WorkRequest } from '@/domain/model'
+import type { CriterionCheck, Notification, RequestDraft, WorkRequest } from '@/domain/model'
 import { createTestApi } from '@/test/mock-api'
 import { signInAs, testQueryClient } from '@/test/session'
-import { call } from './client'
-import { api } from './contract'
-import { keys, useMarkNotificationRead, useSaveVerification, useUpdateUser } from './queries'
+import { ApiError, call } from './client'
+import { api, type SavedDraft, type SavedDraftSummary } from './contract'
+import {
+  keys,
+  useCreateDraft,
+  useCreateRequest,
+  useDeleteDraft,
+  useDraft,
+  useDrafts,
+  useMarkNotificationRead,
+  useSaveVerification,
+  useUpdateDraft,
+  useUpdateUser,
+} from './queries'
 
 const t = createTestApi()
 const IN_VERIFICATION = 1021 // the requester's request waiting for the acceptance check
@@ -139,5 +150,139 @@ describe('marking a notification read', () => {
     expect(list?.[0]?.readAt).toBeUndefined()
     expect(list?.[1]?.readAt).toBe('2026-11-01T00:00:00.000Z')
     expect(onError.mock.calls[0]?.[0]).toMatchObject({ status: 500, message: 'try later' })
+  })
+})
+
+describe('saved drafts', () => {
+  /** The list as the screen last read it, so a test can see it change in the cache. */
+  async function primeList(qc: QueryClient): Promise<SavedDraftSummary[]> {
+    const list = await call(api.listDrafts)
+    qc.setQueryData(keys.drafts(), list)
+    return list
+  }
+
+  it('reads the list and one draft under their own keys', async () => {
+    const saved = await call(api.createDraft, { body: { step: 2, content: { title: '목록과 상세' } } })
+    const { wrapper } = setup()
+    const list = renderHook(() => useDrafts(), { wrapper })
+    const one = renderHook(() => useDraft(saved.id), { wrapper })
+    await waitFor(() => expect(one.result.current.data).toEqual(saved))
+    await waitFor(() => expect(list.result.current.data?.[0]?.id).toBe(saved.id))
+    // Without an id (a draft kept on this device only) nothing is asked.
+    const none = renderHook(() => useDraft(undefined), { wrapper })
+    expect(none.result.current.fetchStatus).toBe('idle')
+    await call(api.deleteDraft, { params: { id: saved.id } })
+  })
+
+  it('keeps a new draft as the open copy and reads the list again', async () => {
+    const { qc, wrapper } = setup()
+    await primeList(qc)
+    const { result } = renderHook(() => useCreateDraft(), { wrapper })
+    result.current.mutate({ step: 1, content: { title: '새 초안' } })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    const saved = result.current.data!
+    expect(qc.getQueryData<SavedDraft>(keys.draft(saved.id))).toEqual(saved)
+    expect(qc.getQueryState(keys.drafts())?.isInvalidated).toBe(true)
+    await call(api.deleteDraft, { params: { id: saved.id } })
+  })
+
+  it('sends the saves of one draft in order, each on the version before it', async () => {
+    const { id } = await call(api.createDraft, { body: { step: 0, content: {} } })
+    const { qc, wrapper } = setup()
+    await primeList(qc)
+
+    // The first save is slow; sent side by side, the second would arrive first and be refused.
+    const received: number[] = []
+    t.server.use(
+      http.put('*/api/drafts/:id', async ({ request }) => {
+        const body = (await request.clone().json()) as { baseVersion: number }
+        received.push(body.baseVersion)
+        if (received.length === 1) await delay(50)
+      }),
+    )
+    const { result } = renderHook(() => useUpdateDraft(id), { wrapper })
+    result.current.mutate({ baseVersion: 1, step: 1, content: { title: '하나' } })
+    result.current.mutate({ baseVersion: 2, step: 2, content: { title: '둘' } })
+
+    await waitFor(() => expect(qc.isMutating()).toBe(0))
+    expect(received).toEqual([1, 2])
+    expect(result.current.error).toBeNull()
+    expect(qc.getQueryData<SavedDraft>(keys.draft(id))).toMatchObject({ version: 3, title: '둘' })
+    expect(qc.getQueryState(keys.drafts())?.isInvalidated).toBe(true)
+    await call(api.deleteDraft, { params: { id } })
+  })
+
+  it('reads the list again when a save is refused as a conflict', async () => {
+    const { id } = await call(api.createDraft, { body: { step: 0, content: {} } })
+    await call(api.updateDraft, { params: { id }, body: { baseVersion: 1, step: 0, content: {} } })
+    const { qc, wrapper } = setup()
+    await primeList(qc)
+
+    const { result } = renderHook(() => useUpdateDraft(id), { wrapper })
+    result.current.mutate({ baseVersion: 1, step: 3, content: { title: '늦은 저장' } })
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect(result.current.error).toBeInstanceOf(ApiError)
+    expect(result.current.error).toMatchObject({ status: 409, code: 'conflict' })
+    expect(qc.getQueryState(keys.drafts())?.isInvalidated).toBe(true)
+    await call(api.deleteDraft, { params: { id } })
+  })
+
+  it('takes a draft that is already gone as deleted, and drops it from the list at once', async () => {
+    const saved = await call(api.createDraft, { body: { step: 0, content: { title: '지울 초안' } } })
+    const { qc, wrapper } = setup()
+    expect((await primeList(qc)).map((d) => d.id)).toContain(saved.id)
+    qc.setQueryData(keys.draft(saved.id), saved)
+
+    const { result } = renderHook(() => useDeleteDraft(), { wrapper })
+    result.current.mutate(saved.id)
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(qc.getQueryData<SavedDraftSummary[]>(keys.drafts())?.map((d) => d.id)).not.toContain(saved.id)
+    expect(qc.getQueryData(keys.draft(saved.id))).toBeUndefined()
+
+    // Deleted on another device meanwhile: still a success.
+    result.current.mutate(saved.id)
+    await waitFor(() => expect(result.current.isPending).toBe(false))
+    expect(result.current.isSuccess).toBe(true)
+  })
+
+  it('still reports a delete that failed for another reason', async () => {
+    const { wrapper } = setup()
+    t.server.use(
+      http.delete('*/api/drafts/:id', () =>
+        HttpResponse.json({ code: 'internal', message: 'try later' }, { status: 500 }),
+      ),
+    )
+    const { result } = renderHook(() => useDeleteDraft(), { wrapper })
+    result.current.mutate('draft-any')
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    expect(result.current.error).toMatchObject({ status: 500 })
+  })
+
+  it('submits with the draft it was written in, which then leaves the list', async () => {
+    const saved = await call(api.createDraft, { body: { step: 6, content: { title: '제출할 초안' } } })
+    const { qc, wrapper } = setup()
+    await primeList(qc)
+    qc.setQueryData(keys.draft(saved.id), saved)
+
+    const body: RequestDraft = {
+      projectId: 'p-portal',
+      type: 'change',
+      title: '공지사항 검색 추가',
+      targetIds: ['t-notice'],
+      currentBehavior: '',
+      desiredBehavior: '제목으로 공지를 검색한다',
+      acceptanceCriteria: [{ text: '검색어를 입력하면 제목에 그 단어가 있는 공지만 보인다' }],
+      attachmentIds: [],
+    }
+    const { result } = renderHook(() => useCreateRequest(), { wrapper })
+    result.current.mutate({ ...body, draftId: saved.id })
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    expect(qc.getQueryData<SavedDraftSummary[]>(keys.drafts())?.map((d) => d.id)).not.toContain(saved.id)
+    expect(qc.getQueryData(keys.draft(saved.id))).toBeUndefined()
+    expect(qc.getQueryState(keys.drafts())?.isInvalidated).toBe(true)
+    // The server deleted it with the submission.
+    expect((await call(api.listDrafts)).map((d) => d.id)).not.toContain(saved.id)
   })
 })

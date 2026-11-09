@@ -12,8 +12,15 @@ import {
 import type { TransitionCommand } from '../domain/lifecycle'
 import type { Notification, RequestStatus, WorkRequest } from '../domain/model'
 import { useSession } from '../stores/session'
-import { call } from './client'
-import { api, type BodyOf, type ParamsOf, type QueryOf } from './contract'
+import { ApiError, call } from './client'
+import {
+  api,
+  type BodyOf,
+  type ParamsOf,
+  type QueryOf,
+  type SavedDraft,
+  type SavedDraftSummary,
+} from './contract'
 
 export const keys = {
   all: ['api'] as const,
@@ -24,6 +31,9 @@ export const keys = {
   requestList: (query: QueryOf<typeof api.listRequests>) => [...keys.requests(), 'list', query] as const,
   request: (id: number) => [...keys.requests(), 'detail', id] as const,
   regression: () => [...keys.requests(), 'regression'] as const,
+  /** The signed-in person's saved drafts; apart from `draft`, so refreshing the list does not re-read an open draft. */
+  drafts: () => [...keys.all, 'drafts', 'list'] as const,
+  draft: (id: string) => [...keys.all, 'drafts', 'detail', id] as const,
   notifications: () => [...keys.all, 'notifications'] as const,
   notificationSettings: () => [...keys.all, 'notification-settings'] as const,
   dashboard: (month?: string) => [...keys.all, 'dashboard', month ?? 'current'] as const,
@@ -84,6 +94,27 @@ export function useRequest(id: number | undefined) {
     enabled: id !== undefined && Number.isInteger(id) && id > 0,
     refetchInterval: (q) =>
       q.state.data && LIVE_STATUSES.includes(q.state.data.status) ? LIVE_POLL_MS : false,
+  })
+}
+
+/**
+ * The signed-in person's saved drafts, most recently changed first.
+ * `enabled: false` for people who may not file requests (the API refuses them).
+ */
+export function useDrafts(options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: keys.drafts(),
+    queryFn: ({ signal }) => call(api.listDrafts, { signal }),
+    enabled: options.enabled ?? true,
+  })
+}
+
+/** One saved draft with its content and attachments, by its server id. */
+export function useDraft(id: string | undefined) {
+  return useQuery({
+    queryKey: keys.draft(id ?? ''),
+    queryFn: ({ signal }) => call(api.getDraft, { params: { id: id! }, signal }),
+    enabled: Boolean(id),
   })
 }
 
@@ -187,6 +218,35 @@ function onRequestChanged(qc: QueryClient, req: WorkRequest) {
   void qc.invalidateQueries({ queryKey: [...keys.all, 'releases'] })
 }
 
+/** Marks saved-draft changes: `[...DRAFT_MUTATION_KEY, 'update', id]` waits for one draft's saves. */
+export const DRAFT_MUTATION_KEY = ['drafts'] as const
+
+/**
+ * Saves of one draft run one after another (TanStack mutation scope), so each
+ * is sent with the version the previous one answered.
+ */
+const draftScope = (id: string) => ({ id: `draft:${id}` })
+
+/** After a draft was saved: the open copy is the answer, and the list is read again. */
+function onDraftSaved(qc: QueryClient, draft: SavedDraft) {
+  qc.setQueryData(keys.draft(draft.id), draft)
+  void qc.invalidateQueries({ queryKey: keys.drafts() })
+}
+
+/** After a draft was deleted or submitted: it leaves the list at once, then the list is read again. */
+function onDraftGone(qc: QueryClient, id: string) {
+  qc.removeQueries({ queryKey: keys.draft(id), exact: true })
+  qc.setQueryData<SavedDraftSummary[]>(keys.drafts(), (list) => list?.filter((d) => d.id !== id))
+  void qc.invalidateQueries({ queryKey: keys.drafts() })
+}
+
+/** A save refused because the draft is gone (404) or was saved elsewhere (409): the list is out of date. */
+function onDraftRefused(qc: QueryClient, error: Error) {
+  if (error instanceof ApiError && (error.status === 404 || error.status === 409)) {
+    void qc.invalidateQueries({ queryKey: keys.drafts() })
+  }
+}
+
 export function useLogin() {
   const setSession = useSession((s) => s.setSession)
   const qc = useQueryClient()
@@ -239,12 +299,56 @@ export function useCreateRequest(
   const { onCreated, onFailed } = options
   return useMutation({
     mutationKey: CREATE_REQUEST_KEY,
+    // With `draftId`, the server deletes that saved draft along with the submission.
     mutationFn: (body: BodyOf<typeof api.createRequest>) => call(api.createRequest, { body }),
-    onSuccess: (req) => {
+    onSuccess: (req, body) => {
       onRequestChanged(qc, req)
+      if (body.draftId) onDraftGone(qc, body.draftId)
+      else void qc.invalidateQueries({ queryKey: keys.drafts() })
       onCreated?.(req)
     },
     onError: (error, body) => onFailed?.(error, body),
+  })
+}
+
+/** Saves a new draft to the account. 409 `limit_reached` when the account holds as many as allowed. */
+export function useCreateDraft() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationKey: [...DRAFT_MUTATION_KEY, 'create'],
+    mutationFn: (body: BodyOf<typeof api.createDraft>) => call(api.createDraft, { body }),
+    onSuccess: (draft) => onDraftSaved(qc, draft),
+  })
+}
+
+/**
+ * Saves a draft over the version it was based on (`baseVersion`). 409 `conflict`
+ * when it was saved elsewhere since; 404 when it was deleted or submitted.
+ */
+export function useUpdateDraft(id: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationKey: [...DRAFT_MUTATION_KEY, 'update', id],
+    mutationFn: (body: BodyOf<typeof api.updateDraft>) => call(api.updateDraft, { params: { id }, body }),
+    scope: draftScope(id),
+    onSuccess: (draft) => onDraftSaved(qc, draft),
+    onError: (error) => onDraftRefused(qc, error),
+  })
+}
+
+/** Deletes a saved draft. One that is already gone (404: deleted or submitted elsewhere) counts as deleted. */
+export function useDeleteDraft() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationKey: [...DRAFT_MUTATION_KEY, 'delete'],
+    mutationFn: async (id: string): Promise<void> => {
+      try {
+        await call(api.deleteDraft, { params: { id } })
+      } catch (error) {
+        if (!(error instanceof ApiError && error.status === 404)) throw error
+      }
+    },
+    onSuccess: (_void, id) => onDraftGone(qc, id),
   })
 }
 
