@@ -769,6 +769,41 @@ describe('saved drafts', () => {
     await call(api.deleteDraft, { params: { id } })
   })
 
+  it('answers a create repeated after a lost answer with the draft it already made', async () => {
+    await loginAs('planner@example.com')
+    const first = await call(api.createDraft, { body: { step: 3, content, clientId: 'local-abc' } })
+    const count = (await call(api.listDrafts)).length
+
+    // Sent again with more typed: the same draft, as it is, for the client to update.
+    const again = await call(api.createDraft, {
+      body: { step: 4, content: { ...content, title: '더 쓴 제목' }, clientId: 'local-abc' },
+    })
+    expect(again).toEqual(first)
+    expect(await call(api.listDrafts)).toHaveLength(count)
+    // Not even when the account has filled up meanwhile.
+    const filler: string[] = []
+    for (let i = count; i < appConfig.drafts.maxPerAccount; i++) {
+      filler.push((await call(api.createDraft, { body: { step: 0, content: {} } })).id)
+    }
+    await expectApiError(call(api.createDraft, { body: { step: 0, content: {} } }), 409, 'limit_reached')
+    const replayed = await call(api.createDraft, { body: { step: 0, content: {}, clientId: 'local-abc' } })
+    expect(replayed.id).toBe(first.id)
+    for (const id of filler) await call(api.deleteDraft, { params: { id } })
+
+    // Another person's client id is theirs.
+    await loginAs('sales@example.com')
+    const theirs = await call(api.createDraft, { body: { step: 0, content: {}, clientId: 'local-abc' } })
+    expect(theirs.id).not.toBe(first.id)
+    await call(api.deleteDraft, { params: { id: theirs.id } })
+
+    // Once deleted, the same client id makes a new draft.
+    await loginAs('planner@example.com')
+    await call(api.deleteDraft, { params: { id: first.id } })
+    const fresh = await call(api.createDraft, { body: { step: 3, content, clientId: 'local-abc' } })
+    expect(fresh.id).not.toBe(first.id)
+    await call(api.deleteDraft, { params: { id: fresh.id } })
+  })
+
   it('lists the most recently changed first', async () => {
     await loginAs('planner@example.com')
     const first = await call(api.createDraft, { body: { step: 0, content: { title: '첫 번째' } } })

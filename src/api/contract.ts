@@ -341,7 +341,19 @@ export type SavedDraft = z.infer<typeof SavedDraft>
 
 export const SavedDraftSummaryList = named('SavedDraftSummaryList', z.array(SavedDraftSummary))
 const DraftBody = z.object({ step: DraftStep, content: DraftContent })
-export const SavedDraftInput = named('SavedDraftInput', DraftBody)
+export const SavedDraftInput = named(
+  'SavedDraftInput',
+  DraftBody.extend({
+    clientId: z
+      .string()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe(
+        "The client's own id for the draft. A create repeated with a clientId that already made one of the caller's drafts (the first answer was lost) makes no new draft: the answer is that draft as it is now, unchanged, and is not refused for the per-account limit.",
+      ),
+  }),
+)
 export const SavedDraftUpdate = named(
   'SavedDraftUpdate',
   DraftBody.extend({
@@ -569,7 +581,7 @@ export const api = {
     path: '/drafts',
     tag: 'drafts',
     summary:
-      'Save a new draft (request:create). 409 limit_reached when the account already holds as many drafts as allowed (template setting drafts.maxPerAccount). 400 when an attachment is missing or was uploaded by someone else (path content.attachmentIds.<index>).',
+      'Save a new draft (request:create). 409 limit_reached when the account already holds as many drafts as allowed (template setting drafts.maxPerAccount). 400 when an attachment is missing or was uploaded by someone else (path content.attachmentIds.<index>). Repeated with the same clientId, answers with the draft the first create made.',
     body: SavedDraftInput,
     status: 201,
     response: SavedDraft,

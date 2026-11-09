@@ -55,14 +55,19 @@ export function requestFor(
       ? { ...content, attachmentIds: (content.attachmentIds ?? []).filter((id) => !skip.has(id)) }
       : content,
   }
-  if (!entry.draftId) return { kind: 'create', body }
+  // Its own key names it, so a create repeated after a lost answer makes no second draft.
+  if (!entry.draftId) return { kind: 'create', body: { ...body, clientId: entry.localId } }
   if (entry.baseVersion === undefined) return 'conflict'
   return { kind: 'update', id: entry.draftId, body: { ...body, baseVersion: entry.baseVersion } }
 }
 
 /** How a send ended. */
 export type Outcome =
-  | { kind: 'saved'; draft: SavedDraft }
+  /**
+   * Saved as `draft`. `stale`: a create answered with the draft an earlier
+   * create of the same entry made (its answer was lost), without what was sent this time.
+   */
+  | { kind: 'saved'; draft: SavedDraft; stale?: boolean }
   /** 409 conflict: saved elsewhere since the version it was written on */
   | { kind: 'conflict' }
   /** 409 limit_reached: the account holds as many drafts as allowed */
@@ -88,6 +93,26 @@ export function outcomeOf(error: unknown, attachmentIds: readonly string[] = [])
     return id === undefined ? [] : [id]
   })
   return { kind: 'refused', missingAttachments: [...new Set(missing)] }
+}
+
+/** The value with its empty fields left out and its keys in order, for comparing two copies. */
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonical)
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, v]) => v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0))
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([k, v]) => [k, canonical(v)]),
+  )
+}
+
+/** Whether the account's `draft` holds exactly the step and content of `body`. */
+export function holdsSent(draft: SavedDraft, body: DraftRequest['body']): boolean {
+  return (
+    draft.step === body.step &&
+    JSON.stringify(canonical(draft.content)) === JSON.stringify(canonical(body.content))
+  )
 }
 
 /** Same words, choices and step: nothing was typed between sending `b` and now holding `a`. */
@@ -121,6 +146,8 @@ export interface Settlement {
  *
  * - Saved, nothing typed since: the server has it all, the entry goes.
  *   Typed since: it stays, linked to the version the server answered.
+ *   A create answered with a draft that lacks what was sent (an earlier
+ *   create made it): the entry stays, linked to that draft, and is sent again.
  * - A new draft saved for an entry that is gone (submitted, deleted, signed
  *   out of) or that another tab already saved as another draft: the new one
  *   is an orphan, deleted.
@@ -142,6 +169,16 @@ export function settle(current: LocalDraft | undefined, sent: LocalDraft, outcom
       }
       // Another tab already holds a newer answer for this draft.
       if (!created && (current.baseVersion ?? 0) > draft.version) return { again: false }
+      if (created && outcome.stale) {
+        // What this device wrote went on from that draft's first version: sent again over it, so
+        // anything saved there since (another device) comes back as a conflict.
+        const { conflict: _conflict, limited: _limited, ...rest } = current
+        return {
+          next: { ...rest, localId: draft.id, draftId: draft.id, baseVersion: 1 },
+          alias: { id: draft.id, version: 1 },
+          again: true,
+        }
+      }
       const alias = { id: draft.id, version: draft.version }
       if (sameInput(current, sent)) return { next: null, alias, again: false }
       const { conflict: _conflict, limited: _limited, ...rest } = current

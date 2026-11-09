@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { ApiError } from '@/api/client'
 import type { DraftContent, SavedDraft } from '@/api/contract'
 import type { LocalDraft } from '@/stores/draft'
-import { outcomeOf, requestFor, sameInput, settle, shouldSend } from './sync-core'
+import { holdsSent, outcomeOf, requestFor, sameInput, settle, shouldSend } from './sync-core'
 
 const base: LocalDraft = {
   localId: 'local-a',
@@ -28,9 +28,10 @@ describe('what is sent', () => {
   })
 
   it('creates a new draft, or updates over the version it was written on', () => {
+    // Named by its own key, so a create repeated after a lost answer makes no second draft.
     expect(requestFor(base, toContent)).toEqual({
       kind: 'create',
-      body: { step: 3, content: { title: '검색' } },
+      body: { step: 3, content: { title: '검색' }, clientId: 'local-a' },
     })
     expect(requestFor(linked, toContent)).toEqual({
       kind: 'update',
@@ -97,6 +98,26 @@ describe('what a draft on this device becomes', () => {
     expect(settle({ ...base, step: 4 }, base, savedAs('draft-1', 1)).next).toMatchObject({ step: 4 })
   })
 
+  it('is sent again over the first version of a draft an earlier, unanswered create made', () => {
+    const typed = { ...base, content: { title: '검색 추가' }, limited: true }
+    const replayed = { ...savedAs('draft-1', 3), stale: true }
+    expect(settle(typed, base, replayed)).toEqual({
+      next: {
+        localId: 'draft-1',
+        draftId: 'draft-1',
+        baseVersion: 1,
+        step: 3,
+        content: { title: '검색 추가' },
+        updatedAt: base.updatedAt,
+        dirty: true,
+      },
+      alias: { id: 'draft-1', version: 1 },
+      again: true,
+    })
+    // Even when nothing was typed since: the account's copy does not hold what was sent.
+    expect(settle(base, base, replayed)).toMatchObject({ next: { baseVersion: 1 }, again: true })
+  })
+
   it('deletes a new server draft nothing here wants: submitted, deleted or signed out of meanwhile', () => {
     expect(settle(undefined, base, savedAs('draft-9', 1))).toEqual({ orphan: 'draft-9', again: false })
     // An update for an entry that is gone changes nothing.
@@ -142,6 +163,16 @@ describe('what a draft on this device becomes', () => {
   it('keeps everything as it is when there was no answer or a refusal', () => {
     expect(settle(base, base, { kind: 'offline' })).toEqual({ again: false })
     expect(settle(base, base, { kind: 'refused', missingAttachments: [] })).toEqual({ again: false })
+  })
+
+  it('tells whether the account holds what was sent, whatever empty fields or key order it keeps', () => {
+    const saved = (step: number, content: DraftContent) => ({ step, content }) as SavedDraft
+    const body = { step: 3, content: { title: '검색', targetIds: [], acceptanceCriteria: [{ text: 'a' }] } }
+    expect(
+      holdsSent(saved(3, { acceptanceCriteria: [{ text: 'a' }], title: '검색', outOfScope: '' }), body),
+    ).toBe(true)
+    expect(holdsSent(saved(4, body.content), body)).toBe(false)
+    expect(holdsSent(saved(3, { ...body.content, title: '검색 추가' }), body)).toBe(false)
   })
 
   it('compares what was typed, not when', () => {

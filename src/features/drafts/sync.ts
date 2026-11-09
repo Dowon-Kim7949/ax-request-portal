@@ -27,6 +27,7 @@ export const DRAFT_SETTLE_TIMEOUT_MS = 3_000
 
 /** The draft endpoints through the app's client. A draft already gone counts as deleted. */
 export const draftApi: DraftApi = {
+  get: (id) => call(api.getDraft, { params: { id } }),
   create: (body) => call(api.createDraft, { body }),
   update: (id, body) => call(api.updateDraft, { params: { id }, body }),
   remove: async (id) => {

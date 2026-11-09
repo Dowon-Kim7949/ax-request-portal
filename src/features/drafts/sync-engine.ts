@@ -13,10 +13,19 @@ import {
   settleLocalDraft,
   type LocalDraft,
 } from '@/stores/draft'
-import { outcomeOf, requestFor, settle, shouldSend, type Outcome, type SyncTrigger } from './sync-core'
+import {
+  holdsSent,
+  outcomeOf,
+  requestFor,
+  settle,
+  shouldSend,
+  type Outcome,
+  type SyncTrigger,
+} from './sync-core'
 
 /** The draft endpoints, as the engine uses them. `remove` treats a draft that is already gone as removed. */
 export interface DraftApi {
+  get: (id: string) => Promise<SavedDraft>
   create: (body: SavedDraftInput) => Promise<SavedDraft>
   update: (id: string, body: SavedDraftUpdate) => Promise<SavedDraft>
   remove: (id: string) => Promise<void>
@@ -313,9 +322,17 @@ export class DraftSyncEngine {
         request.kind === 'create'
           ? await this.api.create(request.body)
           : await this.api.update(request.id, request.body)
-      outcome = { kind: 'saved', draft }
+      outcome =
+        request.kind === 'create' && !holdsSent(draft, request.body)
+          ? { kind: 'saved', draft, stale: true }
+          : { kind: 'saved', draft }
     } catch (error) {
       outcome = outcomeOf(error, request.body.content.attachmentIds ?? [])
+      if (outcome.kind === 'conflict' && request.kind === 'update') {
+        // The answer to an earlier update of the same words may have been lost: then nothing conflicts.
+        const latest = await this.api.get(request.id).catch(() => null)
+        if (latest && holdsSent(latest, request.body)) outcome = { kind: 'saved', draft: latest }
+      }
     }
     try {
       // Signed out (or someone else signed in) meanwhile: the answer is not this device's business any more.

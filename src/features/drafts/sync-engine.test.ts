@@ -5,7 +5,7 @@
  */
 import { http, HttpResponse } from 'msw'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { call } from '@/api/client'
+import { ApiError, call } from '@/api/client'
 import { api } from '@/api/contract'
 import { appConfig } from '@/config/app.config'
 import { draftContentOf, EMPTY_VALUES } from '@/features/wizard/schema'
@@ -84,6 +84,7 @@ function gate() {
 function heldApi(holds: { create?: Array<Promise<void>>; update?: Array<Promise<void>> } = {}) {
   const calls = { create: 0, update: 0, remove: 0 }
   const held: DraftApi = {
+    get: (id) => draftApi.get(id),
     create: async (body) => {
       const hold = holds.create?.[calls.create]
       calls.create++
@@ -205,6 +206,77 @@ describe('saving drafts to the account', () => {
     await sync.sync('online')
     expect(listLocalDrafts(USER)).toEqual([])
     expect((await serverDrafts())[0]?.title).toBe('검색')
+  })
+
+  it('makes no second draft when the answer to the first save was lost', async () => {
+    let lose = true
+    const lossy: DraftApi = {
+      ...draftApi,
+      // The server saves it, but the answer never arrives.
+      create: async (body) => {
+        const draft = await draftApi.create(body)
+        if (!lose) return draft
+        lose = false
+        throw new ApiError(0, 'network', 'lost')
+      },
+    }
+    const { sync } = engine(lossy)
+    write('local-a', '검색')
+    await sync.sync('boot')
+    expect(getLocalDraft(USER, 'local-a')).toMatchObject({ dirty: true })
+    expect(await serverDrafts()).toHaveLength(1)
+
+    await sync.sync('online')
+    const drafts = await serverDrafts()
+    expect(drafts).toHaveLength(1)
+    expect(resolveDraftId(USER, 'local-a').id).toBe(drafts[0]!.id)
+    expect(listLocalDrafts(USER)).toEqual([])
+  })
+
+  it('sends what was typed after a lost answer over the draft the first save made', async () => {
+    let lose = true
+    const lossy: DraftApi = {
+      ...draftApi,
+      create: async (body) => {
+        const draft = await draftApi.create(body)
+        if (!lose) return draft
+        lose = false
+        throw new ApiError(0, 'timeout', 'lost')
+      },
+    }
+    const { sync } = engine(lossy)
+    write('local-a', '검색')
+    await sync.sync('boot')
+    write('local-a', '검색 추가')
+    await sync.sync('online')
+
+    const [saved] = await serverDrafts()
+    expect(await serverDrafts()).toHaveLength(1)
+    expect(await serverDraft(saved!.id)).toMatchObject({ title: '검색 추가', version: 2 })
+    expect(listLocalDrafts(USER)).toEqual([])
+  })
+
+  it('takes an update whose answer was lost for saved, not for a conflict', async () => {
+    const draft = await createOnServer('처음')
+    let lose = true
+    const lossy: DraftApi = {
+      ...draftApi,
+      update: async (id, body) => {
+        const saved = await draftApi.update(id, body)
+        if (!lose) return saved
+        lose = false
+        throw new ApiError(0, 'network', 'lost')
+      },
+    }
+    const { sync } = engine(lossy)
+    write(draft.id, '고친 것', { draftId: draft.id, baseVersion: 1 })
+    await sync.sync('boot')
+    // Still on this device, written over version 1, while the account is at version 2.
+    expect(getLocalDraft(USER, draft.id)).toMatchObject({ baseVersion: 1, dirty: true })
+
+    await sync.sync('online')
+    expect(getLocalDraft(USER, draft.id)).toBeUndefined()
+    expect(await serverDraft(draft.id)).toMatchObject({ title: '고친 것', version: 2 })
   })
 
   it('goes on as a new draft when the account’s draft was deleted or submitted elsewhere', async () => {

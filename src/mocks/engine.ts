@@ -118,6 +118,8 @@ function publicAttachment({ ownerId: _owner, ...attachment }: StoredAttachment):
 export interface StoredDraft {
   id: string
   ownerId: string
+  /** The client's own id for it, so a create repeated after a lost answer makes no second draft */
+  clientId?: string
   /** Wizard step the person was last on */
   step: number
   content: DraftContent
@@ -969,8 +971,17 @@ export class MockEngine {
     return this.presentDraft(this.findDraft(user, id))
   }
 
-  createDraft(user: User, input: { step: number; content: DraftContent }, now: Date): SavedDraft {
+  createDraft(
+    user: User,
+    input: { step: number; content: DraftContent; clientId?: string | undefined },
+    now: Date,
+  ): SavedDraft {
     this.require(user, 'request:create')
+    // Made already, and the answer was lost: the same draft, as it is now.
+    const made = input.clientId
+      ? this.state.drafts.find((d) => d.ownerId === user.id && d.clientId === input.clientId)
+      : undefined
+    if (made) return this.presentDraft(made)
     const limit = this.opts.draftsPerAccount ?? appConfig.drafts.maxPerAccount
     if (this.state.drafts.filter((d) => d.ownerId === user.id).length >= limit) {
       throw new HttpError(409, 'limit_reached', 'draftLimit', { limit })
@@ -980,6 +991,7 @@ export class MockEngine {
     const draft: StoredDraft = {
       id: this.newId('draft'),
       ownerId: user.id,
+      ...(input.clientId ? { clientId: input.clientId } : {}),
       step: input.step,
       content: input.content,
       version: 1,
