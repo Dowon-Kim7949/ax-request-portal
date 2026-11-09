@@ -189,8 +189,9 @@ A layout effect on step change scrolls to the top and focuses the step heading (
 | `useUploadAttachment` | `POST /attachments` (multipart, 120 s time limit) | `File` → `Attachment` | Files upload one by one; over 10 MB is rejected client-side with a toast. Only attachment ids are submitted, and only the uploader may attach an upload. |
 | `useCreateRequest` | `POST /requests` (201) | `RequestSubmission` (project, type, title, targets, current/desired behaviour, 1–5 acceptance criteria — or, for `checklist`, `checklistSource` and 1–30 `checklist` items — out of scope, attachment ids, desired date and its reason; optional `draftId`) → `WorkRequest` | Success: `onRequestChanged`, the named draft leaves the drafts cache (`dropSavedDraft`), then the hook-level handling above. Failure: toast with the server message, or the missing-attachment handling. The server turns each finding into one acceptance criterion (`[number] fixed-when`, or the finding when that is empty). |
 | `draftApi` (sync engine, through `call`) | `GET /drafts/{id}`, `POST /drafts` (201), `PUT /drafts/{id}` | `SavedDraftInput` (`step`, `content: DraftContent`, `clientId`) / `SavedDraftUpdate` (`step`, `content`, `baseVersion`) → `SavedDraft` | `409 conflict` (saved since `baseVersion`), `409 limit_reached` (create only), `404` (not the caller's, or gone), `400` with `content.attachmentIds.<i>` for a missing or someone else's attachment. Saves go to the cache through `storeSavedDraft`. |
-| `useDiscardDraft` | `DELETE /drafts/{id}` (204) | — | A `404` counts as deleted. This device's copy is deleted first; a failure rejects with the account copy still listed. |
-| `useDraft`, `useCreateDraft`, `useUpdateDraft`, `useDeleteDraft` | the same endpoints | — | Query key `keys.draft(id)`; saves of one draft in the mutation scope `draft:<id>`, marked by `DRAFT_MUTATION_KEY`. The wizard and the engine do not use them (the engine orders its own requests); only tests do. |
+| `useDiscardDraft` (through `useDeleteDraft`) | `DELETE /drafts/{id}` (204) | — | A `404` counts as deleted. This device's copy is deleted first; a failure rejects with the account copy still listed. |
+
+There are no query hooks for saving a draft: the sync engine sends each draft's saves one after another itself, because a TanStack mutation scope is fixed per hook and cannot follow a draft whose id changes on its first save. The wizard reads the draft it opens under `keys.draft(id)`.
 
 `DraftContent` has the `RequestDraft` fields with attachments as `attachmentIds`, every top-level field optional and empty values allowed; only abuse ceilings apply (`DRAFT_TEXT_MAX` 10,000 characters, `DRAFT_LIST_MAX` 50 items, `DRAFT_STEP_MAX` 6). `toDraftContent` cuts what would not fit instead of being refused; the device keeps the whole. A saved draft's id matches `DRAFT_ID_PATTERN` (1–100 letters, digits, `-` or `_`, never starting with `local-`). An account holds at most `appConfig.drafts.maxPerAccount` (20) drafts.
 
@@ -226,8 +227,6 @@ Progress bar with `aria-valuenow`; project and type pickers are radio groups; ta
 - The mock keeps uploads up to `INLINE_UPLOAD_BYTES` (512 KB) that are images or PDFs as `data:` URLs in its persisted state (they survive a reload); anything else is an object URL for the session only, and a type a browser could run as a page is stored as `application/octet-stream` (`src/mocks/handlers.ts`). A real backend needs a storage decision and a request-size limit that matches nginx: the commented `/api/` proxy in `deploy/nginx.conf` sets `client_max_body_size 12m` for the 10 MB file cap.
 - `useLiveSearch` relies on React Router's `UNSAFE_DataRouterContext`; check it when upgrading React Router's major version.
 - Two tabs of one browser share one device copy of a draft: the conflict notice protects words both have typed, but the copy itself is last-writer-wins.
-- `useCreateDraft`, `useUpdateDraft`, `useDeleteDraft` and `DRAFT_MUTATION_KEY` are used only by tests; decide whether to keep them.
-- The draft list names the `criteria` step "Acceptance criteria" for every request type, while a `checklist` request's screen is about findings.
 
 ## Review Notes
 

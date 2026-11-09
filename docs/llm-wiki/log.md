@@ -24,6 +24,25 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-09 - Saved drafts on every home that may file requests; list step names; no unused draft hooks
+
+- status: needs_review
+- actor: claude-code
+- scope: code, docs
+- changed:
+  - src/features/home/home-page.tsx, src/features/home/home-page.test.tsx
+  - src/features/drafts/rows.ts, src/features/drafts/drafts-section.tsx, src/features/drafts/drafts-section.test.tsx, src/i18n/ko.ts, src/i18n/en.ts (`wizard.checklist.name`)
+  - src/api/queries.ts, src/api/queries.test.tsx
+  - docs/llm-wiki: domains/05_home.md, domains/08_requests.md, domains/11_wizard.md
+- summary:
+  - Home shows the saved drafts to everyone with `request:create`: reviewers (developers, admins) get them after the developer queue, and only when they have a draft.
+  - A draft row names the criteria step "Audit findings" for a `checklist` request, as its screen does.
+  - Removed `useDraft`, `useCreateDraft`, `useUpdateDraft` and `DRAFT_MUTATION_KEY`, which only tests used; the sync engine orders each draft's saves itself.
+- evidence:
+  - npx vitest run on the changed areas passes; npm run lint, typecheck and format check pass.
+- caveats:
+  - Supersedes the caveat in the entry below that reviewers see their drafts on `/requests` only.
+
 ## 2026-11-09 - Feature: drafts saved to the account
 
 - status: needs_review

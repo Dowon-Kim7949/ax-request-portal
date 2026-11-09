@@ -45,7 +45,7 @@ The landing page at `/` (authentication only, no extra permission). It shows wha
 | Section | Shown when | Content |
 | --- | --- | --- |
 | Dashboard call-to-action | `dashboard:view` | Link to `/dashboard`. |
-| `DeveloperSection` | `request:review` | Up to six requests whose turn is the developer's (`turnOf(status) === 'developer'`), with requester names; "see all" goes to `/work`. |
+| `DeveloperSection` | `request:review` | Up to six requests whose turn is the developer's (`turnOf(status) === 'developer'`), with requester names; "see all" goes to `/work`. Followed by the saved drafts when the person also has `request:create` (developers and admins do). |
 | `RequesterSection` | `request:create` and not `request:review` | Count of open requests (link to `/requests`), "your turn" cards (`turnOf === 'requester'`), the saved drafts under them, active projects that start a request at `/requests/new?project=<id>`, and a new-request button. |
 | `AdminSection` | `project:manage` or `user:manage` | Links to the admin pages the user may open. |
 | `OpsSection` | any of `usage:view`, `agent:manage`, `budget:manage` | This month's AI cost against the monthly limit (with `usage:view`, from `GET /ai/usage`) and links to the AI operations pages ([AI Operations](13_ops.md)). |
@@ -54,7 +54,7 @@ Developers and admins therefore never see the requester section.
 
 ## Saved drafts
 
-`DraftsSection variant="home"` sits in the requester section's left column, under "your turn". It is the same section as on [My Requests](08_requests.md) (rows from the account and this device, badges, `N/20`, delete with confirmation, the room held while the account's list is read) with the newest three rows only, and a "See all saved drafts" link to `/requests#drafts` beside the heading (44 px tall, shown even with three drafts or fewer). It is absent when there are no drafts.
+`DraftsSection variant="home"` shows for everyone with `request:create`: in the requester section's left column under "your turn", and for reviewers (developers, admins) right after the developer queue. It is the same section as on [My Requests](08_requests.md) (rows from the account and this device, badges, `N/20`, delete with confirmation, the room held while the account's list is read) with the newest three rows only, and a "See all saved drafts" link to `/requests#drafts` beside the heading (44 px tall, shown even with three drafts or fewer). It is absent when there are no drafts, so a reviewer's home looks as before until they save one.
 
 ## API Services
 
@@ -78,7 +78,7 @@ Developers and admins therefore never see the requester section.
 
 ## Open Questions
 
-- The saved drafts are inside the requester section, so a person with `request:create` who also has `request:review` (a developer or an admin) sees their drafts only on `/requests`, not on home.
+- None.
 
 ## Review Notes
 
