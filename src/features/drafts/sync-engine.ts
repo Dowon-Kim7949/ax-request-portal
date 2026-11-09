@@ -99,9 +99,12 @@ export class DraftSyncEngine {
     return this.stopped
   }
 
-  /** Sends `localId` once typing has paused for a moment. */
+  /**
+   * Sends `localId` once typing has paused for a moment. Not a draft the
+   * account had no room for: that one waits for a slot, not for a pause (see `shouldSend`).
+   */
   schedule(localId: string): void {
-    if (this.stopped) return
+    if (this.stopped || getLocalDraft(this.userId, localId)?.limited) return
     this.clearTimer(localId)
     this.timers.set(
       localId,

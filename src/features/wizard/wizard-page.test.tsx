@@ -448,6 +448,55 @@ describe('the draft in the account', () => {
     expect(getLocalDraft(USER, LOCAL)).toMatchObject({ limited: true })
   })
 
+  it('stays as it is while typing goes on in a draft the account has no room for', async () => {
+    await Promise.all(
+      Array.from({ length: appConfig.drafts.maxPerAccount }, (_, i) =>
+        saveToAccount({ ...EMPTY_VALUES, title: `초안 ${i}` }),
+      ),
+    )
+    keepLocal(READY)
+    renderWizard(`/requests/new?draft=${LOCAL}&step=3`)
+    const notice = await screen.findByText(/임시 저장함이 가득 찼어요/, {}, SYNCED)
+    let sawSaving = false
+    const observer = new MutationObserver(() => {
+      if (screen.queryByText('저장 중…', STATUS)) sawSaving = true
+    })
+    observer.observe(document.body, { subtree: true, childList: true, characterData: true })
+    try {
+      await userEvent.type(screen.getByLabelText('요청 제목'), ' 더')
+      // Past the write and the sync's wait.
+      await act(() => new Promise((resolve) => setTimeout(resolve, 1_600)))
+    } finally {
+      observer.disconnect()
+    }
+    // Nothing is sent on a pause in typing, so the line does not say so, and the notice does not move.
+    expect(sawSaving).toBe(false)
+    expect(notice).toBeInTheDocument()
+    expect(screen.getByText('이 기기에만 저장됨', STATUS)).toBeInTheDocument()
+    expect(getLocalDraft(USER, LOCAL)).toMatchObject({
+      limited: true,
+      content: { title: `${READY.title} 더` },
+    })
+  })
+
+  it('says when the draft is kept nowhere but on this screen', async () => {
+    const original = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
+      if (key === draftsKey(USER)) throw new DOMException('full', 'QuotaExceededError')
+      original.call(this, key, value)
+    })
+    t.server.use(http.post('*/api/drafts', () => HttpResponse.error()))
+    renderWizard('/requests/new?project=p-portal')
+    await userEvent.click(await screen.findByRole('radio', { name: /기존 기능 변경/ }))
+    await screen.findByRole('heading', { name: '어느 화면이나 기능인가요?' })
+    await userEvent.click(screen.getByRole('button', { name: '다음' }))
+    await userEvent.type(await screen.findByLabelText('요청 제목'), '사진이 안 올라감')
+
+    expect(await screen.findByText('저장되지 않음 · 화면을 닫지 마세요', STATUS, SYNCED)).toBeInTheDocument()
+    expect(screen.queryByText(/이 기기에만 저장됨/, STATUS)).toBeNull()
+    expect(document.querySelector('[aria-live="polite"]')).toHaveTextContent('저장되지 않음')
+  })
+
   it('says when the account cannot be reached, and keeps the draft on this device', async () => {
     t.server.use(http.post('*/api/drafts', () => HttpResponse.error()))
     keepLocal(READY)

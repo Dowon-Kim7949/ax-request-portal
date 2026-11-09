@@ -184,8 +184,10 @@ describe('saving drafts to the account', () => {
     await sync.sync('boot')
     expect(getLocalDraft(USER, 'local-a')).toMatchObject({ limited: true })
 
-    // Not sent again on every pause in typing.
+    // Not sent again on every pause in typing, nor waiting to be.
     write('local-a', '하나 더 쓰는 중', { limited: true })
+    sync.schedule('local-a')
+    expect(sync.state('local-a')).toBe('idle')
     await sync.sync('input', 'local-a')
     expect(calls.create).toBe(1)
 

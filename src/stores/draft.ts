@@ -176,6 +176,17 @@ export function getLocalDraft(userId: string, localId: string): LocalDraft | und
 }
 
 /**
+ * Whether this device's storage holds `localId` as this tab last wrote it;
+ * false when that write did not fit and only this tab's memory holds it.
+ */
+export function isStoredOnDevice(userId: string, localId: string): boolean {
+  const whole = unsavedState.get(userId)
+  const kept = whole ? own(whole.entries, localId) : undefined
+  if (!kept) return true
+  return own(readStorage(userId).entries, localId)?.updatedAt === kept.updatedAt
+}
+
+/**
  * Where `id` leads now: a local id the server has answered for becomes that
  * server id (with the version it answered), through every hop. Anything else
  * comes back as it is.

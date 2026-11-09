@@ -4,6 +4,7 @@ import {
   draftsKey,
   getLocalDraft,
   isLocalId,
+  isStoredOnDevice,
   legacyDraftKey,
   listLocalDrafts,
   newLocalId,
@@ -172,6 +173,9 @@ describe('the drafts kept on this device', () => {
     expect(putLocalDraft(USER, entry())).toBe('failed')
     expect(getLocalDraft(USER, 'local-a')).toBeDefined()
     expect(getLocalDraft(USER, 'local-old')).toBeDefined()
+    // Only the draft that did not fit is kept nowhere but here.
+    expect(isStoredOnDevice(USER, 'local-a')).toBe(false)
+    expect(isStoredOnDevice(USER, 'local-old')).toBe(true)
     // A removal in this tab holds too, though storage still has the old copy.
     removeLocalDraft(USER, 'local-old')
     expect(getLocalDraft(USER, 'local-old')).toBeUndefined()

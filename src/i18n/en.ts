@@ -258,6 +258,7 @@ const en: Messages = {
       saved: 'Saved to your account',
       local: 'Saved on this device only · uploads once you are online',
       limited: 'Saved on this device only',
+      unsaved: 'Not saved · keep this screen open',
       conflict: 'Save conflict',
     },
     conflict: {

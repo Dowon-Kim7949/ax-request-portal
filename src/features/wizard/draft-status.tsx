@@ -2,7 +2,15 @@
  * Where the open draft stands, shown small under the wizard's progress bar,
  * and the notices that need the person: a conflict, a full account.
  */
-import { CloudCheck, CloudOff, CloudUpload, Smartphone, Trash2, TriangleAlert } from 'lucide-react'
+import {
+  CircleAlert,
+  CloudCheck,
+  CloudOff,
+  CloudUpload,
+  Smartphone,
+  Trash2,
+  TriangleAlert,
+} from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
@@ -21,8 +29,13 @@ const ICONS = {
   saved: CloudCheck,
   local: CloudOff,
   limited: Smartphone,
+  unsaved: CircleAlert,
   conflict: TriangleAlert,
 } as const
+
+/** States that need the person: said in stronger type, and told to screen readers. */
+const ALERTS: ReadonlySet<DraftSaveState> = new Set(['local', 'limited', 'unsaved', 'conflict'])
+const URGENT: ReadonlySet<DraftSaveState> = new Set(['unsaved', 'conflict'])
 
 /**
  * One line: the save state on the left, "delete draft" on the right once
@@ -45,8 +58,7 @@ export function DraftStatusBar({
 }) {
   const { t } = useTranslation()
   // Read out on the way into these states only; every other state empties the region.
-  const announcement =
-    state === 'local' || state === 'limited' || state === 'conflict' ? t(`wizard.save.${state}`) : ''
+  const announcement = state && ALERTS.has(state) ? t(`wizard.save.${state}`) : ''
   const Icon = state ? ICONS[state] : null
   return (
     <div className="flex min-h-11 items-center justify-between gap-2 pt-1">
@@ -54,7 +66,7 @@ export function DraftStatusBar({
         <p
           className={cn(
             'flex min-w-0 items-center gap-1.5 text-xs',
-            state === 'conflict' ? 'font-semibold text-warning-fg' : 'text-ink-500',
+            state && URGENT.has(state) ? 'font-semibold text-warning-fg' : 'text-ink-500',
           )}
         >
           {Icon ? <Icon className="size-4 shrink-0" aria-hidden /> : null}

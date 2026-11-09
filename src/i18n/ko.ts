@@ -257,6 +257,7 @@ const ko = {
       saved: '계정에 저장됨',
       local: '이 기기에만 저장됨 · 연결되면 올려요',
       limited: '이 기기에만 저장됨',
+      unsaved: '저장되지 않음 · 화면을 닫지 마세요',
       conflict: '저장 충돌',
     },
     conflict: {

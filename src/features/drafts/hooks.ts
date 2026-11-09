@@ -7,7 +7,13 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
 import { dropSavedDraft, keys, storeSavedDraft, useDeleteDraft, useDrafts } from '@/api/queries'
 import { useCan, useCurrentUser } from '@/app/hooks'
-import { getLocalDraft, listLocalDrafts, subscribeLocalDrafts, type LocalDraft } from '@/stores/draft'
+import {
+  getLocalDraft,
+  isStoredOnDevice,
+  listLocalDrafts,
+  subscribeLocalDrafts,
+  type LocalDraft,
+} from '@/stores/draft'
 import { localRow, mergeDraftRows, type DraftRow } from './rows'
 import { draftSync, migrateLegacyDraft } from './sync'
 
@@ -56,9 +62,10 @@ export function useDraftSync(): void {
  * - `saved`: the server has all of it;
  * - `local`: kept on this device only for now (no connection; sent when there is one);
  * - `limited`: kept on this device only, because the account holds as many drafts as allowed;
+ * - `unsaved`: kept nowhere but on this screen (storage full, and not sent);
  * - `conflict`: saved elsewhere meanwhile; the person chooses which to keep.
  */
-export type DraftSaveState = 'saving' | 'saved' | 'local' | 'limited' | 'conflict'
+export type DraftSaveState = 'saving' | 'saved' | 'local' | 'limited' | 'unsaved' | 'conflict'
 
 /** Calls back on any change to the drafts on this device or to how their sending stands. */
 function useDraftChanges(userId: string) {
@@ -92,9 +99,12 @@ export function useDraftSaveState(
     if (!key) return null
     const entry = getLocalDraft(userId, key)
     const send = draftSync(userId).state(key)
+    const sending = send === 'sending' || send === 'scheduled'
     if (entry?.conflict) return 'conflict'
-    if (send === 'sending' || send === 'scheduled') return 'saving'
+    if (entry?.dirty && !isStoredOnDevice(userId, key)) return sending ? 'saving' : 'unsaved'
+    // Kept here until a slot frees up; a send that may find one changes nothing until it does.
     if (entry?.limited) return 'limited'
+    if (sending) return 'saving'
     if (entry?.dirty) return 'local'
     return onServer ? 'saved' : null
   })
