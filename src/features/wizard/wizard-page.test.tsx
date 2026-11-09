@@ -576,13 +576,26 @@ describe('the draft in the account', () => {
     expect(region).toHaveTextContent('이 기기에만 저장됨')
   })
 
+  it('says a draft never saved to the account is deleted from this device only', async () => {
+    t.server.use(http.post('*/api/drafts', () => HttpResponse.error()))
+    keepLocal(READY)
+    renderWizard(`/requests/new?draft=${LOCAL}&step=3`)
+    await screen.findByText('이 기기에만 저장됨 · 연결되면 올려요', STATUS, SYNCED)
+    await userEvent.click(screen.getByRole('button', { name: '초안 삭제' }))
+    const dialog = await screen.findByRole('dialog', { name: '이 초안을 삭제할까요?' })
+    expect(dialog).toHaveAccessibleDescription('이 기기에서 지워지고 되돌릴 수 없어요.')
+    await userEvent.click(screen.getByRole('button', { name: '삭제' }))
+    expect(await screen.findByRole('heading', { name: '어느 서비스에 대한 요청인가요?' })).toBeInTheDocument()
+    expect(listLocalDrafts(USER)).toEqual([])
+  })
+
   it('deletes the draft here and in the account, after asking', async () => {
     const draft = await saveToAccount(READY)
     const router = renderWizard(`/requests/new?draft=${draft.id}&step=3`)
     await screen.findByLabelText('요청 제목')
     await userEvent.click(screen.getByRole('button', { name: '초안 삭제' }))
     const dialog = await screen.findByRole('dialog', { name: '이 초안을 삭제할까요?' })
-    expect(dialog).toHaveTextContent('되돌릴 수 없어요')
+    expect(dialog).toHaveAccessibleDescription('이 기기와 계정에서 모두 지워지고 되돌릴 수 없어요.')
     await userEvent.click(screen.getByRole('button', { name: '삭제' }))
 
     expect(await screen.findByRole('heading', { name: '어느 서비스에 대한 요청인가요?' })).toBeInTheDocument()

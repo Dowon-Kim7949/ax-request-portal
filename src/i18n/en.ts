@@ -275,9 +275,6 @@ const en: Messages = {
     },
     discardDraft: {
       button: 'Delete draft',
-      title: 'Delete this draft?',
-      body: 'It will be deleted from this device and your account, and cannot be brought back.',
-      confirm: 'Delete',
       done: 'Draft deleted.',
       failed:
         'The draft in your account could not be deleted. Please delete it again from your saved drafts.',

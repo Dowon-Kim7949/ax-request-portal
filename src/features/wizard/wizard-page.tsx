@@ -659,15 +659,26 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
 
   /* ---- deleting the draft ---- */
   const [confirmDiscard, setConfirmDiscard] = useState(false)
+  /** Whether the account has a copy to delete too, as the sheet was opened (it says where the draft goes from) */
+  const [discardsAccountCopy, setDiscardsAccountCopy] = useState(false)
   const [discarding, setDiscarding] = useState(false)
   const discardDraft = useDiscardDraft()
+  /** The account's copy of the open draft, as far as this screen knows; none for a draft never saved there. */
+  const accountCopy = () => {
+    const key = keyRef.current
+    const entry = key ? getLocalDraft(userId, key) : undefined
+    return entry ? entry.draftId : serverRef.current?.id
+  }
+  const askDiscard = () => {
+    setDiscardsAccountCopy(Boolean(accountCopy()))
+    setConfirmDiscard(true)
+  }
   const discard = async () => {
     setDiscarding(true)
     finished.current = true
     draftSaver.cancel()
     const key = keyRef.current
-    const entry = key ? getLocalDraft(userId, key) : undefined
-    const draftId = entry ? entry.draftId : serverRef.current?.id
+    const draftId = accountCopy()
     try {
       await discardDraft({ localId: key, draftId })
       toast.success(t('wizard.discardDraft.done'))
@@ -877,7 +888,7 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
 
         <DraftStatusBar
           state={saveState}
-          onDiscard={draftKey || onServer ? () => setConfirmDiscard(true) : undefined}
+          onDiscard={draftKey || onServer ? askDiscard : undefined}
           // A new request: the drafts there are to continue instead, until this one is saved.
           idle={start.key === null ? <DraftsNotice exclude={[draftKey]} /> : undefined}
         />
@@ -962,8 +973,10 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
         onOpenChange={(open) => {
           if (!open && !discarding) setConfirmDiscard(false)
         }}
-        title={t('wizard.discardDraft.title')}
-        description={t('wizard.discardDraft.body')}
+        title={t('drafts.deleteConfirm.title')}
+        description={
+          discardsAccountCopy ? t('drafts.deleteConfirm.body') : t('drafts.deleteConfirm.bodyLocal')
+        }
         footer={
           <>
             <Button
@@ -982,7 +995,7 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
               loading={discarding}
               onClick={() => void discard()}
             >
-              {t('wizard.discardDraft.confirm')}
+              {t('drafts.deleteConfirm.confirm')}
             </Button>
           </>
         }
