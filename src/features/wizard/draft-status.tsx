@@ -3,6 +3,7 @@
  * and the notices that need the person: a conflict, a full account.
  */
 import { CloudCheck, CloudOff, CloudUpload, Smartphone, Trash2, TriangleAlert } from 'lucide-react'
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
@@ -10,8 +11,10 @@ import { appConfig } from '@/config/app.config'
 import type { DraftSaveState } from '@/features/drafts/hooks'
 import { cn } from '@/lib/cn'
 
+/** The id of the saved-drafts section on the person's requests page (src/features/drafts). */
+export const DRAFTS_SECTION_ID = 'drafts'
 /** The saved drafts on the person's requests page (src/features/requests). */
-export const DRAFTS_LIST_PATH = '/requests#drafts'
+export const DRAFTS_LIST_PATH = `/requests#${DRAFTS_SECTION_ID}`
 
 const ICONS = {
   saving: CloudUpload,
@@ -25,15 +28,20 @@ const ICONS = {
  * One line: the save state on the left, "delete draft" on the right once
  * there is something to delete. Screen readers are not told about every save,
  * only when the draft stops reaching the account (no connection, a full
- * account, a conflict).
+ * account, a conflict). Before anything is saved the line can hold `idle`
+ * instead (the drafts to continue), so the form does not move once the save
+ * state takes its place.
  */
 export function DraftStatusBar({
   state,
   onDiscard,
+  idle,
 }: {
   state: DraftSaveState | null
   /** Shown when there is a draft to delete */
   onDiscard?: () => void
+  /** Shown on the left while there is no save state */
+  idle?: ReactNode
 }) {
   const { t } = useTranslation()
   // Read out on the way into these states only; every other state empties the region.
@@ -42,15 +50,19 @@ export function DraftStatusBar({
   const Icon = state ? ICONS[state] : null
   return (
     <div className="flex min-h-11 items-center justify-between gap-2 pt-1">
-      <p
-        className={cn(
-          'flex min-w-0 items-center gap-1.5 text-xs',
-          state === 'conflict' ? 'font-semibold text-warning-fg' : 'text-ink-500',
-        )}
-      >
-        {Icon ? <Icon className="size-4 shrink-0" aria-hidden /> : null}
-        {state ? <span>{t(`wizard.save.${state}`)}</span> : null}
-      </p>
+      {state || !idle ? (
+        <p
+          className={cn(
+            'flex min-w-0 items-center gap-1.5 text-xs',
+            state === 'conflict' ? 'font-semibold text-warning-fg' : 'text-ink-500',
+          )}
+        >
+          {Icon ? <Icon className="size-4 shrink-0" aria-hidden /> : null}
+          {state ? <span>{t(`wizard.save.${state}`)}</span> : null}
+        </p>
+      ) : (
+        idle
+      )}
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>

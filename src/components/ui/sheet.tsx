@@ -17,6 +17,11 @@ interface SheetProps {
    */
   side?: 'bottom' | 'left'
   closeLabel?: string
+  /**
+   * Called as the sheet closes, before focus goes back to what opened it;
+   * `preventDefault()` and move focus yourself when that is gone (a deleted row).
+   */
+  onCloseAutoFocus?: (event: Event) => void
 }
 
 /** Bottom sheet on phones, dialog on larger screens. Focus-trapped and escape-closable (Radix). */
@@ -29,6 +34,7 @@ export function Sheet({
   footer,
   side = 'bottom',
   closeLabel,
+  onCloseAutoFocus,
 }: SheetProps) {
   const { t } = useTranslation()
   closeLabel ??= t('common.close')
@@ -44,6 +50,7 @@ export function Sheet({
             side === 'left' && 'inset-y-0 left-0 w-[min(20rem,85vw)] animate-slide-left pt-safe pb-safe',
           )}
           {...(description ? {} : { 'aria-describedby': undefined })}
+          {...(onCloseAutoFocus ? { onCloseAutoFocus } : {})}
         >
           {side === 'bottom' ? (
             <div className="mx-auto mt-2.5 h-1 w-10 shrink-0 rounded-full bg-field sm:hidden" aria-hidden />

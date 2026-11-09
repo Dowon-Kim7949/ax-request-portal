@@ -298,11 +298,13 @@ const en: Messages = {
       go: 'Leave',
     },
     project: {
+      name: 'Service',
       title: 'Which service is this about?',
       hint: 'This sets the developer in charge and the wiki to use.',
     },
-    type: { title: 'What kind of request is it?' },
+    type: { name: 'Request type', title: 'What kind of request is it?' },
     targets: {
+      name: 'Screens',
       title: 'Which screen or feature?',
       hint: 'Pick as many as apply. If it is not listed, describe it under Other.',
       other: 'Other (not in the list)',
@@ -310,6 +312,7 @@ const en: Messages = {
       nonCode: 'No code is involved, so you can skip this.',
     },
     describe: {
+      name: 'Details',
       title: 'What happens now, and what should happen?',
       titleLabel: 'Request title',
       titlePlaceholder: 'e.g. Show a message after 5 failed sign-ins',
@@ -322,6 +325,7 @@ const en: Messages = {
       desiredPlaceholder: 'e.g. After 5 failures, a message says to try again later.',
     },
     criteria: {
+      name: 'Acceptance criteria',
       title: 'What does done look like?',
       hint: 'Write 1 to 5 checks in the form "when X, Y happens". The AI works to them, and you will check them yourself later.',
       placeholder: 'e.g. When the password is wrong 5 times, "Try again in 10 minutes" is shown',
@@ -355,6 +359,7 @@ const en: Messages = {
       count: '{{count}} item(s)',
     },
     extra: {
+      name: 'Other details',
       title: 'Anything else we should know?',
       outOfScope: 'Must not change',
       outOfScopePlaceholder: 'e.g. Do not change the password rules (length, characters).',
@@ -368,6 +373,7 @@ const en: Messages = {
       desiredDateReasonPlaceholder: 'e.g. Customer security audit',
     },
     review: {
+      name: 'Review',
       title: 'Ready to submit?',
       checking: 'The AI is checking for anything missing…',
       clean: 'Nothing seems to be missing.',
@@ -404,6 +410,31 @@ const en: Messages = {
       checklistItem: 'Fill in both the finding number and the finding.',
       tooLarge: 'Files must be 10 MB or smaller.',
     },
+  },
+  drafts: {
+    title: 'Saved drafts',
+    count: '{{count}}/{{max}}',
+    countLabel: 'Saved to your account: {{count}} of {{max}}',
+    untitled: 'Untitled draft',
+    stepLabel: 'Step {{current}} of {{total}}',
+    savedAt: 'Saved {{time}}',
+    localOnly: 'This device only',
+    conflict: 'Conflict',
+    continue: 'Continue',
+    delete: 'Delete {{title}}',
+    showAll: 'Show all {{count}}',
+    showLess: 'Show fewer',
+    seeAll: 'See all saved drafts',
+    notice: 'Saved drafts: {{count}}',
+    noticeAction: 'Continue',
+    deleteConfirm: {
+      title: 'Delete this draft?',
+      body: 'It will be deleted from this device and your account, and cannot be brought back.',
+      bodyLocal: 'It will be deleted from this device and cannot be brought back.',
+      confirm: 'Delete',
+    },
+    deleted: 'Draft deleted.',
+    deleteFailed: 'The draft could not be deleted.',
   },
   requests: {
     title: 'My requests',

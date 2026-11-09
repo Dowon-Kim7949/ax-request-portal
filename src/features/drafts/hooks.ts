@@ -5,9 +5,10 @@
  */
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'react'
-import { dropSavedDraft, keys, storeSavedDraft, useDeleteDraft } from '@/api/queries'
+import { dropSavedDraft, keys, storeSavedDraft, useDeleteDraft, useDrafts } from '@/api/queries'
 import { useCan, useCurrentUser } from '@/app/hooks'
 import { getLocalDraft, listLocalDrafts, subscribeLocalDrafts, type LocalDraft } from '@/stores/draft'
+import { localRow, mergeDraftRows, type DraftRow } from './rows'
 import { draftSync, migrateLegacyDraft } from './sync'
 
 /**
@@ -124,6 +125,31 @@ export function useLocalDrafts(): LocalDraft[] {
     if (text !== cache.current.text) cache.current = { text, list }
     return cache.current.list
   })
+}
+
+/**
+ * The person's drafts as a list shows them (see `mergeDraftRows`), kept up to
+ * date with this device and how its sending stands. `query` is the account's
+ * list (its loading and failures); `saved` how many drafts the account holds,
+ * undefined until it was read. For people who may file requests only.
+ */
+export function useDraftRows() {
+  const user = useCurrentUser()
+  const query = useDrafts()
+  const subscribe = useDraftChanges(user.id)
+  const cache = useRef<{ text: string; rows: DraftRow[] }>({ text: '[]', rows: [] })
+  const local = useSyncExternalStore(subscribe, () => {
+    const engine = draftSync(user.id)
+    const rows = listLocalDrafts(user.id).flatMap(
+      (entry) => localRow(entry, engine.state(entry.localId)) ?? [],
+    )
+    // Small rows rather than the entries: those hold attachments' data.
+    const text = JSON.stringify(rows)
+    if (text !== cache.current.text) cache.current = { text, rows }
+    return cache.current.rows
+  })
+  const rows = useMemo(() => mergeDraftRows(query.data, local), [query.data, local])
+  return { rows, query, saved: query.data?.length }
 }
 
 /**

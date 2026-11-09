@@ -295,11 +295,13 @@ const ko = {
       go: '나가기',
     },
     project: {
+      name: '서비스',
       title: '어느 서비스에 대한 요청인가요?',
       hint: '고르면 담당자와 참고할 위키가 자동으로 정해져요.',
     },
-    type: { title: '어떤 종류의 요청인가요?' },
+    type: { name: '요청 유형', title: '어떤 종류의 요청인가요?' },
     targets: {
+      name: '대상 화면',
       title: '어느 화면이나 기능인가요?',
       hint: '여러 개를 고를 수 있어요. 목록에 없으면 기타에 적어 주세요.',
       other: '기타 (목록에 없는 화면)',
@@ -307,6 +309,7 @@ const ko = {
       nonCode: '코드가 필요 없는 요청이라 건너뛰어도 돼요.',
     },
     describe: {
+      name: '요청 내용',
       title: '지금은 어떻고, 어떻게 바뀌면 좋을까요?',
       titleLabel: '요청 제목',
       titlePlaceholder: '예: 로그인 5회 실패 시 안내 문구 추가',
@@ -318,6 +321,7 @@ const ko = {
       desiredPlaceholder: '예: 5번 틀리면 잠시 후 다시 시도하라는 안내가 보였으면 해요.',
     },
     criteria: {
+      name: '완료 기준',
       title: '무엇이 되면 완료인가요?',
       hint: '‘~하면 ~된다’ 형식으로 1~5개 적어 주세요. 이 기준으로 AI가 작업하고, 나중에 직접 확인하게 돼요.',
       placeholder: '예: 비밀번호를 5번 틀리면 ‘10분 후 다시 시도’ 안내가 보인다',
@@ -351,6 +355,7 @@ const ko = {
       count: '{{count}}개 항목',
     },
     extra: {
+      name: '추가 정보',
       title: '마지막으로 알려 주실 것이 있나요?',
       outOfScope: '건드리면 안 되는 것',
       outOfScopePlaceholder: '예: 비밀번호 정책(길이, 조합)은 바꾸지 않아요.',
@@ -364,6 +369,7 @@ const ko = {
       desiredDateReasonPlaceholder: '예: 고객사 보안 점검 일정',
     },
     review: {
+      name: '제출 전 확인',
       title: '이대로 제출할까요?',
       checking: 'AI가 빠진 칸이 없는지 살펴보고 있어요…',
       clean: '빠진 내용이 없어 보여요.',
@@ -400,6 +406,31 @@ const ko = {
       checklistItem: '지적 번호와 지적 내용을 모두 적어 주세요.',
       tooLarge: '10MB 이하 파일만 올릴 수 있어요.',
     },
+  },
+  drafts: {
+    title: '임시 저장',
+    count: '{{count}}/{{max}}',
+    countLabel: '계정에 저장된 초안 {{count}}개, 최대 {{max}}개',
+    untitled: '제목 없는 초안',
+    stepLabel: '{{total}}단계 중 {{current}}단계',
+    savedAt: '{{time}} 저장',
+    localOnly: '이 기기에만',
+    conflict: '충돌',
+    continue: '이어 쓰기',
+    delete: '{{title}} 삭제',
+    showAll: '{{count}}개 모두 보기',
+    showLess: '접기',
+    seeAll: '임시 저장함 전체 보기',
+    notice: '임시 저장된 초안 {{count}}개',
+    noticeAction: '이어 쓰기',
+    deleteConfirm: {
+      title: '이 초안을 삭제할까요?',
+      body: '이 기기와 계정에서 모두 지워지고 되돌릴 수 없어요.',
+      bodyLocal: '이 기기에서 지워지고 되돌릴 수 없어요.',
+      confirm: '삭제',
+    },
+    deleted: '초안을 삭제했어요.',
+    deleteFailed: '초안을 삭제하지 못했어요.',
   },
   requests: {
     title: '내 요청',
