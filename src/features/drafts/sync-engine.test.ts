@@ -97,9 +97,10 @@ function heldApi(holds: { create?: Array<Promise<void>>; update?: Array<Promise<
       if (hold) await hold
       return draftApi.update(id, body)
     },
+    // Counted once the server has answered, so a test that waits for it can read the account at once.
     remove: async (id) => {
+      await draftApi.remove(id)
       calls.remove++
-      return draftApi.remove(id)
     },
   }
   return { api: held, calls }
