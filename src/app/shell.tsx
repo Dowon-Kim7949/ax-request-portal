@@ -185,6 +185,8 @@ function AccountMenu() {
             type="button"
             className={item}
             onClick={() => {
+              // The panel goes: a sign-out the person is asked about gives focus back to the account button.
+              triggerRef.current?.focus()
               close()
               actions.logout()
             }}

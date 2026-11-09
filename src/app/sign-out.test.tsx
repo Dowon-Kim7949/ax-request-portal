@@ -107,6 +107,8 @@ describe('signing out', () => {
     expect(dialog).toHaveTextContent('이 기기에만 저장된 초안 1개가 있어요')
     await userEvent.click(screen.getByRole('button', { name: '취소' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    // The menu that held "sign out" is gone: focus is back on the account button.
+    expect(screen.getByRole('button', { name: /내 계정/ })).toHaveFocus()
     expect(useSession.getState().user?.id).toBe(USER)
     expect(localStorage.getItem(draftsKey(USER))).not.toBeNull()
 

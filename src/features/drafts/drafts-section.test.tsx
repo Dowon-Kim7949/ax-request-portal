@@ -148,10 +148,11 @@ describe('the saved drafts on the requests page', () => {
     expect(dialog).toHaveTextContent('지울 초안')
     expect(dialog).toHaveTextContent('이 기기와 계정에서 모두 지워지고 되돌릴 수 없어요.')
 
-    // Changing one's mind leaves it.
+    // Changing one's mind leaves it, and focus goes back to its delete button.
     await userEvent.click(within(dialog).getByRole('button', { name: '취소' }))
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(items(section)).toHaveLength(2)
+    await waitFor(() => expect(within(section).getByRole('button', { name: '지울 초안 삭제' })).toHaveFocus())
 
     await userEvent.click(within(section).getByRole('button', { name: '지울 초안 삭제' }))
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '삭제' }))
