@@ -110,14 +110,13 @@ export function useDraftSaveState(
   })
 }
 
-/** The draft kept as `key` on this device, kept up to date (another tab may write it). */
-export function useLocalDraft(userId: string, key: string | null): LocalDraft | undefined {
+/**
+ * When the draft kept as `key` on this device was last written (its words or
+ * step, here or in another tab), kept up to date; undefined while there is none.
+ */
+export function useLocalDraftWrittenAt(userId: string, key: string | null): string | undefined {
   const subscribe = useDraftChanges(userId)
-  const snapshot = useSyncExternalStore(subscribe, () => {
-    const entry = key ? getLocalDraft(userId, key) : undefined
-    return entry ? JSON.stringify(entry) : ''
-  })
-  return useMemo(() => (snapshot ? (JSON.parse(snapshot) as LocalDraft) : undefined), [snapshot])
+  return useSyncExternalStore(subscribe, () => (key ? getLocalDraft(userId, key)?.updatedAt : undefined))
 }
 
 /**

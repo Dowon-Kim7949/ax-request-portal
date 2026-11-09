@@ -26,7 +26,7 @@ import { LoadFailed } from '@/components/ui/load-failed'
 import { Sheet } from '@/components/ui/sheet'
 import type { PrecheckIssue } from '@/domain/model'
 import { DraftsNotice } from '@/features/drafts/drafts-section'
-import { useDiscardDraft, useDraftSaveState, useLocalDraft } from '@/features/drafts/hooks'
+import { useDiscardDraft, useDraftSaveState, useLocalDraftWrittenAt } from '@/features/drafts/hooks'
 import { DRAFT_SETTLE_TIMEOUT_MS, draftSync } from '@/features/drafts/sync'
 import { unlinked } from '@/features/drafts/sync-core'
 import { debounce } from '@/lib/debounce'
@@ -463,9 +463,11 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
   sendNowRef.current = sendNow
 
   // Another tab wrote this draft: follow its words, or ask when this screen has its own too.
-  const stored = useLocalDraft(userId, draftKey)
+  const writtenAt = useLocalDraftWrittenAt(userId, draftKey)
   useEffect(() => {
-    if (!stored || finished.current || stored.updatedAt === seen.current.at) return
+    if (!writtenAt || !draftKey || finished.current || writtenAt === seen.current.at) return
+    const stored = getLocalDraft(userId, draftKey)
+    if (!stored) return
     const theirs = wordsOf(stored.content)
     if (theirs === seen.current.words) {
       seen.current = { ...seen.current, at: stored.updatedAt }
@@ -475,7 +477,7 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
     if (mine === seen.current.words) take(stored)
     else if (mine !== theirs) setTabConflict(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `take` reads refs and the form
-  }, [stored, form])
+  }, [writtenAt, draftKey, userId, form])
 
   useEffect(() => {
     const sub = form.watch(() => draftSaver.schedule())
