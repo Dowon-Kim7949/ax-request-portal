@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: wcag
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-09
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -23,6 +23,9 @@ source_files:
   - e2e/axe.spec.ts
 evidence:
   - src/app/update-notice.tsx#symbol:UpdateNotice
+  - src/components/ui/sheet.tsx#symbol:Sheet
+  - src/components/ui/sheet.test.tsx
+  - src/features/wizard/draft-status.tsx#symbol:DraftStatusBar
   - src/theme.test.ts#symbol:PAIRS
   - src/theme.test.ts#L37-L39
   - src/index.css#L154-L188
@@ -95,7 +98,8 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 - A screen reader ignores a live region that arrives with its text already in it. The login screen's session-expiry notice is therefore injected 100 ms after mounting into an empty `sr-only` `role="status"`; the visible copy is `aria-hidden` and is the e-mail field's description, so it is heard once.
 - The time-zone preview in Settings is not a live region (each arrow key on the select would be read out); the select points to it with `aria-describedby`.
 - Wizard steps move focus to the step heading (`StepTitle`, `tabIndex=-1`) in a layout effect, before paint. A passive effect stole focus after the user had started typing and dropped the input.
-- `Sheet` (Radix Dialog) traps focus and closes on Escape.
+- `Sheet` (Radix Dialog) traps focus and closes on Escape. On closing it gives focus back to what had it when it opened; when that is gone the caller moves focus (after deleting a saved draft: the section heading, or `main` when the section went with it). A sheet that must not close mid-operation keeps Escape from closing it (deleting a saved draft).
+- Saved drafts: the wizard's save line tells screen readers only when the draft stops reaching the account, once; a conflict or full-account notice describes the step heading, so it is heard when the heading takes focus. A count shown as `N/20` is read as a sentence (visually hidden text). See [Request Wizard](domains/11_wizard.md) and [My Requests](domains/08_requests.md).
 
 ## Reflow
 
@@ -118,6 +122,7 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 - `src/components/ui/button.tsx#L66-L67` — `disabled` and `aria-busy` while loading.
 - `src/components/request/status.tsx#symbol:Stepper` — `aria-current="step"`.
 - `src/features/wizard/steps.tsx#symbol:StepTitle` — focus target for step changes.
+- `src/components/ui/sheet.tsx#symbol:Sheet`, `src/components/ui/sheet.test.tsx` — focus given back when a sheet closes; `src/features/wizard/draft-status.tsx#symbol:DraftStatusBar` — the save line's announcements.
 - `e2e/cursor.spec.ts`, `e2e/layout.spec.ts`, `e2e/theme.spec.ts`, `e2e/a11y.spec.ts`, `e2e/axe.spec.ts` — the automated checks; `playwright.config.ts#L14-L15` — which projects skip which specs.
 - `src/app/shell.tsx#symbol:Glyph`, `src/app/demo-banner.tsx#symbol:DemoBanner` — CSS-drawn glyphs and the banner landmark.
 - `src/components/ui/load-failed.tsx#symbol:LoadFailed`, `src/components/ui/load-failed.tsx#symbol:RefreshFailed`, `src/features/auth/login-page.tsx#symbol:ANNOUNCE_DELAY_MS`, `src/features/settings/time-zone-section.tsx#symbol:TimeZonePicker` — status semantics and the delayed announcement.

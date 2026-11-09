@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: profile
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-09
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -61,7 +61,7 @@ Front-end rules that apply to every screen. The deeper references are [Architect
 - Server state comes only from hooks in `src/api/queries.ts`; components never call `fetch` (the one other `fetch` is `src/app/update-check.ts`, which reads the static `version.json`, not the API). Client-only state lives in the component, in the URL (filters, wizard step) when it should survive a reload or be shareable, or in a zustand store when it is global.
 - Errors: a query that loaded nothing renders `LoadFailed` (full or `compact`) with retry, never an empty state; a failed refresh keeps the data and adds `RefreshFailed` ([Architecture Conventions](../ARCHITECTURE_CONVENTIONS.md)). A failed mutation shows a toast with the localized server message (`errorText`). The raw text of an unexpected error reaches the page only in development.
 - Times: timestamps through `DateTimeText`; date-only values through `formatDate`; "today" is `hqToday()` wherever it limits or groups dates.
-- A form that can lose typing on navigation saves a draft and confirms leaving with `useBlocker` plus `beforeunload` (the wizard). Playwright accepts `beforeunload` automatically only when no listener is registered.
+- A form that can lose typing on navigation keeps a draft as it is typed and confirms leaving with `useBlocker` plus `beforeunload` only while the words are kept nowhere (the wizard, whose drafts are kept on the device and saved to the account). Playwright accepts `beforeunload` automatically only when no listener is registered.
 
 ## Checklist for a UI change
 
@@ -80,7 +80,7 @@ Front-end rules that apply to every screen. The deeper references are [Architect
 - `src/app/page.tsx#symbol:PageHeader`, `src/app/title.ts#symbol:usePageTitle` — page heading and title.
 - `src/app/update-check.ts#symbol:checkForUpdateNow`, `src/app/pages.tsx#symbol:RouteErrorView` — new-version check and the error page when a page fails to load.
 - `src/components/ui/load-failed.tsx#symbol:LoadFailed`, `src/components/ui/date-time.tsx#symbol:DateTimeText` — failure and time display.
-- `src/features/wizard/wizard-page.tsx#symbol:WizardForm` — draft saving, leave confirmation and the pinned step bar.
+- `src/features/wizard/wizard-page.tsx#symbol:WizardForm` — draft writing, leave confirmation and the pinned step bar.
 
 ## Open Questions
 

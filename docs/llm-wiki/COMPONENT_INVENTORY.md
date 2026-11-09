@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: component_inventory
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-09
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -44,6 +44,12 @@ evidence:
   - src/app/shell.tsx#symbol:Glyph
   - src/features/wizard/steps.tsx#symbol:MissingAttachments
   - src/features/detail/attachment-link.tsx#symbol:AttachmentLink
+  - src/components/ui/sheet.test.tsx
+  - src/features/drafts/drafts-section.tsx#symbol:DraftsSection
+  - src/features/drafts/drafts-section.tsx#symbol:DraftsNotice
+  - src/features/wizard/draft-status.tsx#symbol:DraftStatusBar
+  - src/features/wizard/draft-status.tsx#symbol:ConflictNotice
+  - src/features/wizard/draft-status.tsx#symbol:LimitNotice
   - vite.config.ts
 related:
   - docs/llm-wiki/WCAG.md
@@ -77,7 +83,7 @@ The primitives are written by hand in the shadcn style (Tailwind classes, `class
 | `DateTimeText`, `HqCalendarNote` | `<time>` | `DateTimeText iso variant` renders a timestamp in the viewing time zone inside `<time dateTime>`: `compact` (lists, cards: local time, full form in the tooltip), `full` (detail screens, timelines: adds the zone and head-office time when the clocks differ), `date` (the date it falls on; `calendar="viewer"` by default, `calendar="hq"` for business days such as a release day, whose tooltip always adds head-office time; optional `weekday`). `sentence={(time) => t(key, { time })}` keeps a translated sentence's word order. `HqCalendarNote` is the "dates follow head-office time" line, rendered only for viewers on another clock. Both re-render when Settings change (`useTimeView`). |
 | `Input`, `Textarea`, `Label`, `Field`, `AdviceText` | native | `Field` wires label, hint and error with `useId`; the error is a `role="alert"` paragraph. `AdviceText` renders precheck advice next to a field. |
 | `Segmented` | ARIA radio group | Generic over the value type; options are `role="radio"` with `aria-checked`, optional count badges. Used for list filters, theme and language. |
-| `Sheet` | Radix `Dialog` | Bottom sheet on phones, centered dialog on larger screens; focus trap and Escape come from Radix. Close button is 44 px. |
+| `Sheet` | Radix `Dialog` | Bottom sheet on phones, centered dialog on larger screens; focus trap and Escape come from Radix. Close button is 44 px. Opened from state, not a Radix trigger, so it remembers what had focus when it opened (a layout effect, before Radix moves focus in) and gives focus back to it on closing. `onCloseAutoFocus(event)` runs first: call `preventDefault()` and move focus yourself when that element is gone (a deleted row). |
 | `StatTile` | plain elements | Label, value, an optional short note (muted or warning with an icon) and optional children such as a `Meter` or a description. Used by the executive dashboard and the AI usage dashboard. |
 | `MonthStepper` | buttons | Previous / next month above a monthly dashboard; "next" is disabled at the current month of the head-office calendar, and `HqCalendarNote` sits beside it. |
 
@@ -90,6 +96,17 @@ The primitives are written by hand in the shadcn style (Tailwind classes, `class
 | `Glyph` (local to `shell.tsx`) | Decorative text drawn by CSS (`content: attr(data-glyph)`, `aria-hidden`) inside a control whose name already says it: the brand initials, the unread count on the bell, the account initial. As DOM text it would become part of the visible label, which must be contained in the accessible name (WCAG 2.5.3). Reuse the pattern for any initial or counter inside a named control. |
 
 Page-local components worth knowing: `MissingAttachments` (wizard, an alert naming attachments the server could not find, see [Request Wizard](domains/11_wizard.md)) and `AttachmentLink` (request page, opens or downloads an attachment safely, see [Request Detail](domains/04_detail.md)).
+
+## Draft pieces (`src/features/drafts`, `src/features/wizard`)
+
+Feature-local, listed here because three screens share them.
+
+| Component | Notes |
+| --- | --- |
+| `DraftsSection` | The saved-drafts section, `variant="page"` on My requests (section `id="drafts"`, three rows then "show all") or `"home"` (three rows and a "see all" link). Renders only for `request:create` and only when there is something to show; rows, badges, deleting and the room held while loading are in [My Requests](domains/08_requests.md). |
+| `DraftsNotice` | "Saved drafts: N · Continue" on a new, empty request, in the wizard's save line. |
+| `DraftStatusBar` | The wizard's save line under the progress bar: save state, "delete draft", and an `idle` slot for `DraftsNotice` before anything is saved, so the form does not move. |
+| `ConflictNotice`, `LimitNotice` | The wizard's notices for a draft saved elsewhere meanwhile and for a full account; they describe the step heading through `StepNotice` ([Request Wizard](domains/11_wizard.md)). |
 
 ## Request widgets (`src/components/request`)
 
@@ -127,7 +144,8 @@ Page-local components worth knowing: `MissingAttachments` (wizard, an alert nami
 - `src/components/ui/feedback.tsx#symbol:ErrorState` — alert role and retry; spinners and skeletons in the same file.
 - `src/components/ui/field.tsx#symbol:Field` — label/hint/error wiring.
 - `src/components/ui/segmented.tsx#symbol:Segmented` — radio-group semantics.
-- `src/components/ui/sheet.tsx#symbol:Sheet` — Radix Dialog as sheet/dialog.
+- `src/components/ui/sheet.tsx#symbol:Sheet`, `src/components/ui/sheet.test.tsx` — Radix Dialog as sheet/dialog, and its focus return.
+- `src/features/drafts/drafts-section.tsx#symbol:DraftsSection`, `src/features/drafts/drafts-section.tsx#symbol:DraftsNotice`, `src/features/wizard/draft-status.tsx#symbol:DraftStatusBar`, `src/features/wizard/draft-status.tsx#symbol:ConflictNotice`, `src/features/wizard/draft-status.tsx#symbol:LimitNotice` — draft pieces.
 - `src/components/request/request-card.tsx#symbol:RequestCard`, `src/components/request/status.tsx#symbol:StatusBadge`, `src/components/request/status.tsx#symbol:Stepper`, `src/components/request/timeline.tsx#symbol:Timeline` — request widgets.
 - `src/components/ui/load-failed.tsx#symbol:LoadFailed`, `src/components/ui/load-failed.tsx#symbol:RefreshFailed` — load and refresh failures.
 - `src/components/ui/date-time.tsx#symbol:DateTimeText`, `src/components/ui/date-time.tsx#symbol:HqCalendarNote`, `src/components/ui/date-time.test.tsx`, `src/app/time-zone.ts#symbol:useTimeView`, `src/app/time-zone.ts#symbol:useHqCalendarNote`, `src/components/ui/month-stepper.tsx#symbol:MonthStepper` — times and the business calendar.
@@ -139,7 +157,7 @@ Page-local components worth knowing: `MissingAttachments` (wizard, an alert nami
 
 ## Open Questions
 
-- Only `DateTimeText` has a component-level unit test (`src/components/ui/date-time.test.tsx`); the other primitives are covered through screen tests and E2E. Decide whether primitives need their own tests before the inventory grows.
+- Only `DateTimeText` and `Sheet` have component-level unit tests (`src/components/ui/date-time.test.tsx`, `src/components/ui/sheet.test.tsx`); the other primitives are covered through screen tests and E2E. Decide whether primitives need their own tests before the inventory grows.
 
 ## Review Notes
 

@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: architecture_conventions
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-09
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -28,6 +28,8 @@ source_files:
   - vite.config.ts
   - deploy/nginx.conf
   - src/app/update-check.ts
+  - src/stores/draft.ts
+  - src/features/drafts/sync-engine.ts
 evidence:
   - src/api/contract.ts#symbol:EndpointSpec
   - src/api/contract.ts#symbol:timeoutOf
@@ -40,6 +42,13 @@ evidence:
   - src/api/queries.ts#symbol:onRequestChanged
   - src/api/queries.ts#symbol:storeRequest
   - src/api/queries.ts#symbol:requestScope
+  - src/api/queries.ts#symbol:storeSavedDraft
+  - src/api/queries.ts#symbol:dropSavedDraft
+  - src/features/drafts/sync-engine.ts#symbol:DraftSyncEngine
+  - src/features/drafts/hooks.ts#symbol:useDraftSync
+  - src/stores/draft.ts#symbol:draftsKey
+  - src/mocks/engine.ts#symbol:MockState
+  - src/config/app.config.ts#symbol:appConfig
   - src/api/query-client.ts#symbol:createQueryClient
   - src/api/query-client.ts#symbol:isRetryable
   - src/api/refresh.ts#symbol:refreshOf
@@ -126,9 +135,9 @@ A front-end-only SPA whose backend is a contract. One table of endpoints (`src/a
 | `src/config/` | `app.config.ts` (validated template settings), `env.ts` (build-time variables), `env-check.ts` (build-setting rules), `nginx-csp.ts`, `zod-jitless.ts` | `domain`, `i18n/locales` |
 | `src/lib/` | Formatting (`format.ts`), time zones (`time-zone.ts`, no UI state, also used by the mock), small helpers (`abort.ts`, `debounce.ts`, `data-url.ts`) | `config`, `i18n`, `stores` (`format.ts` only) |
 | `src/app/` | Router, guards, session sync, shell and navigation, theme, page helpers, demo banner and demo-data signals, time-zone hooks | everything below |
-| `src/features/<domain>/` | Pages and page-specific components, one folder per domain | `app`, `api`, `components`, `domain` |
+| `src/features/<domain>/` | Pages and page-specific components, one folder per domain; `drafts/` has no page: the draft sync engine (`sync-core.ts` rules, `sync-engine.ts` without React, `sync.ts` wiring, `hooks.ts`) and the saved-drafts section the home, requests and wizard screens render | `app`, `api`, `components`, `domain`, `stores` |
 | `src/components/` | Shared UI (`ui/`) and request widgets (`request/`) | `domain` types, `lib` |
-| `src/stores/` | zustand stores persisted to `localStorage` (`session`, `preferences`) and the wizard draft's storage helper (`draft.ts`) | — |
+| `src/stores/` | zustand stores persisted to `localStorage` (`session`, `preferences`) and the drafts kept on this device (`draft.ts`: plain functions over one `localStorage` key per person, no React; `session.ts` imports it to delete them on sign-out) | — |
 | `src/i18n/` | i18next setup, `ko.ts`, `en.ts`, `locales.ts` | `config`, `stores` |
 
 - `@/` is an alias for `src/`. The mock is reached only through dynamic imports in `src/main.tsx` and `src/app/demo.ts`, each behind the `__API_MOCK__` build constant (see Build and deploy); branching on anything else (e.g. `env.apiMock`) keeps the import and ships the mock. The app may import `src/mocks/signals.ts` statically: it has no imports.
@@ -137,10 +146,10 @@ A front-end-only SPA whose backend is a contract. One table of endpoints (`src/a
 
 ## API contract
 
-- `EndpointSpec`: `method`, OpenAPI-style `path` (`/requests/{id}`), `summary`, `tag`, optional `public`, `params`, `query`, `body` (Zod), `multipart`, `status` (200/201), `response` (`null` → 204) and `timeoutMs`. The table is `api`; it has 36 endpoints.
+- `EndpointSpec`: `method`, OpenAPI-style `path` (`/requests/{id}`), `summary`, `tag`, optional `public`, `params`, `query`, `body` (Zod), `multipart`, `status` (200/201), `conflict` (what a `409` means there, written into `docs/openapi.json`), `response` (`null` → 204) and `timeoutMs`. The table is `api`; it has 41 endpoints.
 - Time limits belong to the endpoint, the same for every caller: `timeoutOf(spec)` is the spec's `timeoutMs`, else `UPLOAD_TIMEOUT_MS` (120 s) for multipart, else `DEFAULT_TIMEOUT_MS` (30 s); `0` means no limit. `call` takes no time-limit argument.
 - `call` in `client.ts` builds the URL from the spec, adds `Authorization: Bearer`, `Accept: application/json` and `Accept-Language`, and runs the whole call — sending, the mock's re-send and reading the body — under one deadline combined with the caller's `signal` (`anySignal`: `AbortSignal.any`, or a manual merge where it is missing). Every failure becomes an `ApiError`: `timeout` when the deadline passed, `network` when the request could not be sent or read, `contract_violation` when a success body is not JSON (typically an HTML page behind a wrong API base URL) or does not match the spec's schema, otherwise the server's code. Two exceptions pass through: a cancel through the caller's `signal` stays an `AbortError` (how TanStack Query drops a superseded fetch), and a bug such as a missing path parameter is thrown as is.
-- A `401` from a non-public endpoint calls `onUnauthorized(token)` with the token the refused request carried ([Auth](domains/02_auth.md)). The optional `recover` hook (set only in mock mode) sees every response first; when it resolves `true` the request is sent exactly once more. `ClientHooks.messages` holds the texts for errors the client raises itself; English fills any gap. Error bodies follow `ApiErrorBody` (`bad_request`, `unauthorized`, `forbidden`, `not_found`, `invalid_transition`, `guard_failed`, `internal`) with a localized `message` and optional `issues[]` (`path`, `message`).
+- A `401` from a non-public endpoint calls `onUnauthorized(token)` with the token the refused request carried ([Auth](domains/02_auth.md)). The optional `recover` hook (set only in mock mode) sees every response first; when it resolves `true` the request is sent exactly once more. `ClientHooks.messages` holds the texts for errors the client raises itself; English fills any gap. Error bodies follow `ApiErrorBody` (`bad_request`, `unauthorized`, `forbidden`, `not_found`, `invalid_transition`, `guard_failed`, `conflict` (a saved draft was saved again since it was read), `limit_reached` (no room for another saved draft), `internal`) with a localized `message` and optional `issues[]` (`path`, `message`).
 - What a user is told about a failure comes from one function, `errorText(error, fallback)` in `src/api/error-text.ts`: the API's localized message, or the fallback.
 - Every URL field in the contract is validated with the rules in `src/domain/url.ts` (`isSafeUrl` with a kind: `web` absolute http(s); `link` http(s) or a path on this site; `file` adds `data:` images and PDFs and `blob:`; `image` adds `data:image/*` and `blob:`), so a `javascript:` or `data:text/html` URL fails as `contract_violation`. Screens check again before they render a link or an image.
 - Every schema used by the contract is registered with `named()` (`src/domain/registry.ts`); an unregistered schema makes OpenAPI generation throw.
@@ -155,6 +164,7 @@ A front-end-only SPA whose backend is a contract. One table of endpoints (`src/a
 - Live polling: while a request is `submitted`, `reporting` or `in_progress`, detail polls every 2 s and lists every 4 s; notifications poll every 15 s.
 - Every mutation that changes a request must call `onRequestChanged`: it stores the returned request with `storeRequest` and invalidates lists, the regression queue, notifications, the dashboard and releases. A new screen derived from requests must be added there. `storeRequest` keeps the cached copy when it is newer (`updatedAt`) than the answer, because answers and polls can arrive out of order.
 - Every change to one request runs in the TanStack mutation scope `request:<id>` (`requestScope`), one after another in the order made.
+- Saved drafts: `keys.drafts()` (the list) and `keys.draft(id)` (one draft) are separate, so refreshing the list does not re-read an open draft. Drafts are written to the server by the draft sync engine (`DraftSyncEngine`, outside React, one request at a time per tab; [Request Wizard](domains/11_wizard.md)), not by mutation hooks; `useDraftSync` in the shell applies its results to the cache: `storeSavedDraft` puts a saved draft into the detail and list caches at once (upsert, sorted) and then invalidates the list, `dropSavedDraft` removes a deleted or submitted one. Signing out clears the whole cache as before.
 - Switching language invalidates every query, because server texts are localized.
 
 ## Showing load failures
@@ -186,13 +196,14 @@ Two clocks matter ([Glossary](GLOSSARY.md)):
 - Boot (`main.tsx`): `zod-jitless` first, then i18n (the language decides the seed), theme sync, the query client, client configuration, then in mock mode the service worker races an 8 s timeout. On failure the page reloads once (a `sessionStorage` flag prevents loops) and then shows a retry screen. Reason: WebKit can refuse or hang the worker registration when the page is reloaded during the first load; creating a second worker on the same page risks handling requests twice.
 - Worker restarts after boot: browsers stop an idle service worker (Chrome after about 30 s), and MSW's 5 s keep-alive timer is throttled in a background tab, so a tab left alone loses its worker. The restarted worker has an empty `activeClientIds` and passes every request to the network (GitHub Pages answers `404`), which used to leave an error on every screen until a reload. Every mock response carries `X-Mock-Api: 1` (`MOCK_RESPONSE_HEADER`); a response without it makes `reattachIfBypassed` post MSW's `MOCK_ACTIVATE` to the registered worker, wait up to 3 s (`REATTACH_TIMEOUT_MS`) for `MOCKING_ENABLED`, and let the client resend the request once. Concurrent bypassed requests share one re-attach. A bypassed request never reached the mock, so resending a mutation does not apply it twice. `MOCK_ACTIVATE` / `MOCKING_ENABLED` are MSW's worker protocol, not a public API: `e2e/mock-api.spec.ts` stops the worker through the Chrome DevTools Protocol and fails if an MSW upgrade changes them (Chromium only).
 - `createHandlers` derives one MSW handler per contract entry, validates params/query/body with the same schemas, adds 120–380 ms latency, reads the language and the mock token, advances simulated time (`engine.tick`) and runs the resolver. A handler reads the request body first and then takes up other tabs' saves, handles the request and saves with nothing awaited in between; an upload takes them up once more after reading the file.
-- State is `MockState` in `localStorage` (`ax-request-portal:mock-db`), `STATE_VERSION` 5. Bumping it discards every visitor's stored data and reseeds; so does a stored value that fails the shallow shape check (`stateProblem`, with a console warning). The seed is produced by running the real engine through the lifecycle, so seeded requests are always reachable states; steps a person would click (scope choices, assumption ticks) are filled in by `withDefaults` with the AI's suggestion. `dirty` marks data a person edited, uploads and read notifications included: untouched demo data is regenerated when the language changes, edited data keeps its language.
+- State is `MockState` in `localStorage` (`ax-request-portal:mock-db`), `STATE_VERSION` 6. Bumping it discards every visitor's stored data and reseeds; so does a stored value that fails the shallow shape check (`stateProblem`, with a console warning). The seed is produced by running the real engine through the lifecycle, so seeded requests are always reachable states; steps a person would click (scope choices, assumption ticks) are filled in by `withDefaults` with the AI's suggestion. `dirty` marks data a person edited, uploads, read notifications and saved drafts included (their routes use `edit`, not `touch`, so a language change cannot reseed a person's drafts away): untouched demo data is regenerated when the language changes, edited data keeps its language.
+- Saved drafts live in `MockState.drafts` with their owner (never returned). Someone else's draft answers `404`; an update whose `baseVersion` is not the stored version answers `409 conflict`; a create over the limit (`EngineOptions.draftsPerAccount`, default `appConfig.drafts.maxPerAccount`) answers `409 limit_reached`, except a create repeated with a `clientId` that already made one of the caller's drafts, which returns that draft unchanged. A missing or someone else's attachment is a `400` at `content.attachmentIds.<i>`. The list is most recently changed first. `createRequest` with a `draftId` deletes the caller's draft in the same operation; a refused submission keeps it.
 - Several tabs: every save increments a revision, also written to its own key (`REVISION_KEY`, `ax-request-portal:mock-db:revision`). Before each request, and on a `storage` event, the store reads a newer save from another tab first, so tabs used in turn neither overwrite each other nor issue the same request number twice; a reset continues the numbering so other tabs follow it. After taking up another tab's change the mock sends `MOCK_DATA_CHANGED_EVENT`, and `DemoDataSync` invalidates every query (`keys.all`, debounced 150 ms). Two tabs saving at the same instant can still lose one change.
 - When saving fails (storage full or blocked) the demo keeps working in memory: `reportMockStorageFull` raises `MOCK_STORAGE_FULL_EVENT` once per run of failures and remembers it until a listener calls `takeMockStorageFull` (the first save can fail before the app renders), and `DemoStorageNotice` shows one toast pointing to "reset demo data". A browser that blocks `localStorage` altogether starts the mock in memory. Notifications are capped at the newest 200 per person.
 
 ## Configuration
 
-- Template users change `src/config/app.config.ts`: brand (per locale), organization (`timeZone`, an IANA name for the head office's business calendar, and `timeZoneLabel` per locale), locales and default locale, enabled roles, role permissions, request types, workflow (`scopeCheck`: ask the requester to confirm the AI's reading before developer review; the mock follows it and a real backend should read the same setting), mock timings. `AppConfigSchema` validates it at start-up and refuses a configuration without `admin`, without an active role that can manage users, with a default locale that is not enabled, or with an unknown time zone.
+- Template users change `src/config/app.config.ts`: brand (per locale), organization (`timeZone`, an IANA name for the head office's business calendar, and `timeZoneLabel` per locale), locales and default locale, enabled roles, role permissions, request types, workflow (`scopeCheck`: ask the requester to confirm the AI's reading before developer review; the mock follows it and a real backend should read the same setting), mock timings, and `drafts.maxPerAccount` (saved drafts per account, 20; the API refuses more). `AppConfigSchema` validates it at start-up and refuses a configuration without `admin`, without an active role that can manage users, with a default locale that is not enabled, or with an unknown time zone.
 - Colours are tokens in `src/index.css`; texts are in `src/i18n/`; demo accounts and seed data are in `src/mocks/seed.ts`.
 
 ## i18n
@@ -228,7 +239,9 @@ Two clocks matter ([Glossary](GLOSSARY.md)):
 - `src/api/openapi.test.ts`, `src/domain/registry.ts#symbol:named` — OpenAPI generation and its test.
 - `src/domain/url.ts#symbol:isSafeUrl` — URL rules of the contract.
 - `src/main.tsx#symbol:MOCK_START_TIMEOUT_MS`, `src/main.tsx#symbol:BOOT_RELOAD_KEY` — boot recovery.
-- `src/mocks/handlers.ts#symbol:createHandlers`, `src/mocks/engine.ts#symbol:STATE_VERSION` — mock server.
+- `src/mocks/handlers.ts#symbol:createHandlers`, `src/mocks/engine.ts#symbol:STATE_VERSION`, `src/mocks/engine.ts#symbol:MockState` — mock server and its state, saved drafts included.
+- `src/api/queries.ts#symbol:storeSavedDraft`, `src/api/queries.ts#symbol:dropSavedDraft`, `src/features/drafts/sync-engine.ts#symbol:DraftSyncEngine`, `src/features/drafts/hooks.ts#symbol:useDraftSync`, `src/stores/draft.ts#symbol:draftsKey` — the drafts cache, the sync engine and the drafts kept on this device.
+- `src/config/app.config.ts#symbol:appConfig` — template settings, `drafts.maxPerAccount` included.
 - `src/mocks/handlers.ts#symbol:MOCK_RESPONSE_HEADER`, `src/mocks/browser.ts#symbol:reattachIfBypassed`, `src/mocks/handlers.test.ts`, `e2e/mock-api.spec.ts` — recovery after the mock worker restarts.
 - `src/mocks/store.ts#symbol:REVISION_KEY`, `src/mocks/store.ts#symbol:stateProblem`, `src/mocks/store.ts#symbol:createMockStore`, `src/mocks/store.test.ts` — persistence, shape check and tabs.
 - `src/mocks/signals.ts#symbol:reportMockStorageFull`, `src/mocks/signals.ts#symbol:takeMockStorageFull`, `src/mocks/signals.ts#symbol:MOCK_DATA_CHANGED_EVENT`, `src/app/demo-data-sync.tsx#symbol:DemoDataSync`, `src/app/demo-storage-notice.tsx#symbol:DemoStorageNotice` — the mock's signals to the app.

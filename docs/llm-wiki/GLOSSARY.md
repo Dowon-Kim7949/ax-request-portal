@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: glossary
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-09
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -36,6 +36,9 @@ evidence:
   - src/app/demo-banner.tsx#symbol:DemoBanner
   - src/stores/session.ts#symbol:SessionEndReason
   - src/domain/url.ts#symbol:UrlKind
+  - src/api/contract.ts#symbol:SavedDraft
+  - src/stores/draft.ts#symbol:LocalDraft
+  - src/features/drafts/sync-engine.ts#symbol:DraftSyncEngine
 related:
   - docs/llm-wiki/domains/00_overview.md
   - docs/llm-wiki/DOMAIN_FEATURES.md
@@ -77,6 +80,10 @@ Terms as the code uses them. Identifiers are kept in English in both UI language
 | Runtime | How a task drives the model: `api` for precheck and report, `claude_code` or `codex` for AI work. | `src/domain/ai.ts` |
 | Usage entry | One booked AI call or agent run: provider, model, runtime, normalized tokens and estimated cost, priced once and never re-priced. | `src/domain/ai.ts` |
 | Precheck (`PrecheckIssue`) | Advice on a draft before submission; never blocks. | `src/domain/precheck.ts` |
+| Saved draft (`SavedDraft`; "임시 저장" / "Saved drafts") | An unsubmitted request saved to the person's account: step, content (`DraftContent`) and a `version` that grows with every save. Continued on any device; deleted by the server when a request names it (`draftId`). At most `drafts.maxPerAccount` (20) per account. | `src/api/contract.ts` |
+| Draft on this device (`LocalDraft`) | What the person wrote that the account does not have yet, kept in `localStorage` per person and deleted once the account holds the same. Keyed by a local id (`local-…`) until the server saves it, then by the server id. Shown as "This device only" when it cannot reach the account. | `src/stores/draft.ts` |
+| Draft sync | Sending drafts on this device to the account (`DraftSyncEngine`): one request at a time, a second after typing pauses and on step changes, leaving, hiding, start and reconnecting. | `src/features/drafts/sync-engine.ts` |
+| Draft conflict | The account's draft was saved elsewhere (another device or tab) since the version this device's copy was written over (`409 conflict`); nothing is sent until the person keeps this screen's version or loads the saved one. | `src/features/drafts/sync-core.ts` |
 | Feasibility report (`FeasibilityReport`) | The AI's assessment before any work: verdict, evidence, impact, plan, verification, size, risks, open questions. | `src/domain/model.ts` |
 | Verdict (`ReportVerdict`) | `feasible`, `conditional`, `out_of_scope`, `undetermined`. | `src/domain/model.ts` |
 | Wiki trust (`WikiTrust`) | `high` / `medium` / `low`, derived from how many of the report's evidence documents are human-verified. | `src/domain/report.ts` |
@@ -93,7 +100,7 @@ Terms as the code uses them. Identifiers are kept in English in both UI language
 | Viewing time zone | The time zone timestamps are shown in on this device: the one chosen in Settings, else the device's (`resolveViewTimeZone`). Never derived from the IP address. | `src/lib/time-zone.ts` |
 | Head-office time (shown beside local time) | On detail screens, "local time (zone) · Korea time", added only when the viewing time zone reads a different clock from the head office at that instant and the viewer keeps "show head-office time" on (`describeDateTime`). | `src/lib/format.ts` |
 | Date-only value | A `YYYY-MM-DD` calendar date (desired date, scheduled release date). Shown as written in every time zone; never converted. | `src/lib/format.ts` |
-| Session end reason (`SessionEndReason`) | Why a session ended in this tab: `signedOut` (on purpose: the next sign-in starts at home, the draft is deleted) or `expired` (a 401: the login screen keeps `next` and says so). | `src/stores/session.ts` |
+| Session end reason (`SessionEndReason`) | Why a session ended in this tab: `signedOut` (on purpose: the next sign-in starts at home, the drafts kept on this device are deleted) or `expired` (a 401: the login screen keeps `next` and says so). | `src/stores/session.ts` |
 | Load failure / refresh failure | Nothing could be loaded (`LoadFailed`) versus a refresh failed while earlier data stays on screen (`RefreshFailed`). | `src/components/ui/load-failed.tsx` |
 | Safe URL (`UrlKind`) | A URL the API may hand to the browser for its kind: `web`, `link`, `file` or `image` (`isSafeUrl`). | `src/domain/url.ts` |
 
@@ -105,6 +112,7 @@ Terms as the code uses them. Identifiers are kept in English in both UI language
 - `src/mocks/engine.ts#symbol:MockState`, `src/config/env-check.ts#symbol:isApiMock`, `src/app/demo-banner.tsx#symbol:DemoBanner` — mock and demo terms.
 - `src/config/app.config.ts#symbol:appConfig`, `src/lib/time-zone.ts#symbol:hqToday`, `src/lib/time-zone.ts#symbol:resolveViewTimeZone`, `src/lib/format.ts#symbol:describeDateTime` — time terms.
 - `src/stores/session.ts#symbol:SessionEndReason`, `src/domain/url.ts#symbol:UrlKind` — session and URL terms.
+- `src/api/contract.ts#symbol:SavedDraft`, `src/stores/draft.ts#symbol:LocalDraft`, `src/features/drafts/sync-engine.ts#symbol:DraftSyncEngine` — draft terms.
 
 ## Open Questions
 

@@ -6,12 +6,13 @@ tags:
 status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-09
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
 source_files:
   - src/features/home
+  - src/features/drafts/drafts-section.tsx
 evidence:
   - src/features/home/home-page.tsx#symbol:HomePage
   - src/features/home/home-page.tsx#symbol:RequesterSection
@@ -22,6 +23,7 @@ evidence:
   - src/components/ui/load-failed.tsx#symbol:LoadFailed
   - src/api/refresh.ts#symbol:refreshOf
   - src/features/home/home-page.test.tsx
+  - src/features/drafts/drafts-section.tsx#symbol:DraftsSection
 related:
   - docs/llm-wiki/domains/08_requests.md
   - docs/llm-wiki/domains/12_work.md
@@ -44,17 +46,22 @@ The landing page at `/` (authentication only, no extra permission). It shows wha
 | --- | --- | --- |
 | Dashboard call-to-action | `dashboard:view` | Link to `/dashboard`. |
 | `DeveloperSection` | `request:review` | Up to six requests whose turn is the developer's (`turnOf(status) === 'developer'`), with requester names; "see all" goes to `/work`. |
-| `RequesterSection` | `request:create` and not `request:review` | Count of open requests (link to `/requests`), "your turn" cards (`turnOf === 'requester'`), active projects that start a request at `/requests/new?project=<id>`, and a new-request button. |
+| `RequesterSection` | `request:create` and not `request:review` | Count of open requests (link to `/requests`), "your turn" cards (`turnOf === 'requester'`), the saved drafts under them, active projects that start a request at `/requests/new?project=<id>`, and a new-request button. |
 | `AdminSection` | `project:manage` or `user:manage` | Links to the admin pages the user may open. |
 | `OpsSection` | any of `usage:view`, `agent:manage`, `budget:manage` | This month's AI cost against the monthly limit (with `usage:view`, from `GET /ai/usage`) and links to the AI operations pages ([AI Operations](13_ops.md)). |
 
 Developers and admins therefore never see the requester section.
 
+## Saved drafts
+
+`DraftsSection variant="home"` sits in the requester section's left column, under "your turn". It is the same section as on [My Requests](08_requests.md) (rows from the account and this device, badges, `N/20`, delete with confirmation, the room held while the account's list is read) with the newest three rows only, and a "See all saved drafts" link to `/requests#drafts` beside the heading (44 px tall, shown even with three drafts or fewer). It is absent when there are no drafts.
+
 ## API Services
 
 - `useRequests({ scope: 'mine' })` and `useRequests({ scope: 'assigned' })` → `GET /requests?scope=…` → `WorkRequestSummary[]`. Lists poll every 4 s while any request is in a live status (`submitted`, `reporting`, `in_progress`).
 - `useDirectory` → `GET /users`, `GET /projects` for names and project icons.
-- No mutations; loading shows skeletons.
+- `useDrafts` → `GET /drafts` → `SavedDraftSummary[]` for the saved drafts, merged with this device's; deleting a draft is the one change made from home (`useDiscardDraft`, [Request Wizard](11_wizard.md)).
+- Loading shows skeletons.
 
 ## Load failures
 
@@ -66,11 +73,12 @@ Developers and admins therefore never see the requester section.
 - `src/features/home/home-page.tsx#symbol:HomePage`, `src/features/home/home-page.tsx#symbol:RequesterSection`, `src/features/home/home-page.tsx#symbol:DeveloperSection` — composition rules.
 - `src/domain/lifecycle.ts#symbol:turnOf` — whose turn a status is.
 - `src/api/queries.ts#symbol:useRequests` — scopes and live polling.
-- `src/app/hooks.ts#symbol:useDirectory`, `src/components/ui/load-failed.tsx#symbol:LoadFailed`, `src/api/refresh.ts#symbol:refreshOf`, `src/features/home/home-page.test.tsx` — load and refresh failures.
+- `src/app/hooks.ts#symbol:useDirectory`, `src/components/ui/load-failed.tsx#symbol:LoadFailed`, `src/api/refresh.ts#symbol:refreshOf`, `src/features/home/home-page.test.tsx` — load and refresh failures; the saved drafts on home.
+- `src/features/drafts/drafts-section.tsx#symbol:DraftsSection` — the saved-drafts section.
 
 ## Open Questions
 
-- None.
+- The saved drafts are inside the requester section, so a person with `request:create` who also has `request:review` (a developer or an admin) sees their drafts only on `/requests`, not on home.
 
 ## Review Notes
 

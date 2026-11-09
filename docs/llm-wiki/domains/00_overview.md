@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: domain_overview
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-09
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -102,7 +102,7 @@ Thirteen statuses (`RequestStatus`) and sixteen events (`TRANSITIONS` in `src/do
 
 ## API Services
 
-All 36 endpoints are declared once in `src/api/contract.ts` and published as `docs/openapi.json`; each domain document lists the ones it uses. Cross-domain cache rule: every mutation that changes a request calls `onRequestChanged`, which replaces that request in the cache and invalidates request lists, the regression queue, notifications, the dashboard and the release schedule. See [Architecture Conventions](../ARCHITECTURE_CONVENTIONS.md).
+All 41 endpoints are declared once in `src/api/contract.ts` and published as `docs/openapi.json`; each domain document lists the ones it uses. Cross-domain cache rule: every mutation that changes a request calls `onRequestChanged`, which replaces that request in the cache and invalidates request lists, the regression queue, notifications, the dashboard and the release schedule. See [Architecture Conventions](../ARCHITECTURE_CONVENTIONS.md).
 
 ## Evidence
 

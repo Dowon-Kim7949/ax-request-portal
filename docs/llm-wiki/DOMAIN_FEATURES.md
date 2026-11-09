@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: domain_overview
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-09
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -23,6 +23,7 @@ evidence:
   - e2e/demo-banner.spec.ts
   - e2e/axe.spec.ts
   - e2e/csp.spec.ts
+  - e2e/drafts.spec.ts
   - src/app/router.tsx#symbol:routes
   - src/app/nav.ts#symbol:NAV_ITEMS
   - src/domain/roles.ts#symbol:DEFAULT_ROLE_PERMISSIONS
@@ -45,8 +46,10 @@ User-facing features by role. Each row names the domain document that holds the 
 
 | Feature | Domain | E2E |
 | --- | --- | --- |
-| File a request in seven steps with a saved draft and a non-blocking precheck | [Request Wizard](domains/11_wizard.md) | `requester.spec.ts` |
-| Leaving with something written asks first; a submission finishes even if the wizard is left; attachments the server cannot find are named | [Request Wizard](domains/11_wizard.md) | — (unit tests) |
+| File a request in seven steps with a non-blocking precheck | [Request Wizard](domains/11_wizard.md) | `requester.spec.ts` |
+| Drafts are kept on this device as they are typed and saved to the account (up to 20), so they continue after a reload, without a connection and on another device; the wizard shows where the draft stands and asks which version to keep after a conflict | [Request Wizard](domains/11_wizard.md) | `requester.spec.ts`, `drafts.spec.ts` |
+| Saved drafts listed on home, on My requests and on a new request: continue one at the step it was left, or delete it | [My Requests](domains/08_requests.md), [Home](domains/05_home.md) | `drafts.spec.ts` |
+| Leaving asks first only when the draft is kept nowhere; a submission finishes even if the wizard is left and deletes its saved draft; attachments the server cannot find are named | [Request Wizard](domains/11_wizard.md) | — (unit tests) |
 | Open an attachment in a new tab (images, PDF) or download it | [Request Detail](domains/04_detail.md) | `attachments.spec.ts` |
 | File audit findings item by item, pasted from a table | [Request Wizard](domains/11_wizard.md) | `requester.spec.ts` |
 | Confirm the AI's reading of the request (choices, a note, or "not quite" twice) | [Request Detail](domains/04_detail.md) | `requester.spec.ts` |
@@ -97,7 +100,7 @@ User-facing features by role. Each row names the domain document that holds the 
 | Feature | Domain | E2E |
 | --- | --- | --- |
 | Sign in, including one-click demo accounts in mock mode | [Login](domains/06_login.md) | `smoke.spec.ts` |
-| Signing out starts the next sign-in at home; after an expiry the same person returns to the page they had open; a link someone may not open goes home; tabs follow each other's sign-ins and sign-outs | [Auth](domains/02_auth.md), [Login](domains/06_login.md) | `auth.spec.ts` |
+| Signing out sends drafts still on their way first and asks before deleting the ones only this device has; the next sign-in starts at home; after an expiry the same person returns to the page they had open; a link someone may not open goes home; tabs follow each other's sign-ins and sign-outs | [Auth](domains/02_auth.md), [Login](domains/06_login.md) | `auth.spec.ts`, `drafts.spec.ts` |
 | Times in the viewer's own time zone, with head-office time beside them where the clocks differ; dates and monthly totals on the head office's calendar; choose the time zone and turn head-office time off in Settings | [Settings](domains/10_settings.md), [Architecture Conventions](ARCHITECTURE_CONVENTIONS.md) | `time-zone.spec.ts` |
 | A demo build says so on every screen | [Login](domains/06_login.md), [Component Inventory](COMPONENT_INVENTORY.md) | `demo-banner.spec.ts` |
 | Data that could not be loaded says so and offers a retry; a failed refresh keeps what is on screen | [Architecture Conventions](ARCHITECTURE_CONVENTIONS.md) | `layout.spec.ts` (320 px) |
@@ -109,7 +112,7 @@ User-facing features by role. Each row names the domain document that holds the 
 
 ## API Services
 
-The 36 endpoints of `src/api/contract.ts` are listed per domain in the domain documents; the generated reference is `docs/openapi.json`.
+The 41 endpoints of `src/api/contract.ts` are listed per domain in the domain documents; the generated reference is `docs/openapi.json`.
 
 ## Evidence
 
@@ -119,6 +122,7 @@ The 36 endpoints of `src/api/contract.ts` are listed per domain in the domain do
 - `src/api/contract.ts#symbol:api` — the endpoint table.
 - `e2e/update.spec.ts` — new-version notice.
 - `e2e/time-zone.spec.ts`, `e2e/auth.spec.ts`, `e2e/lifecycle.spec.ts`, `e2e/attachments.spec.ts`, `e2e/demo-banner.spec.ts`, `e2e/axe.spec.ts`, `e2e/csp.spec.ts` — the features added to the tables above.
+- `e2e/drafts.spec.ts` — saved drafts: listed, continued, on another device, deleted, submitted, and signing out.
 
 ## Open Questions
 

@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-09
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -18,13 +18,17 @@ source_files:
   - src/app/hooks.ts
   - src/app/session-sync.ts
   - src/stores/draft.ts
+  - src/app/sign-out.tsx
 evidence:
   - src/app/guards.tsx#symbol:RequireAuth
   - src/app/guards.tsx#symbol:RequirePermission
   - src/app/guards.tsx#symbol:SessionSync
   - src/stores/session.ts#symbol:useSession
   - src/stores/session.ts#symbol:sessionChangeFrom
-  - src/stores/draft.ts#symbol:clearDraft
+  - src/stores/draft.ts#symbol:clearDrafts
+  - src/app/sign-out.tsx#symbol:useSignOut
+  - src/features/drafts/sync.ts#symbol:flushDraftsBeforeSignOut
+  - src/app/sign-out.test.tsx
   - src/app/session-sync.ts#symbol:expireSession
   - src/app/session-sync.ts#symbol:useSessionSync
   - src/app/router.tsx#symbol:RouteHandle
@@ -61,7 +65,8 @@ Who the user is and what they may do: the session, the auth and permission guard
 - `useSession` (zustand `persist`, key `SESSION_STORAGE_KEY` = `ax-request-portal:session`) keeps `token` and `user` so a reload does not log the user out. It is a cache: `GET /auth/me` is the source of truth, and `RequireAuth` writes its result back with `setUser`.
 - `clear(reason)` always takes why the session ended: `signedOut` (the person left, here or in another tab) or `expired` (the server stopped accepting the token). The store keeps `ended { reason, userId }` in memory only; the next `setSession` resets it.
 - The persisted value of a signed-out session carries `endReason`, so other tabs end theirs the same way. When the store hydrates, `merge` drops it: a tab opened later starts without history, and `ended` exists only in the tab where the session ended.
-- Signing out on purpose (`clear('signedOut')`) also deletes that person's wizard draft (`clearDraft`, `src/stores/draft.ts`), because someone else may use the device next. An expiry keeps the draft for when they sign in again.
+- Signing out on purpose (`clear('signedOut')`) also deletes everything this device keeps of that person's drafts (`clearDrafts`, `src/stores/draft.ts`), because someone else may use the device next; with no user left in the store it uses `ended.userId`, so a sign-out right after an expiry still deletes them. An expiry keeps the drafts for when they sign in again. The drafts saved to the account stay there ([Request Wizard](11_wizard.md)).
+- The shell's sign-out button goes through `useSignOut` (`src/app/sign-out.tsx`): with drafts on this device it first sends them to the account for at most `DRAFT_SETTLE_TIMEOUT_MS` (3 s, a loading toast meanwhile; `flushDraftsBeforeSignOut`). When some still cannot reach the account (no connection, a full account, a conflict), a sheet says how many drafts on this device only would be deleted, with Cancel and Sign out; Cancel gives focus back to the account button. On phones the "more" sheet closes first. A sign-out from another tab deletes the drafts without asking.
 - The API client is configured once in `main.tsx` (`configureClient`) with `getToken` and `onUnauthorized(token)`. A `401` from a non-public endpoint calls `expireSession(queryClient, token)` with the token the refused request carried: only a refusal of the current token clears the whole query cache and the session (`clear('expired')`). A late `401` for a session that already ended, or for an earlier session after a new sign-in, changes nothing.
 - In mock mode the token has the shape `Bearer mock-token.<userId>`; a real backend issues its own token and the client does not inspect it.
 
@@ -109,7 +114,8 @@ The config schema refuses a configuration without `admin`, or without an enabled
 ## Evidence
 
 - `src/app/guards.tsx#symbol:RequireAuth`, `src/app/guards.tsx#symbol:RequirePermission`, `src/app/guards.tsx#symbol:SessionSync` — redirect, forbidden behaviour and the tab sync's mount point.
-- `src/stores/session.ts#symbol:useSession`, `src/stores/session.ts#symbol:sessionChangeFrom`, `src/stores/draft.ts#symbol:clearDraft` — persisted session, end reasons, how another tab's write is read, the draft deleted on sign-out.
+- `src/stores/session.ts#symbol:useSession`, `src/stores/session.ts#symbol:sessionChangeFrom`, `src/stores/draft.ts#symbol:clearDrafts` — persisted session, end reasons, how another tab's write is read, the drafts deleted on sign-out.
+- `src/app/sign-out.tsx#symbol:useSignOut`, `src/features/drafts/sync.ts#symbol:flushDraftsBeforeSignOut`, `src/app/sign-out.test.tsx` — drafts sent before signing out, and the question about the ones that could not be.
 - `src/app/session-sync.ts#symbol:expireSession`, `src/app/session-sync.ts#symbol:useSessionSync` — 401 handling and tab synchronisation.
 - `src/app/router.tsx#symbol:RouteHandle`, `src/features/auth/post-login.ts#symbol:resolvePostLoginPath` — route permissions and the redirect that reads them.
 - `src/api/queries.ts#symbol:useLogin`, `src/api/queries.ts#symbol:useMe`, `src/api/queries.ts#symbol:useLogout` — session hooks.

@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: change_log
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-09
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -23,6 +23,32 @@ contains_sensitive_info: false
 # LLM-WIKI Change Log
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
+
+## 2026-11-09 - Feature: drafts saved to the account
+
+- status: needs_review
+- actor: claude-code
+- scope: code, docs
+- changed:
+  - Contract and mock: src/api/contract.ts (`DraftContent`, `SavedDraft*`, `RequestSubmission`, `DRAFT_ID_PATTERN`, error codes `conflict` / `limit_reached`, `EndpointSpec.conflict`, five `/drafts` endpoints: 41 in all), src/api/openapi.ts, docs/openapi.json, src/config/ (`drafts.maxPerAccount`), src/mocks/ (`MockState.drafts`, STATE_VERSION 6, `clientId`, per-account limit, `createRequest` deletes the named draft)
+  - Client: src/api/queries.ts (`keys.drafts` / `keys.draft`, `useDrafts`, `storeSavedDraft`, `dropSavedDraft`), src/stores/draft.ts (drafts per person on this device, aliases, `clearDrafts`), src/stores/session.ts, src/features/drafts/ (sync engine, hooks, rows, saved-drafts section), src/features/wizard/ (`?draft=`, opening, save line, conflict and limit notices, submission with `draftId`), src/app/sign-out.tsx, src/app/shell.tsx, src/components/ui/sheet.tsx (focus return, `onCloseAutoFocus`), src/features/home/, src/features/requests/, src/i18n/
+  - Tests: unit tests next to the code above (new: sync-core, sync-engine, rows, drafts-section, draft store, sign-out, sheet); e2e/drafts.spec.ts, e2e/helpers.ts (`seedSavedDrafts`, `keepDraftOffline`, `SEEDED_DRAFTS`), axe, i18n, requester and screens specs
+  - docs/llm-wiki: domains/11_wizard.md, 08_requests.md, 05_home.md, 02_auth.md, 00_overview.md, ARCHITECTURE_CONVENTIONS.md, DOMAIN_FEATURES.md, GLOSSARY.md, E2E_WORKFLOWS.md, COMPONENT_INVENTORY.md, WCAG.md, profiles/frontend.md
+  - README.md, README.ko.md
+- summary:
+  - A draft is written to this device as it is typed (`ax-request-portal:drafts:<userId>`) and saved to the account by a sync engine that sends one request at a time, a second after typing pauses and on step changes, leaving, hiding, start and reconnecting. The device keeps only what the account does not have yet.
+  - Creates carry `clientId` so a lost answer makes no second draft; updates carry `baseVersion` and a `409 conflict` lets the person keep this screen's version or load the saved one; `409 limit_reached` (20 per account) keeps the draft on this device; a `404` continues it as a new draft.
+  - The wizard names the draft in `?draft=` (a local id, then the server id), opens account drafts on any device, shows the save state under the progress bar and asks before leaving only when the words are kept nowhere. A submission names its draft and the server deletes it.
+  - Saved drafts are listed on My requests (`#drafts`), on the requester's home and as a one-line notice on a new request, with badges for drafts on this device only and conflicts, continue and delete.
+  - Signing out sends waiting drafts first (up to 3 s) and asks before deleting the ones only this device has; the account keeps its drafts. `Sheet` gives focus back to what opened it.
+- evidence:
+  - npx vitest run: 57 files / 611 tests pass; npx playwright test --list: 253 tests in 23 files.
+  - npx llm-wiki validate --strict --agent claude passes.
+- caveats:
+  - The wizard's URL updates rely on React Router's `UNSAFE_DataRouterContext`.
+  - Two tabs of one browser share one device copy of a draft (last writer wins on the device; typed words are protected by the conflict notice).
+  - On home, the saved drafts are shown only in the requester section; people with `request:review` see them on `/requests` only.
+  - The E2E offline emulation depends on the client reading the global `fetch` at each call.
 
 ## 2026-11-05 - Fix and feature: sessions, load failures, domain guards, deployment hardening, time zones
 
