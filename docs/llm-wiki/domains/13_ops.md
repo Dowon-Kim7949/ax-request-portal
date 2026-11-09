@@ -6,7 +6,7 @@ tags:
 status: verified
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-09
 author: claude-code
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -39,7 +39,7 @@ evidence:
   - src/domain/model.ts#symbol:perRequestLimitFits
   - src/domain/model.ts#symbol:BUDGET_LIMIT_MAX_KRW
   - src/domain/model.ts#symbol:YearMonth
-  - src/lib/format.ts#symbol:formatKrw
+  - src/lib/format.ts#L162-L175
   - src/features/ops/budget-page.test.tsx
   - src/domain/budget.test.ts
   - src/mocks/api.test.ts#L218-L372
@@ -127,7 +127,7 @@ All calls carry the bearer token; failed changes show `toast.error` with the loc
 - `src/config/ai.ts#symbol:DEFAULT_AI_PRICING` — starting prices (checked 2026-11-03) and default models; the exchange rate is a placeholder.
 - `src/mocks/engine.ts#symbol:bookAi`, `src/mocks/engine.ts#symbol:present`, `src/mocks/engine.ts#symbol:aiUsageReport` and the settings/key/pricing methods — server-side behaviour; `src/mocks/api.test.ts#L218-L372` ("AI budget", "AI operations").
 - `src/domain/model.ts#symbol:checkBudgetLimits`, `src/domain/model.ts#symbol:perRequestLimitFits`, `src/domain/model.ts#symbol:BUDGET_LIMIT_MAX_KRW`, `src/domain/model.ts#symbol:YearMonth`, `src/domain/budget.test.ts`, `src/features/ops/budget-page.test.tsx` — budget limits and their form.
-- `src/mocks/engine.ts#symbol:businessDate`, `src/lib/format.ts#symbol:formatKrw` — business-calendar totals; Korean amounts.
+- `src/mocks/engine.ts#symbol:businessDate`, `src/lib/format.ts#L162-L175` (`formatKrw`) — business-calendar totals; Korean amounts. Cited by line range: `format.ts` is a hub file, and only this function matters here.
 - `e2e/operator.spec.ts` — keys, models, prices, usage, budget and the developer's limit message, end to end.
 
 ## Open Questions

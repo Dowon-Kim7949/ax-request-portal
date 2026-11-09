@@ -24,6 +24,20 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-09 - Docs: cite formatKrw by line range in AI Operations
+
+- status: needs_review
+- actor: claude-code
+- scope: docs
+- changed:
+  - docs/llm-wiki/domains/13_ops.md
+- summary:
+  - `13_ops.md` cited `src/lib/format.ts#symbol:formatKrw`, which `impact.source_changed` reads as the whole file, so any new formatter made it stale. It now cites `src/lib/format.ts#L162-L175`, compared region by region.
+- evidence:
+  - CI's wiki gate failed on PR #15 after a stamp-only re-approval left the document unchanged against main; `npx llm-wiki validate --strict --agent claude` and `impact --since main` pass after this change.
+- caveats:
+  - A line range moves when code above it changes; keep it on `formatKrw` when `format.ts` is edited above line 162.
+
 ## 2026-11-09 - Feature: a month view for the release schedule
 
 - status: needs_review
