@@ -13,9 +13,10 @@ import { Fragment, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, NavLink, Outlet, ScrollRestoration, useMatches } from 'react-router'
 import { toast } from 'sonner'
-import { useLogout, useNotifications } from '@/api/queries'
+import { useNotifications } from '@/api/queries'
 import { Sheet } from '@/components/ui/sheet'
 import { env } from '@/config/env'
+import { useDraftSync } from '@/features/drafts/hooks'
 import { currentLocale } from '@/i18n'
 import { cn } from '@/lib/cn'
 import { useBrand } from './brand'
@@ -24,6 +25,7 @@ import { DemoBanner } from './demo-banner'
 import { useCan, useCurrentUser } from './hooks'
 import { phoneTabs, visibleNav, type NavItem } from './nav'
 import type { RouteHandle } from './router'
+import { useSignOut } from './sign-out'
 
 /* ------------------------------------------------------------------ */
 /* Small pieces                                                        */
@@ -78,11 +80,13 @@ function NotificationBell() {
 }
 
 function useAccountActions() {
-  const logout = useLogout()
+  const signOut = useSignOut()
   const qc = useQueryClient()
   const { t } = useTranslation()
   return {
-    logout: () => logout.mutate(),
+    logout: signOut.signOut,
+    /** Asks before signing out deletes drafts that never reached the account; render it once per caller */
+    signOutDialog: signOut.dialog,
     resetDemo: env.apiMock
       ? async () => {
           await resetDemoData(currentLocale())
@@ -190,6 +194,7 @@ function AccountMenu() {
           </button>
         </div>
       ) : null}
+      {actions.signOutDialog}
     </div>
   )
 }
@@ -408,7 +413,10 @@ function BottomNav({ items }: { items: NavItem[] }) {
           <li>
             <button
               type="button"
-              onClick={actions.logout}
+              onClick={() => {
+                close()
+                actions.logout()
+              }}
               className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-[15px] font-semibold text-danger-fg hover:bg-danger-50"
             >
               <LogOut className="size-5" aria-hidden />
@@ -417,6 +425,7 @@ function BottomNav({ items }: { items: NavItem[] }) {
           </li>
         </ul>
       </Sheet>
+      {actions.signOutDialog}
     </>
   )
 }
@@ -447,6 +456,8 @@ function SkipLink() {
 }
 
 export function AppShell() {
+  // Drafts reach the account from any screen, not only the wizard's.
+  useDraftSync()
   const can = useCan()
   const items = visibleNav(can)
   const focus = useMatches().some((m) => (m.handle as RouteHandle | undefined)?.focus)

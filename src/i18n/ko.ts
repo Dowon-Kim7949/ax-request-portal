@@ -87,6 +87,11 @@ const ko = {
     expand: '메뉴 펼치기',
     resetDemo: '데모 데이터 초기화',
     resetDemoDone: '데모 데이터를 처음 상태로 되돌렸습니다.',
+    signOutSaving: '초안을 계정에 저장하고 있어요…',
+    signOutConfirm: {
+      title: '로그아웃할까요?',
+      body: '이 기기에만 저장된 초안 {{count}}개가 있어요. 로그아웃하면 이 기기에서 지워져요.',
+    },
   },
   role: {
     requester: '요청자',

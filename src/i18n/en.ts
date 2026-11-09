@@ -85,6 +85,11 @@ const en: Messages = {
     collapse: 'Collapse menu',
     expand: 'Expand menu',
     resetDemo: 'Reset demo data',
+    signOutSaving: 'Saving your drafts to your account…',
+    signOutConfirm: {
+      title: 'Sign out?',
+      body: 'Drafts saved only on this device: {{count}}. Signing out deletes them from this device.',
+    },
     resetDemoDone: 'Demo data has been reset.',
   },
   role: {
