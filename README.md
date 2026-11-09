@@ -30,6 +30,7 @@ A responsive React template for an **AI-assisted work request portal**. People w
 - **A request lifecycle you can trust.** One transition table decides who can move a request where. The UI shows buttons from it, the mock API enforces it, and a backend can port it as-is.
 - **One API contract, three consumers.** `src/api/contract.ts` produces the typed client, the mock API handlers and [`docs/openapi.json`](docs/openapi.json). The client validates every response, so a drifting backend fails loudly.
 - **Works with no backend.** An in-browser mock API (MSW) with fictional demo data and a simulated AI that writes reports and opens merge requests in seconds. Progress survives reloads.
+- **Drafts that follow the person.** The request wizard keeps what is typed on the device at once and saves it to the account a second later, so a request half-written on a phone continues on a laptop, after a reload or without a connection. Saved drafts are listed on the home screen and under My requests. A version saved elsewhere in the meantime is never overwritten silently: the wizard asks which one to keep. Signing out asks before deleting drafts that never reached the account.
 - **AI usage you can account for, on Claude and GPT.** An operator picks the model for each AI task (Claude or GPT through their APIs; a Claude agent built on the Claude Agent SDK, or Codex, for AI work), per project if needed, and keeps the price table and exchange rate. Every AI call is booked from the provider's own token report, normalized (Claude and OpenAI count cached tokens differently) and priced once. Developers see what each request cost and why a run is blocked at its limit; the operator gets a usage dashboard by provider, day, model, task and request. Costs are estimates; the bill is in each provider's console. Provider keys are write-only.
 - **Plain language for non-developers.** Requesters see "checking / needs your answer / please check the result". Developers see the precise state. All copy lives in one dictionary per language.
 - **English and Korean.** The language follows the browser until the user picks one. Dates and amounts follow it too. Every API call sends `Accept-Language`, and the mock API answers in it the way a real backend should: errors, notifications and the simulated AI's reports come back in the user's language. The type checker fails if the two dictionaries drift apart.
@@ -133,7 +134,7 @@ Set at build time, in the environment or in `.env.local` (copy [`.env.example`](
 
 ## Connect a real backend
 
-1. Implement the endpoints in [`docs/openapi.json`](docs/openapi.json). Requests carry `Authorization: Bearer <token>` from `POST /auth/login`. Errors use the `ApiError` body (`code`, `message`, optional `issues`). A transition that doesn't fit the current status is a `409`. Requests also carry `Accept-Language`: write error messages, notifications and AI text in that language.
+1. Implement the endpoints in [`docs/openapi.json`](docs/openapi.json). Requests carry `Authorization: Bearer <token>` from `POST /auth/login`. Errors use the `ApiError` body (`code`, `message`, optional `issues`). A transition that doesn't fit the current status is a `409`. Saved drafts (`/drafts`) belong to the person who wrote them: an update over an old `baseVersion` is `409 conflict`, a create beyond `drafts.maxPerAccount` in [`src/config/app.config.ts`](src/config/app.config.ts) is `409 limit_reached`, and a request created with a `draftId` deletes that draft. Requests also carry `Accept-Language`: write error messages, notifications and AI text in that language.
 2. Enforce the lifecycle on the server. [`src/domain/lifecycle.ts`](src/domain/lifecycle.ts) and [`src/domain/report.ts`](src/domain/report.ts) are plain TypeScript with no browser dependency. Port them or import them.
 3. Run the two AI jobs server-side: the feasibility report (read-only access to the code and wiki) and the work run (branch → tests → merge request). The UI polls a request while its status is `submitted`, `reporting` or `in_progress`.
 4. Build against it:
@@ -198,8 +199,8 @@ docs/          openapi.json, README images, llm-wiki/ (agent knowledge base)
 
 ## Quality gates
 
-- `npm run verify`: oxlint with warnings as errors, Prettier, strict TypeScript (`noUncheckedIndexedAccess`), 437 unit tests (including WCAG contrast in both themes and dictionary parity), production build.
-- E2E: 175 tests on phone, tablet and desktop, including the skip link and reduced motion. Every flow runs on all three. Every main screen of every role is checked at 320 px (in both languages) and on a landscape tablet. Separate runs walk each role's screens in English, failing on any leftover Korean, and in dark mode. Horizontal overflow is checked after data has loaded.
+- `npm run verify`: oxlint with warnings as errors, Prettier, strict TypeScript (`noUncheckedIndexedAccess`), 611 unit tests (including WCAG contrast in both themes and dictionary parity), production build.
+- E2E: 253 tests on phone, tablet and desktop, including the skip link and reduced motion. Every flow runs on all three. Every main screen of every role is checked at 320 px (in both languages) and on a landscape tablet. Separate runs walk each role's screens in English, failing on any leftover Korean, and in dark mode. Horizontal overflow is checked after data has loaded.
 - CI runs verify, e2e, the nginx check and the LLM-WIKI checks on every push and pull request. Dependabot keeps dependencies and actions current.
 
 ## Known limits

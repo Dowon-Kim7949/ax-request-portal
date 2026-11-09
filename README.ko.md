@@ -30,6 +30,7 @@
 - **믿을 수 있는 Request Lifecycle.** 누가 요청을 어디로 옮길 수 있는지를 표 하나가 정합니다. 화면은 이 표를 보고 버튼을 보여 주고, 목 API는 이 표대로 막고, 백엔드는 이 표를 그대로 옮겨 쓰면 됩니다.
 - **API 계약 하나, 쓰는 곳 셋.** `src/api/contract.ts`에서 API 클라이언트, 목 API 핸들러, [`docs/openapi.json`](docs/openapi.json)이 모두 나옵니다. 클라이언트가 모든 응답을 계약으로 검증하므로 백엔드가 계약과 어긋나면 바로 드러납니다.
 - **백엔드 없이 동작합니다.** 브라우저 안의 목 API(MSW)에 가상의 시연 데이터가 들어 있고, AI 흉내를 내는 시뮬레이터가 몇 초 만에 보고서를 쓰고 MR을 엽니다. 새로고침해도 진행 상황이 이어집니다.
+- **어느 기기에서든 이어 쓰는 초안.** 요청 위저드는 입력한 내용을 바로 이 기기에 남기고 1초 뒤 계정에 저장합니다. 휴대폰에서 쓰다 만 요청을 PC에서, 새로고침한 뒤에, 연결이 끊긴 상태에서도 이어 쓸 수 있습니다. 임시 저장된 초안은 홈과 내 요청에 모입니다. 그사이 다른 곳에서 저장된 내용은 말없이 덮어쓰지 않고 어느 쪽을 남길지 묻습니다. 계정에 올라가지 못한 초안이 있으면 로그아웃하기 전에 묻습니다.
 - **Claude와 GPT의 AI 사용량을 따질 수 있게.** 운영자가 AI 작업마다 쓸 모델을 고르고(보고서·점검은 Claude나 GPT API, AI 작업은 Claude Agent SDK로 만든 Claude 에이전트나 Codex), 필요하면 프로젝트별로 바꾸며, 단가표와 환율을 관리합니다. AI 호출은 제공사가 돌려준 토큰 수로 하나씩 기록되고, 캐시 토큰을 세는 방식이 Claude와 OpenAI가 달라서 같은 형식으로 맞춘 뒤 그때 단가로 한 번만 계산됩니다. 담당자는 요청마다 AI 비용과 한도에 막힌 이유를 보고, 운영자는 제공사·일·모델·작업·요청별 사용량 대시보드를 봅니다. 금액은 추정치이며 실제 청구액은 각 제공사 콘솔에서 확인합니다. API 키는 저장만 되고 다시 보여 주지 않습니다.
 - **비개발자에게는 쉬운 말로.** 요청자에게는 "검토 중 / 추가 정보 필요 / 확인해 주세요"로, 담당자에게는 정확한 상태로 보입니다. 화면 문구는 언어마다 사전 파일 하나에 모여 있습니다.
 - **한국어와 영어.** 사용자가 고르기 전까지는 브라우저 언어를 따르고, 날짜와 금액 표기도 함께 바뀝니다. 모든 API 호출에 `Accept-Language`가 붙고, 목 API는 실제 백엔드가 해야 하는 방식대로 그 언어로 답합니다. 오류 메시지, 알림, AI 시뮬레이터의 보고서가 사용자 언어로 옵니다. 두 사전의 키가 어긋나면 타입 검사에서 실패합니다.
@@ -117,7 +118,7 @@ npm run dev
 
 ## 실제 백엔드 연결
 
-1. [`docs/openapi.json`](docs/openapi.json)의 엔드포인트를 구현합니다. 요청에는 `POST /auth/login`에서 받은 `Authorization: Bearer <token>`이 붙습니다. 오류 응답은 `ApiError` 형식(`code`, `message`, 선택 `issues`)을 씁니다. 현재 상태에서 할 수 없는 전이는 `409`입니다. 요청에는 `Accept-Language`도 붙으니, 오류 메시지와 알림, AI가 쓰는 글을 그 언어로 돌려주세요.
+1. [`docs/openapi.json`](docs/openapi.json)의 엔드포인트를 구현합니다. 요청에는 `POST /auth/login`에서 받은 `Authorization: Bearer <token>`이 붙습니다. 오류 응답은 `ApiError` 형식(`code`, `message`, 선택 `issues`)을 씁니다. 현재 상태에서 할 수 없는 전이는 `409`입니다. 임시 저장 초안(`/drafts`)은 쓴 사람의 것입니다. 오래된 `baseVersion`으로 고치려 하면 `409 conflict`, [`src/config/app.config.ts`](src/config/app.config.ts)의 `drafts.maxPerAccount`를 넘겨 만들려 하면 `409 limit_reached`이고, `draftId`를 넣어 요청을 만들면 그 초안을 지웁니다. 요청에는 `Accept-Language`도 붙으니, 오류 메시지와 알림, AI가 쓰는 글을 그 언어로 돌려주세요.
 2. Lifecycle은 서버에서 강제합니다. [`src/domain/lifecycle.ts`](src/domain/lifecycle.ts)와 [`src/domain/report.ts`](src/domain/report.ts)는 브라우저 의존이 없는 순수 TypeScript라서 그대로 옮기거나 가져다 쓸 수 있습니다.
 3. AI 작업 두 가지는 서버에서 돌립니다. 구현 확인 보고서(코드와 위키 읽기 전용)와 작업 수행(브랜치 → 테스트 → MR)입니다. 화면은 상태가 `submitted`, `reporting`, `in_progress`인 동안 요청을 주기적으로 다시 불러옵니다.
 4. 이렇게 빌드합니다.
@@ -175,8 +176,8 @@ docs/          openapi.json, README 이미지, llm-wiki/(에이전트용 지식 
 
 ## 품질 검사
 
-- `npm run verify`: 경고도 실패로 보는 oxlint, Prettier, 엄격한 TypeScript(`noUncheckedIndexedAccess`), 단위 테스트 158개(두 테마의 WCAG 대비, 두 사전의 키 일치 포함), 배포용 빌드.
-- E2E: 휴대폰, 태블릿, PC에서 104개. skip link와 모션 줄이기 설정도 검사합니다. 모든 흐름을 세 기기에서 돌리고, 다섯 역할의 주요 화면 전부를 320px 휴대폰(두 언어 모두)과 가로 태블릿에서 점검합니다. 따로 영어로 각 역할의 화면을 돌며 한국어가 남아 있으면 실패시키고, 다크 모드로도 돌립니다. 가로 스크롤은 데이터가 다 그려진 뒤에 검사합니다.
+- `npm run verify`: 경고도 실패로 보는 oxlint, Prettier, 엄격한 TypeScript(`noUncheckedIndexedAccess`), 단위 테스트 611개(두 테마의 WCAG 대비, 두 사전의 키 일치 포함), 배포용 빌드.
+- E2E: 휴대폰, 태블릿, PC에서 253개. skip link와 모션 줄이기 설정도 검사합니다. 모든 흐름을 세 기기에서 돌리고, 다섯 역할의 주요 화면 전부를 320px 휴대폰(두 언어 모두)과 가로 태블릿에서 점검합니다. 따로 영어로 각 역할의 화면을 돌며 한국어가 남아 있으면 실패시키고, 다크 모드로도 돌립니다. 가로 스크롤은 데이터가 다 그려진 뒤에 검사합니다.
 - CI가 push와 PR마다 verify, E2E, nginx 검사, LLM-WIKI 검사를 돌립니다. Dependabot이 의존성과 Actions 버전을 최신으로 유지합니다.
 
 ## 알려진 한계
