@@ -4,7 +4,8 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { ApiError, call, configureClient } from '../api/client'
-import { api } from '../api/contract'
+import { api, type DraftContent } from '../api/contract'
+import { appConfig } from '../config/app.config'
 import type { RequestDraft } from '../domain/model'
 import { createTestApi } from '../test/mock-api'
 import { DEMO_PASSWORD } from './seed'
@@ -669,6 +670,251 @@ describe('release, regression and settings rules', () => {
   })
 })
 
+describe('saved drafts', () => {
+  const content: DraftContent = {
+    projectId: 'p-portal',
+    type: 'change',
+    title: '  공지사항 검색  ',
+    desiredBehavior: '',
+    acceptanceCriteria: [{ text: '' }],
+  }
+
+  /** An upload of `userId`'s, put straight into the store (uploads have their own tests). */
+  function uploadAs(userId: string) {
+    const user = t.store.engine.user(userId)!
+    return t.store.engine.addAttachment(user, {
+      name: 'screen.png',
+      size: 4,
+      type: 'image/png',
+      url: 'https://files.example.com/screen.png',
+    })
+  }
+
+  it('saves a half-written request and keeps it to its owner', async () => {
+    await loginAs('planner@example.com')
+    const created = await call(api.createDraft, { body: { step: 3, content } })
+    expect(created).toMatchObject({
+      title: '공지사항 검색',
+      projectId: 'p-portal',
+      type: 'change',
+      step: 3,
+      version: 1,
+      attachmentCount: 0,
+      attachments: [],
+      content,
+    })
+    expect(created.createdAt).toBe(created.updatedAt)
+    expect(await call(api.getDraft, { params: { id: created.id } })).toEqual(created)
+    const { content: _content, attachments: _attachments, ...summary } = created
+    expect((await call(api.listDrafts)).find((d) => d.id === created.id)).toEqual(summary)
+
+    // Nothing picked or written yet is a draft too.
+    const blank = await call(api.createDraft, { body: { step: 0, content: {} } })
+    expect(blank).toMatchObject({ title: '', step: 0, content: {} })
+    expect(blank).not.toHaveProperty('projectId')
+    expect(blank).not.toHaveProperty('type')
+
+    // Someone else's draft is "not found", whatever they try.
+    await loginAs('sales@example.com')
+    expect((await call(api.listDrafts)).map((d) => d.id)).not.toContain(created.id)
+    const id = created.id
+    await expectApiError(call(api.getDraft, { params: { id } }), 404, 'not_found')
+    await expectApiError(
+      call(api.updateDraft, { params: { id }, body: { baseVersion: 1, step: 0, content: {} } }),
+      404,
+      'not_found',
+    )
+    await expectApiError(call(api.deleteDraft, { params: { id } }), 404, 'not_found')
+
+    await loginAs('planner@example.com')
+    expect((await call(api.getDraft, { params: { id } })).version).toBe(1)
+    await call(api.deleteDraft, { params: { id } })
+    await call(api.deleteDraft, { params: { id: blank.id } })
+    // Gone: a second delete is "not found", which the client takes as done.
+    await expectApiError(call(api.deleteDraft, { params: { id } }), 404, 'not_found')
+    await expectApiError(call(api.getDraft, { params: { id } }), 404, 'not_found')
+  })
+
+  it('refuses an update based on a version that has been saved over', async () => {
+    await loginAs('planner@example.com')
+    const { id } = await call(api.createDraft, { body: { step: 1, content } })
+    t.advance(1)
+    // This device saves first…
+    const phone = await call(api.updateDraft, {
+      params: { id },
+      body: { baseVersion: 1, step: 4, content: { ...content, title: '휴대폰에서 고친 제목' } },
+    })
+    expect(phone).toMatchObject({ version: 2, step: 4, title: '휴대폰에서 고친 제목' })
+    expect(Date.parse(phone.updatedAt)).toBeGreaterThan(Date.parse(phone.createdAt))
+
+    // …so another device still on version 1 is refused, and nothing changes.
+    const refused = await call(api.updateDraft, {
+      params: { id },
+      body: { baseVersion: 1, step: 2, content: { ...content, title: 'PC에서 고친 제목' } },
+    }).catch((e: unknown) => e)
+    expect(refused).toMatchObject({ status: 409, code: 'conflict' })
+    expect((refused as ApiError).message).toBe(
+      '이 초안이 다른 곳에서 먼저 저장되었습니다. 저장된 내용을 불러오거나 이 화면 내용으로 다시 저장해 주세요.',
+    )
+    expect(await call(api.getDraft, { params: { id } })).toEqual(phone)
+
+    // Based on the latest version, the same change goes through.
+    const pc = await call(api.updateDraft, {
+      params: { id },
+      body: { baseVersion: 2, step: 2, content: { ...content, title: 'PC에서 고친 제목' } },
+    })
+    expect(pc).toMatchObject({ version: 3, step: 2, title: 'PC에서 고친 제목' })
+    await call(api.deleteDraft, { params: { id } })
+  })
+
+  it('lists the most recently changed first', async () => {
+    await loginAs('planner@example.com')
+    const first = await call(api.createDraft, { body: { step: 0, content: { title: '첫 번째' } } })
+    const second = await call(api.createDraft, { body: { step: 0, content: { title: '두 번째' } } })
+    expect((await call(api.listDrafts)).slice(0, 2).map((d) => d.id)).toEqual([second.id, first.id])
+
+    // Changed in the same moment as the other was created: the later change still comes first.
+    await call(api.updateDraft, {
+      params: { id: first.id },
+      body: { baseVersion: 1, step: 1, content: { title: '첫 번째, 고침' } },
+    })
+    expect((await call(api.listDrafts)).slice(0, 2).map((d) => d.id)).toEqual([first.id, second.id])
+    t.advance(1)
+    await call(api.updateDraft, {
+      params: { id: second.id },
+      body: { baseVersion: 1, step: 1, content: { title: '두 번째, 고침' } },
+    })
+    expect((await call(api.listDrafts)).slice(0, 2).map((d) => d.id)).toEqual([second.id, first.id])
+
+    await call(api.deleteDraft, { params: { id: first.id } })
+    await call(api.deleteDraft, { params: { id: second.id } })
+  })
+
+  it("holds the person's own uploads and names any other attachment it cannot take", async () => {
+    await loginAs('planner@example.com')
+    const mine = uploadAs('u-kim')
+    const theirs = uploadAs('u-lee')
+
+    const refused = await call(api.createDraft, {
+      body: { step: 5, content: { attachmentIds: [mine.id, theirs.id, 'att-gone'] } },
+    }).catch((e: unknown) => e)
+    expect(refused).toMatchObject({ status: 400, code: 'bad_request' })
+    expect((refused as ApiError).issues?.map((i) => i.path)).toEqual([
+      'content.attachmentIds.1',
+      'content.attachmentIds.2',
+    ])
+
+    const saved = await call(api.createDraft, {
+      body: { step: 5, content: { attachmentIds: [mine.id, mine.id] } },
+    })
+    expect(saved.attachments).toEqual([mine])
+    expect(saved.attachmentCount).toBe(1)
+    expect(saved.attachments[0]).not.toHaveProperty('ownerId')
+    expect((await call(api.listDrafts)).find((d) => d.id === saved.id)?.attachmentCount).toBe(1)
+
+    // An update is checked the same way.
+    const id = saved.id
+    const err = await call(api.updateDraft, {
+      params: { id },
+      body: { baseVersion: 1, step: 5, content: { attachmentIds: [theirs.id] } },
+    }).catch((e: unknown) => e)
+    expect(err).toMatchObject({ status: 400 })
+    expect((err as ApiError).issues?.map((i) => i.path)).toEqual(['content.attachmentIds.0'])
+    await call(api.deleteDraft, { params: { id } })
+  })
+
+  it('takes a loose draft but refuses steps and sizes beyond the contract', async () => {
+    await loginAs('planner@example.com')
+    for (const step of [-1, 7, 1.5]) {
+      await expectApiError(call(api.createDraft, { body: { step, content: {} } }), 400, 'bad_request')
+    }
+    await expectApiError(
+      call(api.createDraft, { body: { step: 0, content: { title: 'x'.repeat(10_001) } } }),
+      400,
+      'bad_request',
+    )
+    await expectApiError(
+      call(api.createDraft, {
+        body: { step: 0, content: { targetIds: Array.from({ length: 51 }, (_, i) => `t-${i}`) } },
+      }),
+      400,
+      'bad_request',
+    )
+  })
+
+  it('stops at the per-account limit, for that account only', async () => {
+    const limit = appConfig.drafts.maxPerAccount
+    await loginAs('planner@example.com')
+    const before = (await call(api.listDrafts)).length
+    const made: string[] = []
+    for (let i = before; i < limit; i++) {
+      made.push((await call(api.createDraft, { body: { step: 0, content: { title: `초안 ${i}` } } })).id)
+    }
+    expect(await call(api.listDrafts)).toHaveLength(limit)
+
+    const refused = await call(api.createDraft, { body: { step: 0, content: {} } }).catch((e: unknown) => e)
+    expect(refused).toMatchObject({ status: 409, code: 'limit_reached' })
+    expect((refused as ApiError).message).toBe(
+      `임시 저장함이 가득 찼습니다(최대 ${limit}개). 다른 초안을 지우면 저장할 수 있습니다.`,
+    )
+    // Updating one that exists is still fine.
+    await call(api.updateDraft, {
+      params: { id: made[0]! },
+      body: { baseVersion: 1, step: 1, content: { title: '고침' } },
+    })
+
+    // Someone else's account has room of its own.
+    await loginAs('sales@example.com')
+    const theirs = await call(api.createDraft, { body: { step: 0, content: {} } })
+    await call(api.deleteDraft, { params: { id: theirs.id } })
+
+    // Deleting one makes room again.
+    await loginAs('planner@example.com')
+    await call(api.deleteDraft, { params: { id: made.pop()! } })
+    made.push((await call(api.createDraft, { body: { step: 0, content: {} } })).id)
+    for (const id of made) await call(api.deleteDraft, { params: { id } })
+  })
+
+  it('deletes the draft a request was written in, together with the submission', async () => {
+    await loginAs('sales@example.com')
+    const theirs = await call(api.createDraft, { body: { step: 6, content: {} } })
+
+    await loginAs('planner@example.com')
+    const mine = await call(api.createDraft, { body: { step: 6, content: {} } })
+    const kept = await call(api.createDraft, { body: { step: 6, content: {} } })
+    await call(api.createRequest, { body: { ...draft, draftId: mine.id } })
+    const left = (await call(api.listDrafts)).map((d) => d.id)
+    expect(left).not.toContain(mine.id)
+    expect(left).toContain(kept.id)
+
+    // A refused submission leaves the draft as it was.
+    await expectApiError(
+      call(api.createRequest, { body: { ...draft, attachmentIds: ['att-gone'], draftId: kept.id } }),
+      400,
+    )
+    expect((await call(api.getDraft, { params: { id: kept.id } })).version).toBe(1)
+
+    // A draft that is gone, or someone else's, does not stop the submission, and theirs stays.
+    await call(api.createRequest, { body: { ...draft, draftId: mine.id } })
+    await call(api.createRequest, { body: { ...draft, draftId: theirs.id } })
+    await loginAs('sales@example.com')
+    expect((await call(api.listDrafts)).map((d) => d.id)).toContain(theirs.id)
+
+    await call(api.deleteDraft, { params: { id: theirs.id } })
+    await loginAs('planner@example.com')
+    await call(api.deleteDraft, { params: { id: kept.id } })
+  })
+
+  it('keeps drafts to people who may file requests', async () => {
+    await loginAs('operator@example.com')
+    await expectApiError(call(api.listDrafts), 403, 'forbidden')
+    await expectApiError(call(api.createDraft, { body: { step: 0, content: {} } }), 403, 'forbidden')
+    // Developers file requests too.
+    await loginAs('dev1@example.com')
+    expect(await call(api.listDrafts)).toEqual([])
+  })
+})
+
 describe('demo data language', () => {
   it('keeps read marks when the language changes', async () => {
     await loginAs('planner@example.com')
@@ -676,5 +922,13 @@ describe('demo data language', () => {
     await call(api.markAllNotificationsRead)
     // Marked as a person's change, so a language switch no longer rebuilds the demo data.
     expect(t.store.engine.state.dirty).toBe(true)
+  })
+
+  it('keeps saved drafts when the language changes', async () => {
+    await loginAs('planner@example.com')
+    t.store.engine.state.dirty = false
+    const { id } = await call(api.createDraft, { body: { step: 0, content: { title: '언어를 바꿔도' } } })
+    expect(t.store.engine.state.dirty).toBe(true)
+    await call(api.deleteDraft, { params: { id } })
   })
 })

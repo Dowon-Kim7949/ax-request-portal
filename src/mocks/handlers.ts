@@ -160,7 +160,10 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
     })
   }
 
-  /** A change a person makes to the demo data (uploads and read marks included: a language switch must not drop them) */
+  /**
+   * A change a person makes to the demo data (uploads, saved drafts and read marks included:
+   * a language switch must not drop them)
+   */
   const edit: RouteOptions = { edits: true }
   /** State changes that are not edits (form checks) */
   const touch: RouteOptions = { mutates: true }
@@ -256,6 +259,17 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
       edit,
     ),
     route(api.regressionQueue, ({ store, me }) => store.engine.regressionQueue(me)),
+
+    /* saved drafts */
+    route(api.listDrafts, ({ store, me }) => store.engine.listDrafts(me)),
+    route(api.createDraft, ({ store, me, body, now }) => store.engine.createDraft(me, body, now), edit),
+    route(api.getDraft, ({ store, me, params }) => store.engine.getDraft(me, params.id)),
+    route(
+      api.updateDraft,
+      ({ store, me, params, body, now }) => store.engine.updateDraft(me, params.id, body, now),
+      edit,
+    ),
+    route(api.deleteDraft, ({ store, me, params }) => store.engine.deleteDraft(me, params.id), edit),
 
     /* notifications */
     route(api.listNotifications, ({ store, me, lang }) => store.engine.notificationsFor(me, lang)),

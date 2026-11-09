@@ -58,7 +58,15 @@ export function stateProblem(value: unknown): string | null {
   if (value.language !== 'ko' && value.language !== 'en') return 'unknown language'
   if (typeof value.dirty !== 'boolean' || typeof value.seededAt !== 'string') return 'missing flags'
 
-  const lists = ['users', 'projects', 'requests', 'notifications', 'aiUsage', 'attachments'] as const
+  const lists = [
+    'users',
+    'projects',
+    'requests',
+    'notifications',
+    'aiUsage',
+    'attachments',
+    'drafts',
+  ] as const
   for (const key of lists) {
     const list = value[key]
     if (!Array.isArray(list) || !list.every((item) => isRecord(item) && item.id !== undefined)) {
@@ -71,6 +79,18 @@ export function stateProblem(value: unknown): string | null {
   }
   if (requests.some((r) => (r.id as number) >= (value.nextRequestId as number))) {
     return 'request ids would be issued twice'
+  }
+  const drafts = value.drafts as Array<Record<string, unknown>>
+  if (
+    !drafts.every(
+      (d) =>
+        typeof d.ownerId === 'string' &&
+        isRecord(d.content) &&
+        isCounter(d.version) &&
+        typeof d.updatedAt === 'string',
+    )
+  ) {
+    return 'a draft is incomplete'
   }
 
   if (!isRecord(value.notificationSettings)) return 'notificationSettings is missing'

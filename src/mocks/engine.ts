@@ -9,11 +9,17 @@
  */
 import type {
   AiSettingsInput,
+  ApiErrorBody,
+  DraftContent,
   PreviewFeedbackInput,
   ProjectInput,
   RegressionQueue,
   RequestScope,
+  RequestSubmission,
+  SavedDraft,
+  SavedDraftSummary,
 } from '../api/contract'
+import { appConfig } from '../config/app.config'
 import {
   addUsage,
   AI_PROVIDERS,
@@ -75,7 +81,7 @@ import { renderNotification, type ErrorKey, type NotificationKey, type ServerLan
 /* ------------------------------------------------------------------ */
 
 /** Bump when the stored shape changes: older demo data is discarded and reseeded. */
-export const STATE_VERSION = 5
+export const STATE_VERSION = 6
 
 /** Notifications kept per person; older ones are dropped as new ones arrive. */
 export const NOTIFICATIONS_PER_USER_MAX = 200
@@ -108,6 +114,19 @@ function publicAttachment({ ownerId: _owner, ...attachment }: StoredAttachment):
   return attachment
 }
 
+/** A saved draft as the mock keeps it: only its owner can read, change or delete it. */
+export interface StoredDraft {
+  id: string
+  ownerId: string
+  /** Wizard step the person was last on */
+  step: number
+  content: DraftContent
+  /** 1 when created, one more on every update */
+  version: number
+  createdAt: string
+  updatedAt: string
+}
+
 export interface MockState {
   version: typeof STATE_VERSION
   /** Counts saves, so a tab can tell that another tab has saved since it last read (see store.ts) */
@@ -129,6 +148,8 @@ export interface MockState {
   /** Usage ledger: one entry per model call or agent run, priced when booked */
   aiUsage: AiUsageEntry[]
   attachments: StoredAttachment[]
+  /** Unsubmitted requests, saved per person; the most recently changed last */
+  drafts: StoredDraft[]
 }
 
 export interface EngineOptions {
@@ -143,6 +164,8 @@ export interface EngineOptions {
    * a real backend must use the same setting.
    */
   timeZone?: string
+  /** Saved drafts one person may keep. Defaults to appConfig.drafts.maxPerAccount. */
+  draftsPerAccount?: number
 }
 
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
@@ -155,8 +178,7 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
 /** Thrown by engine operations; the MSW layer renders `key` in the request's language. */
 export class HttpError extends Error {
   readonly status: number
-  readonly code:
-    'bad_request' | 'unauthorized' | 'forbidden' | 'not_found' | 'invalid_transition' | 'guard_failed'
+  readonly code: Exclude<ApiErrorBody['code'], 'internal'>
   readonly key: ErrorKey
   readonly params: Record<string, string | number>
   /** Body fields the error is about (`issues[].path`), e.g. `attachmentIds.1` */
@@ -565,22 +587,15 @@ export class MockEngine {
     return precheckDraft(draft, this.today(now), lang)
   }
 
-  createRequest(user: User, draft: RequestDraft, now: Date, lang: ServerLanguage): WorkRequest {
+  createRequest(user: User, draft: RequestSubmission, now: Date, lang: ServerLanguage): WorkRequest {
     this.require(user, 'request:create')
     const project = this.project(draft.projectId)
     if (!project || !project.active) throw new HttpError(400, 'bad_request', 'projectNotFound')
     const unknownTarget = draft.targetIds.find((t) => !project.targets.some((pt) => pt.id === t))
     if (unknownTarget) throw new HttpError(400, 'bad_request', 'unknownTarget', { target: unknownTarget })
 
-    // Ids are easy to guess: someone else's upload is treated as missing. Each missing one is named
-    // (issues[].path = attachmentIds.<index>), so the form can say which to upload again.
-    const mine = (aid: string) => {
-      const stored = this.state.attachments.find((a) => a.id === aid)
-      return stored && stored.ownerId === user.id ? stored : undefined
-    }
-    const missing = draft.attachmentIds.flatMap((aid, i) => (mine(aid) ? [] : [`attachmentIds.${i}`]))
-    if (missing.length) throw new HttpError(400, 'bad_request', 'attachmentNotFound', {}, missing)
-    const attachments = [...new Set(draft.attachmentIds)].map((aid) => publicAttachment(mine(aid)!))
+    this.requireAttachments(user, draft.attachmentIds, 'attachmentIds')
+    const attachments = this.attachmentsOf(user.id, draft.attachmentIds)
     const at = now.toISOString()
     const id = this.state.nextRequestId++
 
@@ -639,6 +654,10 @@ export class MockEngine {
     }
     req = this.apply(req, { event: 'startReport' }, { type: 'system' }, now)
     this.state.requests.push(req)
+    // The draft it was written in has done its job. Someone else's, or one already gone, is ignored.
+    if (draft.draftId) {
+      this.state.drafts = this.state.drafts.filter((d) => d.id !== draft.draftId || d.ownerId !== user.id)
+    }
     return req
   }
 
@@ -864,6 +883,29 @@ export class MockEngine {
       }))
   }
 
+  /** The person's own upload of that id. Ids are easy to guess: someone else's counts as missing. */
+  private ownAttachment(ownerId: string, id: string): StoredAttachment | undefined {
+    const stored = this.state.attachments.find((a) => a.id === id)
+    return stored && stored.ownerId === ownerId ? stored : undefined
+  }
+
+  /**
+   * Refuses ids that are not the person's uploads, naming each by its place
+   * (issues[].path = <field>.<index>) so the form can say which to upload again.
+   */
+  private requireAttachments(user: User, ids: readonly string[], field: string): void {
+    const missing = ids.flatMap((id, i) => (this.ownAttachment(user.id, id) ? [] : [`${field}.${i}`]))
+    if (missing.length) throw new HttpError(400, 'bad_request', 'attachmentNotFound', {}, missing)
+  }
+
+  /** The owner's uploads among `ids`, each once, in order; ids that resolve to nothing are skipped. */
+  private attachmentsOf(ownerId: string, ids: readonly string[]): Attachment[] {
+    return [...new Set(ids)].flatMap((id) => {
+      const stored = this.ownAttachment(ownerId, id)
+      return stored ? [publicAttachment(stored)] : []
+    })
+  }
+
   addAttachment(user: User, file: { name: string; size: number; type: string; url: string }): Attachment {
     this.require(user, 'request:create')
     const stored: StoredAttachment = {
@@ -876,6 +918,104 @@ export class MockEngine {
     }
     this.state.attachments.push(stored)
     return publicAttachment(stored)
+  }
+
+  /* ---------- saved drafts ---------- */
+
+  /** A draft of the person's own; anyone else's is "not found", like one that never existed. */
+  private findDraft(user: User, id: string): StoredDraft {
+    const draft = this.state.drafts.find((d) => d.id === id && d.ownerId === user.id)
+    if (!draft) throw new HttpError(404, 'not_found', 'draftNotFound')
+    return draft
+  }
+
+  private presentDraft(draft: StoredDraft): SavedDraft {
+    const attachments = this.attachmentsOf(draft.ownerId, draft.content.attachmentIds ?? [])
+    return { ...this.summarizeDraft(draft, attachments.length), content: draft.content, attachments }
+  }
+
+  private summarizeDraft(draft: StoredDraft, attachmentCount: number): SavedDraftSummary {
+    const { projectId, type } = draft.content
+    return {
+      id: draft.id,
+      title: draft.content.title?.trim() ?? '',
+      ...(projectId ? { projectId } : {}),
+      ...(type ? { type } : {}),
+      step: draft.step,
+      attachmentCount,
+      version: draft.version,
+      createdAt: draft.createdAt,
+      updatedAt: draft.updatedAt,
+    }
+  }
+
+  listDrafts(user: User): SavedDraftSummary[] {
+    this.require(user, 'request:create')
+    // Most recently changed first; of two changed in the same moment, the later change (stored last).
+    return this.state.drafts
+      .map((draft, i) => ({ draft, i }))
+      .filter(({ draft }) => draft.ownerId === user.id)
+      .sort((a, b) => b.draft.updatedAt.localeCompare(a.draft.updatedAt) || b.i - a.i)
+      .map(({ draft }) =>
+        this.summarizeDraft(
+          draft,
+          this.attachmentsOf(draft.ownerId, draft.content.attachmentIds ?? []).length,
+        ),
+      )
+  }
+
+  getDraft(user: User, id: string): SavedDraft {
+    this.require(user, 'request:create')
+    return this.presentDraft(this.findDraft(user, id))
+  }
+
+  createDraft(user: User, input: { step: number; content: DraftContent }, now: Date): SavedDraft {
+    this.require(user, 'request:create')
+    const limit = this.opts.draftsPerAccount ?? appConfig.drafts.maxPerAccount
+    if (this.state.drafts.filter((d) => d.ownerId === user.id).length >= limit) {
+      throw new HttpError(409, 'limit_reached', 'draftLimit', { limit })
+    }
+    this.requireAttachments(user, input.content.attachmentIds ?? [], 'content.attachmentIds')
+    const at = now.toISOString()
+    const draft: StoredDraft = {
+      id: this.newId('draft'),
+      ownerId: user.id,
+      step: input.step,
+      content: input.content,
+      version: 1,
+      createdAt: at,
+      updatedAt: at,
+    }
+    this.state.drafts.push(draft)
+    return this.presentDraft(draft)
+  }
+
+  /** Replaces step and content, but only over the version the change was based on. */
+  updateDraft(
+    user: User,
+    id: string,
+    input: { baseVersion: number; step: number; content: DraftContent },
+    now: Date,
+  ): SavedDraft {
+    this.require(user, 'request:create')
+    const current = this.findDraft(user, id)
+    if (input.baseVersion !== current.version) throw new HttpError(409, 'conflict', 'draftConflict')
+    this.requireAttachments(user, input.content.attachmentIds ?? [], 'content.attachmentIds')
+    const next: StoredDraft = {
+      ...current,
+      step: input.step,
+      content: input.content,
+      version: current.version + 1,
+      updatedAt: now.toISOString(),
+    }
+    this.state.drafts = [...this.state.drafts.filter((d) => d !== current), next]
+    return this.presentDraft(next)
+  }
+
+  deleteDraft(user: User, id: string): void {
+    this.require(user, 'request:create')
+    const draft = this.findDraft(user, id)
+    this.state.drafts = this.state.drafts.filter((d) => d !== draft)
   }
 
   /* ---------- users & projects ---------- */

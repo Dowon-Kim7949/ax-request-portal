@@ -71,6 +71,11 @@ const ERRORS = {
     releaseUnscheduled: '배포 예정일을 먼저 정해야 배포 완료로 바꿀 수 있습니다.',
     requestClosed: '끝난 요청은 바꿀 수 없습니다.',
     attachmentNotFound: '첨부 파일을 찾을 수 없습니다. 첨부를 지우고 다시 올려 주세요.',
+    draftNotFound: '임시 저장된 초안을 찾을 수 없습니다. 다른 기기에서 지웠거나 제출했을 수 있습니다.',
+    draftLimit: (p) =>
+      `임시 저장함이 가득 찼습니다(최대 ${p.limit}개). 다른 초안을 지우면 저장할 수 있습니다.`,
+    draftConflict:
+      '이 초안이 다른 곳에서 먼저 저장되었습니다. 저장된 내용을 불러오거나 이 화면 내용으로 다시 저장해 주세요.',
     releaseDateInPast: (p) =>
       `배포 예정일은 오늘(본사 기준 ${readableDate('ko', p.today)}) 이후로 정해 주세요.`,
     emailTaken: '이미 등록된 이메일입니다.',
@@ -118,6 +123,10 @@ const ERRORS = {
     releaseUnscheduled: 'Set the planned release date before marking the request released.',
     requestClosed: 'This request is closed and can no longer be changed.',
     attachmentNotFound: 'An attachment was not found. Remove it and upload it again.',
+    draftNotFound: 'The saved draft was not found. It may have been deleted or submitted on another device.',
+    draftLimit: (p) => `Your saved drafts are full (up to ${p.limit}). Delete one to save another.`,
+    draftConflict:
+      'This draft was saved somewhere else in the meantime. Load the saved version, or save what is on this screen over it.',
     releaseDateInPast: (p) =>
       `The release date cannot be in the past. Today is ${readableDate('en', p.today)} at the head office.`,
     emailTaken: 'This email is already registered.',

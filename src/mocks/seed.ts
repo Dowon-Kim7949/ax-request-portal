@@ -1107,6 +1107,7 @@ function emptyState(now: Date, lang: ServerLanguage): MockState {
     },
     aiUsage: [],
     attachments: [],
+    drafts: [],
   }
 }
 

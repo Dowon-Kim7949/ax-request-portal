@@ -61,6 +61,12 @@ describe('loading', () => {
     expect(stateProblem({ ...seed, revision: -1 })).toMatch(/revision/)
     expect(stateProblem({ ...seed, ai: { ...seed.ai, pricing: null } })).toMatch(/AI settings/)
     expect(stateProblem({ ...seed, nextRequestId: 1000 })).toMatch(/issued twice/)
+    // Data saved before drafts were kept on the server is rebuilt rather than read without them.
+    expect(stateProblem({ ...seed, version: 5 })).toMatch(/^version 5/)
+    expect(stateProblem({ ...seed, drafts: undefined })).toMatch(/drafts/)
+    expect(stateProblem({ ...seed, drafts: [{ id: 'draft-1', ownerId: 'u-kim', version: 1 }] })).toBe(
+      'a draft is incomplete',
+    )
   })
 
   it('keeps what a previous visit saved', () => {
