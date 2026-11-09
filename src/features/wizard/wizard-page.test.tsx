@@ -9,7 +9,7 @@ import { call } from '@/api/client'
 import { api } from '@/api/contract'
 import { SessionSync } from '@/app/guards'
 import { appConfig } from '@/config/app.config'
-import { resetDraftSync } from '@/features/drafts/sync'
+import { draftSync, resetDraftSync } from '@/features/drafts/sync'
 import { DEMO_PASSWORD } from '@/mocks/seed'
 import {
   clearDrafts,
@@ -602,6 +602,36 @@ describe('leaving', () => {
     expect(screen.getByRole('heading', { name: '홈 화면' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(listLocalDrafts(USER)).toEqual([])
+  })
+
+  it('sends the last words when the page is hidden, without waiting for typing to pause', async () => {
+    t.server.use(http.post('*/api/drafts', () => HttpResponse.error()))
+    keepLocal({ ...READY, title: '' })
+    const engine = draftSync(USER)
+    const sent: Array<{ trigger: string; title: unknown }> = []
+    const sync = engine.sync.bind(engine)
+    vi.spyOn(engine, 'sync').mockImplementation((trigger, key) => {
+      const content = key
+        ? (getLocalDraft(USER, key)?.content as Partial<WizardValues> | undefined)
+        : undefined
+      sent.push({ trigger, title: content?.title })
+      return sync(trigger, key)
+    })
+    renderWizard(`/requests/new?draft=${LOCAL}&step=3`)
+    const field = await screen.findByLabelText('요청 제목')
+
+    await userEvent.type(field, '검색')
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
+    try {
+      document.dispatchEvent(new Event('visibilitychange'))
+    } finally {
+      Reflect.deleteProperty(document, 'visibilityState')
+    }
+    expect(sent.at(-1)).toEqual({ trigger: 'hidden', title: '검색' })
+
+    await userEvent.type(field, ' 추가')
+    window.dispatchEvent(new Event('pagehide'))
+    expect(sent.at(-1)).toEqual({ trigger: 'hidden', title: '검색 추가' })
   })
 
   it('keeps writing the draft on this device, a moment after typing stops', async () => {

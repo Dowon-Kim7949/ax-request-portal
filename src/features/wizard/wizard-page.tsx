@@ -395,8 +395,8 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
   writeRef.current = writeLocal
   const draftSaver = useMemo(() => debounce(() => writeRef.current(), DRAFT_SAVE_DELAY_MS), [])
 
-  /** Sends what is waiting now (the person moved on, or left). */
-  const sendNow = (trigger: 'step' | 'leave') => {
+  /** Sends what is waiting now (the person moved on, left, or the page was hidden). */
+  const sendNow = (trigger: 'step' | 'leave' | 'hidden') => {
     draftSaver.flush()
     if (keyRef.current) void engine.sync(trigger, keyRef.current)
   }
@@ -405,16 +405,18 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
 
   useEffect(() => {
     const sub = form.watch(() => draftSaver.schedule())
-    // A phone may discard a hidden tab without warning: write what is pending first.
+    // A phone may discard a hidden tab without warning: write what is pending and send it. Sent from
+    // here, after the write: the app's own send on hiding may run first, without the last words.
     const onHidden = () => {
-      if (document.visibilityState === 'hidden') draftSaver.flush()
+      if (document.visibilityState === 'hidden') sendNowRef.current('hidden')
     }
+    const onPageHide = () => sendNowRef.current('hidden')
     document.addEventListener('visibilitychange', onHidden)
-    window.addEventListener('pagehide', draftSaver.flush)
+    window.addEventListener('pagehide', onPageHide)
     return () => {
       sub.unsubscribe()
       document.removeEventListener('visibilitychange', onHidden)
-      window.removeEventListener('pagehide', draftSaver.flush)
+      window.removeEventListener('pagehide', onPageHide)
       // Leaving the wizard: write what is pending and send it on its way.
       sendNowRef.current('leave')
     }
