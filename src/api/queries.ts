@@ -305,7 +305,7 @@ export const CREATE_REQUEST_KEY = ['createRequest'] as const
  */
 export function useCreateRequest(
   options: {
-    onCreated?: (req: WorkRequest) => void
+    onCreated?: (req: WorkRequest, body: BodyOf<typeof api.createRequest>) => void
     onFailed?: (error: Error, body: BodyOf<typeof api.createRequest>) => void
   } = {},
 ) {
@@ -319,7 +319,7 @@ export function useCreateRequest(
       onRequestChanged(qc, req)
       if (body.draftId) dropSavedDraft(qc, body.draftId)
       else void qc.invalidateQueries({ queryKey: keys.drafts() })
-      onCreated?.(req)
+      onCreated?.(req, body)
     },
     onError: (error, body) => onFailed?.(error, body),
   })

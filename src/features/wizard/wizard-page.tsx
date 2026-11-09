@@ -32,6 +32,7 @@ import { unlinked } from '@/features/drafts/sync-core'
 import { debounce } from '@/lib/debounce'
 import {
   getLocalDraft,
+  isLocalId,
   newLocalId,
   putLocalDraft,
   resolveDraftId,
@@ -601,12 +602,13 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
   // Handled by the hook, so the draft is deleted and the outcome told even when
   // the person has left the wizard while the request was on its way.
   const create = useCreateRequest({
-    onCreated: () => {
+    onCreated: (_req, body) => {
       finished.current = true
       draftSaver.cancel()
-      // The server deleted its copy with the submission; this device's goes too. A save still on
-      // its way that creates the draft again is deleted when it arrives (see settle in sync-core).
-      if (submittingKey.current) engine.forget(submittingKey.current)
+      // The server deleted its copy with the submission; this device's goes too, and so does a copy
+      // the account got while the request was on its way. A save still on its way that creates the
+      // draft again is deleted when it arrives (see settle in sync-core).
+      if (submittingKey.current) engine.submitted(submittingKey.current, body.draftId)
       toast.success(t('wizard.review.submitted'))
     },
     onFailed: (e, body) => {
@@ -638,7 +640,10 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
     if (key) key = await engine.pause(key, DRAFT_SETTLE_TIMEOUT_MS)
     submittingKey.current = key
     const entry = key ? getLocalDraft(userId, key) : undefined
-    const draftId = entry ? entry.draftId : serverRef.current?.id
+    // Nothing left on this device under a server id: the account has all of it.
+    const draftId = entry
+      ? entry.draftId
+      : (serverRef.current?.id ?? (key && !isLocalId(key) ? key : undefined))
     setPreparing(false)
     create.mutate(
       { ...toDraft(form.getValues()), ...(draftId ? { draftId } : {}) },

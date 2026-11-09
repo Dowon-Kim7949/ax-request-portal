@@ -5,7 +5,14 @@
  * sync.ts and hooks.ts; tests drive it directly.
  */
 import type { DraftContent, SavedDraft, SavedDraftInput, SavedDraftUpdate } from '@/api/contract'
-import { getLocalDraft, listLocalDrafts, settleLocalDraft, type LocalDraft } from '@/stores/draft'
+import {
+  getLocalDraft,
+  isLocalId,
+  listLocalDrafts,
+  resolveDraftId,
+  settleLocalDraft,
+  type LocalDraft,
+} from '@/stores/draft'
 import { outcomeOf, requestFor, settle, shouldSend, type Outcome, type SyncTrigger } from './sync-core'
 
 /** The draft endpoints, as the engine uses them. `remove` treats a draft that is already gone as removed. */
@@ -126,7 +133,7 @@ export class DraftSyncEngine {
    * Stops sending `localId` (a submission is about to take it) and waits at
    * most `timeoutMs` for a request already out for it. Resolves with the key
    * the draft lives under afterwards: a new draft the server just saved moves
-   * to its server id. `release` or `forget` ends the hold.
+   * to its server id. `release`, `forget` or `submitted` ends the hold.
    */
   async pause(localId: string, timeoutMs: number): Promise<string> {
     this.hold(localId)
@@ -135,23 +142,38 @@ export class DraftSyncEngine {
     return this.whereIs(localId)
   }
 
-  /** Lets `localId` be sent again (a submission failed), and sends it soon. */
+  /**
+   * Lets `localId` be sent again (a submission failed), and sends it soon. A
+   * draft saved while it was held has moved to its server id: the hold follows it.
+   */
   release(localId: string): void {
-    this.held.delete(localId)
-    if (getLocalDraft(this.userId, localId)) this.schedule(localId)
+    const keys = this.trail(localId)
+    for (const key of keys) this.held.delete(key)
+    const key = keys[keys.length - 1]!
+    if (getLocalDraft(this.userId, key)) this.schedule(key)
   }
 
   /**
-   * Drops `localId` for good (submitted or deleted): nothing waiting is sent
-   * and the draft leaves this device. A request already out for it can still
-   * be answered: a new draft saved that way is deleted at once (see `settle`).
+   * Drops `localId` for good (submitted or deleted), under every key it has
+   * had: nothing waiting is sent and the draft leaves this device. A request
+   * already out for it can still be answered: a new draft saved that way is
+   * deleted at once (see `settle`).
    */
   forget(localId: string): void {
-    this.held.delete(localId)
-    this.clearTimer(localId)
-    this.queue.delete(localId)
-    if (getLocalDraft(this.userId, localId)) settleLocalDraft(this.userId, localId, null)
-    this.setState(localId, 'idle')
+    for (const key of this.trail(localId)) this.drop(key)
+  }
+
+  /**
+   * The draft once kept as `localId` became a request naming `draftId` (the
+   * server deleted that draft with it). Forgets it like `forget`; and when a
+   * save answered while the submission was on its way left it under a server
+   * id the request did not name, that server draft is deleted too.
+   */
+  submitted(localId: string, draftId: string | undefined): void {
+    const keys = this.trail(localId)
+    for (const key of keys) this.drop(key)
+    const last = keys[keys.length - 1]!
+    if (!isLocalId(last) && last !== draftId) void this.removeOrphan(last)
   }
 
   /** Tries the drafts the account had no room for again (one was just deleted). */
@@ -183,11 +205,35 @@ export class DraftSyncEngine {
     this.queue.delete(localId)
   }
 
+  /**
+   * Every key the draft once kept as `localId` has had, oldest first: the
+   * moves this engine made, and those another tab's saves left on this device
+   * (a local id leads to the server id it was saved as).
+   */
+  private trail(localId: string): string[] {
+    const keys = [localId]
+    for (let hops = 0; hops < 5; hops++) {
+      const last = keys[keys.length - 1]!
+      const next = this.moved.get(last) ?? resolveDraftId(this.userId, last).id
+      if (next === last || keys.includes(next)) break
+      keys.push(next)
+    }
+    return keys
+  }
+
   /** Where the draft once kept as `localId` lives now (it moves to its server id once saved). */
   private whereIs(localId: string): string {
-    let key = localId
-    for (let hops = 0; hops < 5 && this.moved.has(key); hops++) key = this.moved.get(key)!
-    return key
+    const keys = this.trail(localId)
+    return keys[keys.length - 1]!
+  }
+
+  /** Nothing more is sent or kept for `key`. */
+  private drop(key: string) {
+    this.held.delete(key)
+    this.clearTimer(key)
+    this.queue.delete(key)
+    if (getLocalDraft(this.userId, key)) settleLocalDraft(this.userId, key, null)
+    this.setState(key, 'idle')
   }
 
   private clearTimer(localId: string) {
@@ -292,7 +338,8 @@ export class DraftSyncEngine {
   /** Writes down what the answer means for the draft sent as `localId`. Resolves with the key to send again. */
   private apply(localId: string, sent: LocalDraft, outcome: Outcome): string | null {
     const result = settle(getLocalDraft(this.userId, localId), sent, outcome)
-    if (result.orphan) void this.removeOrphan(result.orphan)
+    // Not when the draft lives there now: another tab's save of the same draft answered first.
+    if (result.orphan && this.whereIs(localId) !== result.orphan) void this.removeOrphan(result.orphan)
     const nextKey = result.next ? result.next.localId : localId
     if (result.next !== undefined) settleLocalDraft(this.userId, localId, result.next, result.alias)
     const movedTo = result.next ? result.next.localId : result.alias?.id

@@ -283,6 +283,82 @@ describe('races', () => {
     await vi.waitFor(() => expect(events.at(-1)).toMatchObject({ type: 'removed' }))
   })
 
+  it('a new draft saved after the submission stopped waiting, but before the request was created, is deleted', async () => {
+    const posted = gate()
+    const { sync, events } = engine(heldApi({ create: [posted.closed] }).api)
+    write('local-a', '검색')
+    const running = sync.sync('boot')
+    await vi.waitFor(() => expect(sync.state('local-a')).toBe('sending'))
+    // Too slow: the request goes without naming it…
+    expect(await sync.pause('local-a', 10)).toBe('local-a')
+    // …and the save is answered first: the draft now lives under its server id.
+    posted.open()
+    await running
+    const [saved] = await serverDrafts()
+    expect(saved?.title).toBe('검색')
+
+    sync.submitted('local-a', undefined)
+    await vi.waitFor(async () => expect(await serverDrafts()).toEqual([]))
+    expect(listLocalDrafts(USER)).toEqual([])
+    expect(events.at(-1)).toEqual({ type: 'removed', draftId: saved!.id })
+  })
+
+  it('so is what was typed while it was on its way, and nothing more is sent for it', async () => {
+    const posted = gate()
+    const { api: held, calls } = heldApi({ create: [posted.closed] })
+    const { sync } = engine(held)
+    write('local-a', '검색')
+    const running = sync.sync('boot')
+    await vi.waitFor(() => expect(sync.state('local-a')).toBe('sending'))
+    expect(await sync.pause('local-a', 10)).toBe('local-a')
+    write('local-a', '검색 추가')
+    posted.open()
+    await running
+    const [saved] = await serverDrafts()
+    // Kept under the server id, still to send; held for the submission.
+    expect(getLocalDraft(USER, saved!.id)).toMatchObject({ dirty: true, content: { title: '검색 추가' } })
+
+    sync.submitted('local-a', undefined)
+    await vi.waitFor(() => expect(calls.remove).toBe(1))
+    expect(listLocalDrafts(USER)).toEqual([])
+    await sync.sync('online')
+    expect(calls.update).toBe(0)
+    expect(await serverDrafts()).toEqual([])
+  })
+
+  it('a request that named the draft leaves the deleting to the server', async () => {
+    const draft = await createOnServer('처음')
+    const { api: held, calls } = heldApi()
+    const { sync } = engine(held)
+    write(draft.id, '고친 것', { draftId: draft.id, baseVersion: 1 })
+    expect(await sync.pause(draft.id, 10)).toBe(draft.id)
+    sync.submitted(draft.id, draft.id)
+    expect(listLocalDrafts(USER)).toEqual([])
+    expect(calls.remove).toBe(0)
+  })
+
+  it('a failed submission sends the draft again under the server id it was saved as meanwhile', async () => {
+    const posted = gate()
+    const { api: held, calls } = heldApi({ create: [posted.closed] })
+    const { sync } = engine(held)
+    write('local-a', '검색')
+    const running = sync.sync('boot')
+    await vi.waitFor(() => expect(sync.state('local-a')).toBe('sending'))
+    expect(await sync.pause('local-a', 10)).toBe('local-a')
+    posted.open()
+    await running
+    const [saved] = await serverDrafts()
+
+    // The submission failed: the hold ends, wherever the draft lives now.
+    sync.release('local-a')
+    write(saved!.id, '검색 고침', { draftId: saved!.id, baseVersion: 1 })
+    sync.schedule(saved!.id)
+    await vi.waitFor(() => expect(calls.update).toBe(1))
+    await vi.waitFor(() => expect(sync.state(saved!.id)).toBe('idle'))
+    expect(await serverDraft(saved!.id)).toMatchObject({ title: '검색 고침', version: 2 })
+    expect(listLocalDrafts(USER)).toEqual([])
+  })
+
   it('nothing is sent for a draft held for a submission, until it is released', async () => {
     const { api: held, calls } = heldApi()
     const { sync } = engine(held)

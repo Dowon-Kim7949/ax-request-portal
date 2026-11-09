@@ -196,6 +196,35 @@ describe('submitting', () => {
     expect(listLocalDrafts(USER)).toEqual([])
   })
 
+  it('a save answered after the wizard stopped waiting, but before the request was created, leaves no draft', async () => {
+    keepLocal(READY)
+    const posted = gate()
+    const created = gate()
+    let submitted = false
+    t.server.use(
+      http.post('*/api/drafts', async () => {
+        await posted.closed
+      }),
+      http.post('*/api/requests', async () => {
+        submitted = true
+        await created.closed
+      }),
+    )
+    renderWizard(REVIEW)
+    await screen.findByText(/확인해 보면 좋은 점 \d+개/)
+    await userEvent.click(screen.getByRole('button', { name: '요청 제출' }))
+    // The wizard waits a moment for the save, then sends the request without naming the draft…
+    await waitFor(() => expect(submitted).toBe(true), { timeout: 5_000 })
+    // …and the save arrives before the request is created: the account has the draft now.
+    posted.open()
+    await waitFor(async () => expect(await accountDrafts()).toHaveLength(1))
+
+    created.open()
+    expect(await screen.findByRole('heading', { name: '요청 상세' })).toBeInTheDocument()
+    await waitFor(async () => expect(await accountDrafts()).toEqual([]))
+    expect(listLocalDrafts(USER)).toEqual([])
+  })
+
   it('names the attachments the server could not find and leads back to them', async () => {
     const photo = {
       id: 'att-expired',
