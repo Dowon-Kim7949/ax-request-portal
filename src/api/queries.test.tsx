@@ -6,18 +6,16 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { CriterionCheck, Notification, RequestDraft, WorkRequest } from '@/domain/model'
 import { createTestApi } from '@/test/mock-api'
 import { signInAs, testQueryClient } from '@/test/session'
-import { ApiError, call } from './client'
+import { call } from './client'
 import { api, type SavedDraft, type SavedDraftSummary } from './contract'
 import {
   keys,
-  useCreateDraft,
+  storeSavedDraft,
   useCreateRequest,
   useDeleteDraft,
-  useDraft,
   useDrafts,
   useMarkNotificationRead,
   useSaveVerification,
-  useUpdateDraft,
   useUpdateUser,
 } from './queries'
 
@@ -161,74 +159,26 @@ describe('saved drafts', () => {
     return list
   }
 
-  it('reads the list and one draft under their own keys', async () => {
-    const saved = await call(api.createDraft, { body: { step: 2, content: { title: '목록과 상세' } } })
+  it('reads the list under its own key', async () => {
+    const saved = await call(api.createDraft, { body: { step: 2, content: { title: '목록' } } })
     const { wrapper } = setup()
     const list = renderHook(() => useDrafts(), { wrapper })
-    const one = renderHook(() => useDraft(saved.id), { wrapper })
-    await waitFor(() => expect(one.result.current.data).toEqual(saved))
     await waitFor(() => expect(list.result.current.data?.[0]?.id).toBe(saved.id))
-    // Without an id (a draft kept on this device only) nothing is asked.
-    const none = renderHook(() => useDraft(undefined), { wrapper })
-    expect(none.result.current.fetchStatus).toBe('idle')
     await call(api.deleteDraft, { params: { id: saved.id } })
   })
 
-  it('keeps a new draft as the open copy, lists it at once and reads the list again', async () => {
-    const { qc, wrapper } = setup()
+  it('keeps a saved draft as the open copy, lists it at once and reads the list again', async () => {
+    const { qc } = setup()
     await primeList(qc)
-    const { result } = renderHook(() => useCreateDraft(), { wrapper })
-    result.current.mutate({ step: 1, content: { title: '새 초안' } })
-    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    const saved = await call(api.createDraft, { body: { step: 1, content: { title: '새 초안' } } })
+    storeSavedDraft(qc, saved)
 
-    const saved = result.current.data!
     expect(qc.getQueryData<SavedDraft>(keys.draft(saved.id))).toEqual(saved)
     // In the list before it is read again (the sync deletes this device's copy in the same moment).
     const { content: _content, attachments: _attachments, ...summary } = saved
     expect(qc.getQueryData<SavedDraftSummary[]>(keys.drafts())?.[0]).toEqual(summary)
     expect(qc.getQueryState(keys.drafts())?.isInvalidated).toBe(true)
     await call(api.deleteDraft, { params: { id: saved.id } })
-  })
-
-  it('sends the saves of one draft in order, each on the version before it', async () => {
-    const { id } = await call(api.createDraft, { body: { step: 0, content: {} } })
-    const { qc, wrapper } = setup()
-    await primeList(qc)
-
-    // The first save is slow; sent side by side, the second would arrive first and be refused.
-    const received: number[] = []
-    t.server.use(
-      http.put('*/api/drafts/:id', async ({ request }) => {
-        const body = (await request.clone().json()) as { baseVersion: number }
-        received.push(body.baseVersion)
-        if (received.length === 1) await delay(50)
-      }),
-    )
-    const { result } = renderHook(() => useUpdateDraft(id), { wrapper })
-    result.current.mutate({ baseVersion: 1, step: 1, content: { title: '하나' } })
-    result.current.mutate({ baseVersion: 2, step: 2, content: { title: '둘' } })
-
-    await waitFor(() => expect(qc.isMutating()).toBe(0))
-    expect(received).toEqual([1, 2])
-    expect(result.current.error).toBeNull()
-    expect(qc.getQueryData<SavedDraft>(keys.draft(id))).toMatchObject({ version: 3, title: '둘' })
-    expect(qc.getQueryState(keys.drafts())?.isInvalidated).toBe(true)
-    await call(api.deleteDraft, { params: { id } })
-  })
-
-  it('reads the list again when a save is refused as a conflict', async () => {
-    const { id } = await call(api.createDraft, { body: { step: 0, content: {} } })
-    await call(api.updateDraft, { params: { id }, body: { baseVersion: 1, step: 0, content: {} } })
-    const { qc, wrapper } = setup()
-    await primeList(qc)
-
-    const { result } = renderHook(() => useUpdateDraft(id), { wrapper })
-    result.current.mutate({ baseVersion: 1, step: 3, content: { title: '늦은 저장' } })
-    await waitFor(() => expect(result.current.isError).toBe(true))
-    expect(result.current.error).toBeInstanceOf(ApiError)
-    expect(result.current.error).toMatchObject({ status: 409, code: 'conflict' })
-    expect(qc.getQueryState(keys.drafts())?.isInvalidated).toBe(true)
-    await call(api.deleteDraft, { params: { id } })
   })
 
   it('takes a draft that is already gone as deleted, and drops it from the list at once', async () => {

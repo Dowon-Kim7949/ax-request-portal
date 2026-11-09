@@ -109,15 +109,6 @@ export function useDrafts(options: { enabled?: boolean } = {}) {
   })
 }
 
-/** One saved draft with its content and attachments, by its server id. */
-export function useDraft(id: string | undefined) {
-  return useQuery({
-    queryKey: keys.draft(id ?? ''),
-    queryFn: ({ signal }) => call(api.getDraft, { params: { id: id! }, signal }),
-    enabled: Boolean(id),
-  })
-}
-
 export function useRegressionQueue() {
   return useQuery({
     queryKey: keys.regression(),
@@ -218,17 +209,14 @@ function onRequestChanged(qc: QueryClient, req: WorkRequest) {
   void qc.invalidateQueries({ queryKey: [...keys.all, 'releases'] })
 }
 
-/** Marks saved-draft changes: `[...DRAFT_MUTATION_KEY, 'update', id]` waits for one draft's saves. */
-export const DRAFT_MUTATION_KEY = ['drafts'] as const
-
 /**
- * Saves of one draft run one after another (TanStack mutation scope), so each
- * is sent with the version the previous one answered.
+ * Drafts are saved by the draft sync (src/features/drafts/sync-engine.ts), which
+ * sends each draft's saves one after another itself: a mutation scope is fixed
+ * per hook and cannot follow a draft whose id changes when it is first saved.
  */
-const draftScope = (id: string) => ({ id: `draft:${id}` })
 
 /**
- * After a draft was saved (here or by the draft sync): the open copy is the
+ * After a draft was saved by the draft sync: the open copy is the
  * answer, and so is its line in the list, at once (the device's own copy may
  * be deleted in the same moment, and the list must not lose the draft until
  * it is read again). Then the list is read again.
@@ -251,13 +239,6 @@ export function dropSavedDraft(qc: QueryClient, id: string) {
   qc.removeQueries({ queryKey: keys.draft(id), exact: true })
   qc.setQueryData<SavedDraftSummary[]>(keys.drafts(), (list) => list?.filter((d) => d.id !== id))
   void qc.invalidateQueries({ queryKey: keys.drafts() })
-}
-
-/** A save refused because the draft is gone (404) or was saved elsewhere (409): the list is out of date. */
-function onDraftRefused(qc: QueryClient, error: Error) {
-  if (error instanceof ApiError && (error.status === 404 || error.status === 409)) {
-    void qc.invalidateQueries({ queryKey: keys.drafts() })
-  }
 }
 
 export function useLogin() {
@@ -325,36 +306,10 @@ export function useCreateRequest(
   })
 }
 
-/** Saves a new draft to the account. 409 `limit_reached` when the account holds as many as allowed. */
-export function useCreateDraft() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationKey: [...DRAFT_MUTATION_KEY, 'create'],
-    mutationFn: (body: BodyOf<typeof api.createDraft>) => call(api.createDraft, { body }),
-    onSuccess: (draft) => storeSavedDraft(qc, draft),
-  })
-}
-
-/**
- * Saves a draft over the version it was based on (`baseVersion`). 409 `conflict`
- * when it was saved elsewhere since; 404 when it was deleted or submitted.
- */
-export function useUpdateDraft(id: string) {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationKey: [...DRAFT_MUTATION_KEY, 'update', id],
-    mutationFn: (body: BodyOf<typeof api.updateDraft>) => call(api.updateDraft, { params: { id }, body }),
-    scope: draftScope(id),
-    onSuccess: (draft) => storeSavedDraft(qc, draft),
-    onError: (error) => onDraftRefused(qc, error),
-  })
-}
-
 /** Deletes a saved draft. One that is already gone (404: deleted or submitted elsewhere) counts as deleted. */
 export function useDeleteDraft() {
   const qc = useQueryClient()
   return useMutation({
-    mutationKey: [...DRAFT_MUTATION_KEY, 'delete'],
     mutationFn: async (id: string): Promise<void> => {
       try {
         await call(api.deleteDraft, { params: { id } })
