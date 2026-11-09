@@ -26,7 +26,7 @@ import { LoadFailed } from '@/components/ui/load-failed'
 import { Sheet } from '@/components/ui/sheet'
 import type { PrecheckIssue } from '@/domain/model'
 import { DraftsNotice } from '@/features/drafts/drafts-section'
-import { useDiscardDraft, useDraftSaveState } from '@/features/drafts/hooks'
+import { useDiscardDraft, useDraftSaveState, useLocalDraft } from '@/features/drafts/hooks'
 import { DRAFT_SETTLE_TIMEOUT_MS, draftSync } from '@/features/drafts/sync'
 import { unlinked } from '@/features/drafts/sync-core'
 import { debounce } from '@/lib/debounce'
@@ -37,6 +37,7 @@ import {
   putLocalDraft,
   resolveDraftId,
   updateLocalDraft,
+  type LocalDraft,
   type LocalSaveResult,
 } from '@/stores/draft'
 import { useSession } from '@/stores/session'
@@ -47,6 +48,7 @@ import {
   startLocal,
   startNew,
   startServer,
+  wordsOf,
   type FormStart,
   type ServerCopy,
 } from './draft-opening'
@@ -58,6 +60,7 @@ import {
   firstInvalidStep,
   hasWrittenContent,
   missingAttachmentIds,
+  readDraftValues,
   savedDraftValues,
   STEPS,
   toDraft,
@@ -313,12 +316,25 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
   /** What the account holds of it, as far as this screen knows */
   const serverRef = useRef<ServerCopy | null>(start.server)
   const [onServer, setOnServer] = useState(Boolean(start.server))
-  const saveState = useDraftSaveState(userId, draftKey, onServer)
+  const draftSaveState = useDraftSaveState(userId, draftKey, onServer)
   /** Set once the request is created or the draft deleted: from then on nothing may write the draft back. */
   const finished = useRef(false)
   /** How the last write on this device went (a full storage keeps the words only, or nothing) */
   const lastSave = useRef<LocalSaveResult>('saved')
   const warned = useRef(new Set<LocalSaveResult>())
+  /**
+   * The words this screen last wrote to this device or took from it, and when
+   * that copy was written. Another tab open on the same draft writes the same
+   * entry: this screen follows its words when it has none of its own, and asks
+   * when both have written (`tabConflict`), rather than writing over them.
+   */
+  const seen = useRef({
+    at: start.key ? getLocalDraft(userId, start.key)?.updatedAt : undefined,
+    words: wordsOf(start.values),
+  })
+  const [tabConflict, setTabConflict] = useState(false)
+  const tabConflictRef = useRef(tabConflict)
+  tabConflictRef.current = tabConflict
 
   /** The draft lives as `next` now: the page keeps this form for it, and the URL follows (below). */
   const moveTo = (next: string) => {
@@ -335,7 +351,18 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
     void navigate(`?${p}`, OWN_MOVE)
   }, [draftKey, params, liveSearch, navigate])
 
-  const writeLocal = () => {
+  /** Shows the words another tab wrote on this device for this draft, in place of this screen's. */
+  const take = (entry: LocalDraft) => {
+    const restored = readDraftValues(entry.content)
+    if (!restored) return
+    draftSaver.cancel()
+    seen.current = { at: entry.updatedAt, words: wordsOf(restored.values) }
+    form.reset(restored.values)
+    setTabConflict(false)
+  }
+
+  /** Writes the form to this device. `force`: over words another tab wrote meanwhile (the person chose). */
+  const writeLocal = (force = false) => {
     if (finished.current) return
     // Signed out on purpose (here or in another tab): the drafts went with the session, and the
     // write still pending when the wizard closes must not bring them back.
@@ -362,6 +389,27 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
     }
     const existing = getLocalDraft(userId, key)
     const server = serverRef.current
+    const mine = wordsOf(values)
+    if (existing && existing.updatedAt !== seen.current.at && !force) {
+      const theirs = wordsOf(existing.content)
+      // Another tab wrote other words for this draft since this screen last wrote or read them.
+      if (theirs !== seen.current.words) {
+        // Nothing new here: follow that tab.
+        if (mine === seen.current.words) return take(existing)
+        // Both wrote: the person chooses; nothing is written over meanwhile.
+        if (mine !== theirs) return setTabConflict(true)
+      }
+    }
+    // This device already holds exactly this, as this screen wrote it.
+    if (
+      existing &&
+      existing.updatedAt === seen.current.at &&
+      existing.step === stepNow &&
+      mine === seen.current.words &&
+      lastSave.current === 'saved'
+    ) {
+      return
+    }
     // Nothing the account does not already have.
     if (!existing && server?.id === key && server.baseline === baselineOf(stepNow, values)) return
     // Which server version it was written over is the sync's to keep; a fresh copy starts from what this screen knows.
@@ -375,14 +423,17 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
       : server?.id === key
         ? { draftId: server.id, baseVersion: server.version }
         : {}
+    const updatedAt = new Date().toISOString()
     const result = putLocalDraft(userId, {
       localId: key,
       ...link,
       step: stepNow,
       content: values,
-      updatedAt: new Date().toISOString(),
+      updatedAt,
       dirty: true,
     })
+    seen.current = { at: updatedAt, words: mine }
+    setTabConflict(false)
     lastSave.current = result
     // Storage full: say so once per kind, without stopping the person.
     if (result !== 'saved' && !warned.current.has(result)) {
@@ -402,6 +453,21 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
   }
   const sendNowRef = useRef(sendNow)
   sendNowRef.current = sendNow
+
+  // Another tab wrote this draft: follow its words, or ask when this screen has its own too.
+  const stored = useLocalDraft(userId, draftKey)
+  useEffect(() => {
+    if (!stored || finished.current || stored.updatedAt === seen.current.at) return
+    const theirs = wordsOf(stored.content)
+    if (theirs === seen.current.words) {
+      seen.current = { ...seen.current, at: stored.updatedAt }
+      return
+    }
+    const mine = wordsOf(form.getValues())
+    if (mine === seen.current.words) take(stored)
+    else if (mine !== theirs) setTabConflict(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `take` reads refs and the form
+  }, [stored, form])
 
   useEffect(() => {
     const sub = form.watch(() => draftSaver.schedule())
@@ -473,6 +539,7 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
   }, [])
 
   /* ---- a conflict: the person chooses which version to keep ---- */
+  const saveState = tabConflict ? 'conflict' : draftSaveState
   const [resolving, setResolving] = useState<'keep' | 'load' | null>(null)
   /** The account's latest copy of the open draft; null when it is gone. */
   const readLatest = async (key: string): Promise<SavedDraft | null> => {
@@ -493,6 +560,16 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
     void engine.sync('manual', key)
   }
   const keepMine = async () => {
+    if (tabConflict) {
+      // This screen's words go over the other tab's.
+      draftSaver.cancel()
+      writeLocal(true)
+      const key = keyRef.current
+      if (key && !getLocalDraft(userId, key)?.conflict) {
+        void engine.sync('manual', key)
+        return
+      }
+    }
     const key = keyRef.current
     if (!key) return
     setResolving('keep')
@@ -514,6 +591,13 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
     }
   }
   const loadSaved = async () => {
+    if (tabConflict) {
+      // The other tab's words, while this device still holds them; once sent, the account's.
+      const entry = keyRef.current ? getLocalDraft(userId, keyRef.current) : undefined
+      if (entry) take(entry)
+      if (entry && !entry.conflict) return
+      setTabConflict(false)
+    }
     const key = keyRef.current
     if (!key) return
     setResolving('load')
@@ -656,6 +740,8 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
   /* ---- leaving: free once the draft is kept somewhere; asked only when it is kept nowhere ---- */
   /** Nothing would be lost: written on this device, or the account has it. */
   const keptSomewhere = () => {
+    // Held back from this device while another tab's words are there.
+    if (tabConflictRef.current) return false
     if (lastSave.current !== 'failed') return true
     const key = keyRef.current
     return Boolean(key && !getLocalDraft(userId, key) && serverRef.current)

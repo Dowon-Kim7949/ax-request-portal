@@ -476,6 +476,69 @@ describe('the draft in the account', () => {
   })
 })
 
+describe('the same draft open in another tab', () => {
+  /** Another tab on this device writes the draft (here, straight to this device's store). */
+  const writeFromOtherTab = (title: string) =>
+    act(() => {
+      const entry = getLocalDraft(USER, LOCAL)!
+      putLocalDraft(USER, {
+        ...entry,
+        content: { ...(entry.content as WizardValues), title },
+        updatedAt: new Date(Date.now() + 1_000).toISOString(),
+      })
+    })
+
+  async function openInThisTab() {
+    // Kept off the account, so both tabs' words stay on this device.
+    t.server.use(http.post('*/api/drafts', () => HttpResponse.error()))
+    keepLocal({ ...READY, title: '처음 제목' })
+    renderWizard(`/requests/new?draft=${LOCAL}&step=3`)
+    expect(await screen.findByLabelText('요청 제목')).toHaveValue('처음 제목')
+  }
+
+  it('follows the words the other tab wrote while nothing new was typed here', async () => {
+    await openInThisTab()
+    writeFromOtherTab('다른 탭에서 고친 제목')
+    expect(await screen.findByLabelText('요청 제목')).toHaveValue('다른 탭에서 고친 제목')
+    expect(screen.queryByText('다른 곳에서 이 초안이 먼저 저장됐어요')).toBeNull()
+
+    // Moving on from here keeps them: this screen does not write its older words back.
+    await userEvent.click(screen.getByRole('button', { name: '다음' }))
+    await screen.findByRole('heading', { name: '무엇이 되면 완료인가요?' })
+    expect(getLocalDraft(USER, LOCAL)?.content).toMatchObject({ title: '다른 탭에서 고친 제목' })
+  })
+
+  it('asks which to keep when both tabs wrote, and writes neither over the other meanwhile', async () => {
+    await openInThisTab()
+    const field = screen.getByLabelText('요청 제목')
+    await userEvent.type(field, ' 이 탭')
+    writeFromOtherTab('다른 탭에서 고친 제목')
+
+    expect(await screen.findByText('다른 곳에서 이 초안이 먼저 저장됐어요')).toBeInTheDocument()
+    expect(screen.getByText('저장 충돌', STATUS)).toBeInTheDocument()
+    expect(field).toHaveValue('처음 제목 이 탭')
+    // Past the moment this screen would have written.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 500)))
+    expect(getLocalDraft(USER, LOCAL)?.content).toMatchObject({ title: '다른 탭에서 고친 제목' })
+
+    await userEvent.click(screen.getByRole('button', { name: '이 화면 내용으로 저장' }))
+    await waitFor(() => expect(screen.queryByText('다른 곳에서 이 초안이 먼저 저장됐어요')).toBeNull())
+    expect(getLocalDraft(USER, LOCAL)?.content).toMatchObject({ title: '처음 제목 이 탭' })
+  })
+
+  it('or takes the other tab’s words in place of this screen’s', async () => {
+    await openInThisTab()
+    await userEvent.type(screen.getByLabelText('요청 제목'), ' 이 탭')
+    writeFromOtherTab('다른 탭에서 고친 제목')
+    await screen.findByText('다른 곳에서 이 초안이 먼저 저장됐어요')
+
+    await userEvent.click(screen.getByRole('button', { name: '저장된 내용 불러오기' }))
+    await waitFor(() => expect(screen.getByLabelText('요청 제목')).toHaveValue('다른 탭에서 고친 제목'))
+    expect(screen.queryByText('다른 곳에서 이 초안이 먼저 저장됐어요')).toBeNull()
+    expect(getLocalDraft(USER, LOCAL)?.content).toMatchObject({ title: '다른 탭에서 고친 제목' })
+  })
+})
+
 describe('leaving', () => {
   it('leaves without asking once the draft is kept, and sends it on its way', async () => {
     keepLocal({ ...READY, title: '' })

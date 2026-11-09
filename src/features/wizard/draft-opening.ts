@@ -31,6 +31,9 @@ export const baselineOf = (step: number, values: WizardValues) =>
 export const baselineOfContent = (step: number, content: unknown) =>
   JSON.stringify([step, draftContentOf(content)])
 
+/** The words and choices of a draft, whatever its step (values or content as this device keeps it), for comparing. */
+export const wordsOf = (content: unknown) => JSON.stringify(draftContentOf(content))
+
 /** What the form starts from. */
 export interface FormStart {
   values: WizardValues
