@@ -82,7 +82,7 @@ function operation(name: string, e: EndpointSpec): JsonSchema {
     responses['403'] = errorResponse('Not allowed for this user')
   }
   if (e.params) responses['404'] = errorResponse('Not found')
-  if (name === 'transitionRequest') responses['409'] = errorResponse('Transition not allowed in this status')
+  if (e.conflict) responses['409'] = errorResponse(e.conflict)
 
   const params = parameters(e)
   return {

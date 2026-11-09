@@ -29,7 +29,9 @@ import {
   ReleaseScheduleItem,
   RequestDraft,
   RequestStatus,
+  RequestType,
   Role,
+  Timestamp,
   User,
   VcsProvider,
   WorkRequest,
@@ -61,6 +63,8 @@ export interface EndpointSpec {
   multipart?: boolean
   /** Success status; defaults to 200 */
   status?: 200 | 201
+  /** What a 409 answer means here, for endpoints that give one (written into docs/openapi.json) */
+  conflict?: string
   /** Registered schema of the success body. `null` = 204 No Content. */
   response: z.ZodType | null
   /**
@@ -112,12 +116,14 @@ export const ApiErrorBody = named(
       'not_found',
       'invalid_transition',
       'guard_failed',
+      'conflict',
+      'limit_reached',
       'internal',
     ]),
     message: z.string(),
     issues: z.array(z.object({ path: z.string(), message: z.string() })).optional(),
   }),
-  'Error body for every 4xx/5xx response',
+  'Error body for every 4xx/5xx response. 409 codes: invalid_transition and guard_failed (request lifecycle), conflict (a saved draft was saved again since it was read), limit_reached (no room for another saved draft).',
 )
 export type ApiErrorBody = z.infer<typeof ApiErrorBody>
 
@@ -163,6 +169,20 @@ export const RequestScope = named(
   'mine = filed by me; assigned = projects I own or requests assigned to me; all = everything (needs request:read:all)',
 )
 export type RequestScope = z.infer<typeof RequestScope>
+
+export const RequestSubmission = named(
+  'RequestSubmission',
+  RequestDraft.safeExtend({
+    draftId: z
+      .string()
+      .optional()
+      .describe(
+        "The saved draft the request was written in. Once the request is created, that draft is deleted in the same operation if it is the caller's; otherwise it is ignored.",
+      ),
+  }),
+  'Body of createRequest: the RequestDraft, plus the saved draft it came from',
+)
+export type RequestSubmission = z.infer<typeof RequestSubmission>
 
 export const RequestSummaryList = named('WorkRequestSummaryList', z.array(WorkRequestSummary))
 export const PrecheckResult = named('PrecheckResult', z.object({ issues: z.array(PrecheckIssue) }))
@@ -233,6 +253,90 @@ export const ProviderKeyInput = named(
   'ProviderKeyInput',
   z.object({
     apiKey: z.string().trim().min(8).max(500).describe('Write-only: stored by the server, never returned'),
+  }),
+)
+
+/* ---------- saved drafts ---------- */
+
+/** Last step of the request wizard, counted from 0 (the seven STEPS of src/features/wizard/schema.ts). */
+export const DRAFT_STEP_MAX = 6
+/** Ceilings that only stop abuse; RequestDraft's own rules apply when the request is submitted. */
+export const DRAFT_TEXT_MAX = 10_000
+export const DRAFT_LIST_MAX = 50
+
+const DraftText = z.string().max(DRAFT_TEXT_MAX)
+const draftList = <T extends z.ZodType>(item: T) => z.array(item).max(DRAFT_LIST_MAX)
+const DraftStep = z.int().min(0).max(DRAFT_STEP_MAX)
+
+export const DraftContent = named(
+  'DraftContent',
+  z
+    .object({
+      projectId: DraftText,
+      type: z.union([RequestType, z.literal('')]),
+      targetIds: draftList(DraftText),
+      targetOther: DraftText,
+      title: DraftText,
+      currentBehavior: DraftText,
+      desiredBehavior: DraftText,
+      acceptanceCriteria: draftList(z.object({ text: DraftText })),
+      checklistSource: DraftText,
+      checklist: draftList(
+        z.object({ ref: DraftText, clause: DraftText, finding: DraftText, expected: DraftText }),
+      ),
+      outOfScope: DraftText,
+      attachmentIds: draftList(DraftText),
+      desiredDate: DraftText,
+      desiredDateReason: DraftText,
+    })
+    .partial(),
+  `A half-written request as the wizard holds it: the RequestDraft fields, every one optional and empty values allowed. Only abuse ceilings apply (text up to ${DRAFT_TEXT_MAX.toLocaleString('en-US')} characters, lists up to ${DRAFT_LIST_MAX} items).`,
+)
+export type DraftContent = z.infer<typeof DraftContent>
+
+export const SavedDraftSummary = named(
+  'SavedDraftSummary',
+  z.object({
+    id: z.string(),
+    title: z.string().describe('content.title without surrounding spaces; empty when there is none'),
+    projectId: z.string().optional().describe('content.projectId, once one is picked'),
+    type: RequestType.optional().describe('content.type, once one is picked'),
+    step: DraftStep.describe(`Wizard step the person was last on (0–${DRAFT_STEP_MAX})`),
+    attachmentCount: z.int().nonnegative().describe('How many attachments SavedDraft.attachments holds'),
+    version: z
+      .int()
+      .positive()
+      .describe('1 when created, one more on every update; an update sends it back as baseVersion'),
+    createdAt: Timestamp,
+    updatedAt: Timestamp,
+  }),
+  "One of the caller's saved drafts, as a list shows it",
+)
+export type SavedDraftSummary = z.infer<typeof SavedDraftSummary>
+
+export const SavedDraft = named(
+  'SavedDraft',
+  SavedDraftSummary.extend({
+    content: DraftContent,
+    attachments: z
+      .array(Attachment)
+      .describe(
+        'The attachments of content.attachmentIds that still exist and were uploaded by the caller, each once, in that order',
+      ),
+  }),
+  'A saved draft with everything needed to continue it, on this device or another',
+)
+export type SavedDraft = z.infer<typeof SavedDraft>
+
+export const SavedDraftSummaryList = named('SavedDraftSummaryList', z.array(SavedDraftSummary))
+export const SavedDraftInput = named('SavedDraftInput', z.object({ step: DraftStep, content: DraftContent }))
+export const SavedDraftUpdate = named(
+  'SavedDraftUpdate',
+  SavedDraftInput.extend({
+    baseVersion: z
+      .int()
+      .positive()
+      .describe('The version the content was based on; 409 conflict when the draft has been saved since'),
   }),
 )
 
@@ -357,8 +461,8 @@ export const api = {
     path: '/requests',
     tag: 'requests',
     summary:
-      'Submit a request. The AI starts the feasibility report immediately. 400 when an attachment is missing or was uploaded by someone else, with one issue per such attachment (path attachmentIds.<index>).',
-    body: RequestDraft,
+      "Submit a request. The AI starts the feasibility report immediately. 400 when an attachment is missing or was uploaded by someone else, with one issue per such attachment (path attachmentIds.<index>). With draftId, the caller's saved draft of that id is deleted along with the submission.",
+    body: RequestSubmission,
     status: 201,
     response: WorkRequest,
   }),
@@ -369,6 +473,7 @@ export const api = {
     summary: 'Move a request through its lifecycle (409 when the transition is not allowed)',
     params: IdParam,
     body: TransitionCommand,
+    conflict: 'Transition not allowed in this status',
     response: WorkRequest,
   }),
   saveVerification: endpoint({
@@ -426,6 +531,54 @@ export const api = {
     tag: 'requests',
     summary: 'Open regression checks on requests the developer is responsible for',
     response: RegressionQueue,
+  }),
+
+  /* saved drafts */
+  listDrafts: endpoint({
+    method: 'GET',
+    path: '/drafts',
+    tag: 'drafts',
+    summary: "The caller's saved drafts, most recently changed first (request:create)",
+    response: SavedDraftSummaryList,
+  }),
+  getDraft: endpoint({
+    method: 'GET',
+    path: '/drafts/{id}',
+    tag: 'drafts',
+    summary: "One saved draft with its content and attachments (404 for a draft that is not the caller's)",
+    params: StringIdParam,
+    response: SavedDraft,
+  }),
+  createDraft: endpoint({
+    method: 'POST',
+    path: '/drafts',
+    tag: 'drafts',
+    summary:
+      'Save a new draft (request:create). 409 limit_reached when the account already holds as many drafts as allowed (template setting drafts.maxPerAccount). 400 when an attachment is missing or was uploaded by someone else (path content.attachmentIds.<index>).',
+    body: SavedDraftInput,
+    status: 201,
+    response: SavedDraft,
+    conflict: 'limit_reached: the account holds as many saved drafts as allowed',
+  }),
+  updateDraft: endpoint({
+    method: 'PUT',
+    path: '/drafts/{id}',
+    tag: 'drafts',
+    summary:
+      "Replace a draft's step and content; the answer carries the next version. 409 conflict when baseVersion is not the stored version (saved meanwhile, e.g. on another device). 404 for a draft that is not the caller's; attachments as in createDraft.",
+    params: StringIdParam,
+    body: SavedDraftUpdate,
+    response: SavedDraft,
+    conflict: 'conflict: the draft was saved since baseVersion',
+  }),
+  deleteDraft: endpoint({
+    method: 'DELETE',
+    path: '/drafts/{id}',
+    tag: 'drafts',
+    summary:
+      "Delete a saved draft. 404 when it is gone or not the caller's, which a client can take as already deleted.",
+    params: StringIdParam,
+    response: null,
   }),
 
   /* notifications */

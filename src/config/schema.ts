@@ -61,6 +61,14 @@ export const AppConfigSchema = z
        */
       scopeCheck: z.boolean(),
     }),
+    drafts: z.object({
+      /**
+       * Saved drafts one account may keep on the server. The API refuses more
+       * (409 limit_reached; the mock API enforces this value) and the screens
+       * show the count against it; a real backend should read the same setting.
+       */
+      maxPerAccount: z.int().positive(),
+    }),
     mock: z.object({
       /** Seconds the simulated AI takes to write a feasibility report */
       reportSeconds: z.number().positive(),

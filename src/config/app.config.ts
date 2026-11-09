@@ -35,6 +35,10 @@ export const appConfig: AppConfig = AppConfigSchema.parse({
   workflow: {
     scopeCheck: true,
   },
+  /** Unsubmitted requests saved to each account, to continue on any device */
+  drafts: {
+    maxPerAccount: 20,
+  },
   mock: {
     reportSeconds: 6,
     workSeconds: 20,

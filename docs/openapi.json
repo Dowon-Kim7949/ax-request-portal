@@ -34,6 +34,9 @@
       "name": "requests"
     },
     {
+      "name": "drafts"
+    },
+    {
       "name": "notifications"
     },
     {
@@ -612,7 +615,7 @@
       },
       "post": {
         "operationId": "createRequest",
-        "summary": "Submit a request. The AI starts the feasibility report immediately. 400 when an attachment is missing or was uploaded by someone else, with one issue per such attachment (path attachmentIds.<index>).",
+        "summary": "Submit a request. The AI starts the feasibility report immediately. 400 when an attachment is missing or was uploaded by someone else, with one issue per such attachment (path attachmentIds.<index>). With draftId, the caller's saved draft of that id is deleted along with the submission.",
         "tags": [
           "requests"
         ],
@@ -621,7 +624,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RequestDraft"
+                "$ref": "#/components/schemas/RequestSubmission"
               }
             }
           }
@@ -1329,6 +1332,338 @@
           },
           "403": {
             "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/drafts": {
+      "get": {
+        "operationId": "listDrafts",
+        "summary": "The caller's saved drafts, most recently changed first (request:create)",
+        "tags": [
+          "drafts"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedDraftSummaryList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createDraft",
+        "summary": "Save a new draft (request:create). 409 limit_reached when the account already holds as many drafts as allowed (template setting drafts.maxPerAccount). 400 when an attachment is missing or was uploaded by someone else (path content.attachmentIds.<index>).",
+        "tags": [
+          "drafts"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedDraftInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedDraft"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "limit_reached: the account holds as many saved drafts as allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/drafts/{id}": {
+      "get": {
+        "operationId": "getDraft",
+        "summary": "One saved draft with its content and attachments (404 for a draft that is not the caller's)",
+        "tags": [
+          "drafts"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedDraft"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateDraft",
+        "summary": "Replace a draft's step and content; the answer carries the next version. 409 conflict when baseVersion is not the stored version (saved meanwhile, e.g. on another device). 404 for a draft that is not the caller's; attachments as in createDraft.",
+        "tags": [
+          "drafts"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SavedDraftUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedDraft"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "conflict: the draft was saved since baseVersion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteDraft",
+        "summary": "Delete a saved draft. 404 when it is gone or not the caller's, which a client can take as already deleted.",
+        "tags": [
+          "drafts"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
             "content": {
               "application/json": {
                 "schema": {
@@ -2707,7 +3042,7 @@
         ]
       },
       "ApiError": {
-        "description": "Error body for every 4xx/5xx response",
+        "description": "Error body for every 4xx/5xx response. 409 codes: invalid_transition and guard_failed (request lifecycle), conflict (a saved draft was saved again since it was read), limit_reached (no room for another saved draft).",
         "type": "object",
         "properties": {
           "code": {
@@ -2719,6 +3054,8 @@
               "not_found",
               "invalid_transition",
               "guard_failed",
+              "conflict",
+              "limit_reached",
               "internal"
             ]
           },
@@ -3139,6 +3476,122 @@
           "upcomingReleases",
           "attention"
         ]
+      },
+      "DraftContent": {
+        "description": "A half-written request as the wizard holds it: the RequestDraft fields, every one optional and empty values allowed. Only abuse ceilings apply (text up to 10,000 characters, lists up to 50 items).",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RequestType"
+              },
+              {
+                "type": "string",
+                "const": ""
+              }
+            ]
+          },
+          "targetIds": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 10000
+            }
+          },
+          "targetOther": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "currentBehavior": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "desiredBehavior": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "acceptanceCriteria": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "maxLength": 10000
+                }
+              },
+              "required": [
+                "text"
+              ]
+            }
+          },
+          "checklistSource": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "checklist": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "maxLength": 10000
+                },
+                "clause": {
+                  "type": "string",
+                  "maxLength": 10000
+                },
+                "finding": {
+                  "type": "string",
+                  "maxLength": 10000
+                },
+                "expected": {
+                  "type": "string",
+                  "maxLength": 10000
+                }
+              },
+              "required": [
+                "ref",
+                "clause",
+                "finding",
+                "expected"
+              ]
+            }
+          },
+          "outOfScope": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "attachmentIds": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 10000
+            }
+          },
+          "desiredDate": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "desiredDateReason": {
+            "type": "string",
+            "maxLength": 10000
+          }
+        }
       },
       "FeasibilityReport": {
         "type": "object",
@@ -4187,6 +4640,107 @@
           "cancelled"
         ]
       },
+      "RequestSubmission": {
+        "description": "Body of createRequest: the RequestDraft, plus the saved draft it came from",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "$ref": "#/components/schemas/RequestType"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "targetIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "targetOther": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "currentBehavior": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "desiredBehavior": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "acceptanceCriteria": {
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300
+                }
+              },
+              "required": [
+                "text"
+              ]
+            },
+            "description": "1–5; ignored for checklist requests"
+          },
+          "checklistSource": {
+            "description": "Who raised the findings, e.g. \"Security audit, on-site review\"",
+            "type": "string",
+            "maxLength": 100
+          },
+          "checklist": {
+            "description": "Checklist requests only: each item becomes an acceptance criterion",
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChecklistItemInput"
+            }
+          },
+          "outOfScope": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "attachmentIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "desiredDate": {
+            "type": "string",
+            "format": "date",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+          },
+          "desiredDateReason": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "draftId": {
+            "description": "The saved draft the request was written in. Once the request is created, that draft is deleted in the same operation if it is the caller's; otherwise it is ignored.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "type",
+          "title",
+          "targetIds",
+          "currentBehavior",
+          "desiredBehavior",
+          "acceptanceCriteria",
+          "attachmentIds"
+        ]
+      },
       "RequestType": {
         "description": "checklist = findings from an outside review (audit, inspection, certification) handled item by item",
         "type": "string",
@@ -4208,6 +4762,181 @@
           "developer",
           "admin",
           "operator"
+        ]
+      },
+      "SavedDraft": {
+        "description": "A saved draft with everything needed to continue it, on this device or another",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "description": "content.title without surrounding spaces; empty when there is none"
+          },
+          "projectId": {
+            "description": "content.projectId, once one is picked",
+            "type": "string"
+          },
+          "type": {
+            "description": "content.type, once one is picked",
+            "$ref": "#/components/schemas/RequestType"
+          },
+          "step": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 6,
+            "description": "Wizard step the person was last on (0–6)"
+          },
+          "attachmentCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "How many attachments SavedDraft.attachments holds"
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "1 when created, one more on every update; an update sends it back as baseVersion"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "content": {
+            "$ref": "#/components/schemas/DraftContent"
+          },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Attachment"
+            },
+            "description": "The attachments of content.attachmentIds that still exist and were uploaded by the caller, each once, in that order"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "step",
+          "attachmentCount",
+          "version",
+          "createdAt",
+          "updatedAt",
+          "content",
+          "attachments"
+        ]
+      },
+      "SavedDraftInput": {
+        "type": "object",
+        "properties": {
+          "step": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 6
+          },
+          "content": {
+            "$ref": "#/components/schemas/DraftContent"
+          }
+        },
+        "required": [
+          "step",
+          "content"
+        ]
+      },
+      "SavedDraftSummary": {
+        "description": "One of the caller's saved drafts, as a list shows it",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string",
+            "description": "content.title without surrounding spaces; empty when there is none"
+          },
+          "projectId": {
+            "description": "content.projectId, once one is picked",
+            "type": "string"
+          },
+          "type": {
+            "description": "content.type, once one is picked",
+            "$ref": "#/components/schemas/RequestType"
+          },
+          "step": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 6,
+            "description": "Wizard step the person was last on (0–6)"
+          },
+          "attachmentCount": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991,
+            "description": "How many attachments SavedDraft.attachments holds"
+          },
+          "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "1 when created, one more on every update; an update sends it back as baseVersion"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "step",
+          "attachmentCount",
+          "version",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "SavedDraftSummaryList": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/SavedDraftSummary"
+        }
+      },
+      "SavedDraftUpdate": {
+        "type": "object",
+        "properties": {
+          "step": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 6
+          },
+          "content": {
+            "$ref": "#/components/schemas/DraftContent"
+          },
+          "baseVersion": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991,
+            "description": "The version the content was based on; 409 conflict when the draft has been saved since"
+          }
+        },
+        "required": [
+          "step",
+          "content",
+          "baseVersion"
         ]
       },
       "ScopeDecision": {
