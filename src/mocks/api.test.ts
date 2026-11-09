@@ -4,7 +4,7 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { ApiError, call, configureClient } from '../api/client'
-import { api, type DraftContent } from '../api/contract'
+import { api, DRAFT_ID_PATTERN, type DraftContent } from '../api/contract'
 import { appConfig } from '../config/app.config'
 import type { RequestDraft } from '../domain/model'
 import { createTestApi } from '../test/mock-api'
@@ -704,6 +704,8 @@ describe('saved drafts', () => {
       content,
     })
     expect(created.createdAt).toBe(created.updatedAt)
+    // Never mistaken for a draft the client has not sent yet.
+    expect(created.id).toMatch(DRAFT_ID_PATTERN)
     expect(await call(api.getDraft, { params: { id: created.id } })).toEqual(created)
     const { content: _content, attachments: _attachments, ...summary } = created
     expect((await call(api.listDrafts)).find((d) => d.id === created.id)).toEqual(summary)

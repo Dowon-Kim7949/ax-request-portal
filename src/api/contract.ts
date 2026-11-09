@@ -264,6 +264,12 @@ export const DRAFT_STEP_MAX = 6
 export const DRAFT_TEXT_MAX = 10_000
 export const DRAFT_LIST_MAX = 50
 
+/**
+ * A saved draft's id: opaque to the client, but never starting with "local-",
+ * which marks a draft the server has not seen yet (src/stores/draft.ts).
+ */
+export const DRAFT_ID_PATTERN = /^(?!local-)[A-Za-z0-9_-]{1,100}$/
+
 const DraftText = z.string().max(DRAFT_TEXT_MAX)
 const draftList = <T extends z.ZodType>(item: T) => z.array(item).max(DRAFT_LIST_MAX)
 const DraftStep = z.int().min(0).max(DRAFT_STEP_MAX)
@@ -297,7 +303,12 @@ export type DraftContent = z.infer<typeof DraftContent>
 export const SavedDraftSummary = named(
   'SavedDraftSummary',
   z.object({
-    id: z.string(),
+    id: z
+      .string()
+      .regex(DRAFT_ID_PATTERN)
+      .describe(
+        'Opaque: 1–100 letters, digits, "-" or "_", never starting with "local-" (clients use that prefix for drafts not yet on the server)',
+      ),
     title: z.string().describe('content.title without surrounding spaces; empty when there is none'),
     projectId: z.string().optional().describe('content.projectId, once one is picked'),
     type: RequestType.optional().describe('content.type, once one is picked'),
@@ -329,10 +340,11 @@ export const SavedDraft = named(
 export type SavedDraft = z.infer<typeof SavedDraft>
 
 export const SavedDraftSummaryList = named('SavedDraftSummaryList', z.array(SavedDraftSummary))
-export const SavedDraftInput = named('SavedDraftInput', z.object({ step: DraftStep, content: DraftContent }))
+const DraftBody = z.object({ step: DraftStep, content: DraftContent })
+export const SavedDraftInput = named('SavedDraftInput', DraftBody)
 export const SavedDraftUpdate = named(
   'SavedDraftUpdate',
-  SavedDraftInput.extend({
+  DraftBody.extend({
     baseVersion: z
       .int()
       .positive()
@@ -547,7 +559,8 @@ export const api = {
     method: 'GET',
     path: '/drafts/{id}',
     tag: 'drafts',
-    summary: "One saved draft with its content and attachments (404 for a draft that is not the caller's)",
+    summary:
+      "One saved draft with its content and attachments (request:create). 404 for a draft that is not the caller's.",
     params: StringIdParam,
     response: SavedDraft,
   }),
@@ -567,7 +580,7 @@ export const api = {
     path: '/drafts/{id}',
     tag: 'drafts',
     summary:
-      "Replace a draft's step and content; the answer carries the next version. 409 conflict when baseVersion is not the stored version (saved meanwhile, e.g. on another device). 404 for a draft that is not the caller's; attachments as in createDraft.",
+      "Replace a draft's step and content (request:create); the answer carries the next version. 409 conflict when baseVersion is not the stored version (saved meanwhile, e.g. on another device). 404 for a draft that is not the caller's; attachments as in createDraft.",
     params: StringIdParam,
     body: SavedDraftUpdate,
     response: SavedDraft,
@@ -578,7 +591,7 @@ export const api = {
     path: '/drafts/{id}',
     tag: 'drafts',
     summary:
-      "Delete a saved draft. 404 when it is gone or not the caller's, which a client can take as already deleted.",
+      "Delete a saved draft (request:create). 404 when it is gone or not the caller's, which a client can take as already deleted.",
     params: StringIdParam,
     response: null,
   }),

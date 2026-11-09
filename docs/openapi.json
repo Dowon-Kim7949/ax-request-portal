@@ -1456,7 +1456,7 @@
     "/drafts/{id}": {
       "get": {
         "operationId": "getDraft",
-        "summary": "One saved draft with its content and attachments (404 for a draft that is not the caller's)",
+        "summary": "One saved draft with its content and attachments (request:create). 404 for a draft that is not the caller's.",
         "tags": [
           "drafts"
         ],
@@ -1525,7 +1525,7 @@
       },
       "put": {
         "operationId": "updateDraft",
-        "summary": "Replace a draft's step and content; the answer carries the next version. 409 conflict when baseVersion is not the stored version (saved meanwhile, e.g. on another device). 404 for a draft that is not the caller's; attachments as in createDraft.",
+        "summary": "Replace a draft's step and content (request:create); the answer carries the next version. 409 conflict when baseVersion is not the stored version (saved meanwhile, e.g. on another device). 404 for a draft that is not the caller's; attachments as in createDraft.",
         "tags": [
           "drafts"
         ],
@@ -1614,7 +1614,7 @@
       },
       "delete": {
         "operationId": "deleteDraft",
-        "summary": "Delete a saved draft. 404 when it is gone or not the caller's, which a client can take as already deleted.",
+        "summary": "Delete a saved draft (request:create). 404 when it is gone or not the caller's, which a client can take as already deleted.",
         "tags": [
           "drafts"
         ],
@@ -4769,7 +4769,9 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^(?!local-)[A-Za-z0-9_-]{1,100}$",
+            "description": "Opaque: 1–100 letters, digits, \"-\" or \"_\", never starting with \"local-\" (clients use that prefix for drafts not yet on the server)"
           },
           "title": {
             "type": "string",
@@ -4856,7 +4858,9 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^(?!local-)[A-Za-z0-9_-]{1,100}$",
+            "description": "Opaque: 1–100 letters, digits, \"-\" or \"_\", never starting with \"local-\" (clients use that prefix for drafts not yet on the server)"
           },
           "title": {
             "type": "string",
