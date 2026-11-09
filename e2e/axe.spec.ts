@@ -7,7 +7,14 @@
  */
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from './fixtures.ts'
-import { COLD_START_TIMEOUT, loginAs, openInApp } from './helpers.ts'
+import {
+  COLD_START_TIMEOUT,
+  keepDraftOffline,
+  loginAs,
+  openInApp,
+  SEEDED_DRAFTS,
+  seedSavedDrafts,
+} from './helpers.ts'
 
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa', 'best-practice']
 
@@ -113,6 +120,37 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await expect(page.getByRole('heading', { name: '이대로 제출할까요?' })).toBeVisible()
       await expect(page.getByRole('button', { name: '요청 제출' })).toBeEnabled()
       await scan(page, 'wizard: review')
+    })
+
+    test('saved drafts', async ({ page }) => {
+      test.setTimeout(90_000)
+      // With both marks on show: a conflict, and a draft on this device only.
+      await keepDraftOffline(page, SEEDED_DRAFTS.ko.offline)
+      await loginAs(page, '요청자')
+      await seedSavedDrafts(page)
+      await page.reload()
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: COLD_START_TIMEOUT })
+      await settle(page)
+      const home = page.getByRole('region', { name: '임시 저장' })
+      await expect(home.getByText('4/20')).toBeVisible()
+      await expect(home.getByText('이 기기에만')).toBeVisible()
+      await scan(page, '/ (requester home, saved drafts)')
+
+      await openInApp(page, '/requests')
+      await settle(page)
+      await expect(page.locator('#drafts').getByText('4/20')).toBeVisible()
+      await page.getByRole('button', { name: '5개 모두 보기' }).click()
+      await expect(page.locator('#drafts').getByText('충돌')).toBeVisible()
+      await scan(page, '/requests (saved drafts, all)')
+      await page.getByRole('button', { name: `${SEEDED_DRAFTS.ko.offline} 삭제` }).click()
+      await expect(page.getByRole('dialog', { name: '이 초안을 삭제할까요?' })).toBeVisible()
+      await scan(page, '/requests (delete draft sheet)')
+      await page.keyboard.press('Escape')
+
+      await openInApp(page, '/')
+      await openInApp(page, '/requests/new')
+      await expect(page.getByRole('link', { name: /임시 저장된 초안 5개/ })).toBeVisible()
+      await scan(page, 'wizard (saved drafts notice)')
     })
 
     test('developer screens', async ({ page }) => {

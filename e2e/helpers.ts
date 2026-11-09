@@ -127,3 +127,113 @@ export async function expectNoHorizontalScroll(page: Page) {
   )
   expect(overflow, 'horizontal overflow in px').toBeLessThanOrEqual(0)
 }
+
+/** Titles of the saved drafts `seedSavedDrafts` makes, per UI language. */
+export const SEEDED_DRAFTS = {
+  ko: {
+    untitled: '제목 없는 초안',
+    conflict: '공지사항 검색 추가',
+    conflictHere: '공지사항 검색 추가 (제목 검색만)',
+    long: '마이페이지에서 결제 수단을 바꾸면 확인 메일이 두 번 오는 문제를 고쳐 주세요',
+    field: '사진이 가끔 안 올라감',
+    offline: '출장 중에 쓴 초안',
+  },
+  en: {
+    untitled: 'Untitled draft',
+    conflict: 'Search notices',
+    conflictHere: 'Search notices (titles only)',
+    long: 'Changing the payment method on My page sends the confirmation email twice, please fix it',
+    field: 'Photos sometimes fail to upload',
+    offline: 'Written on a business trip',
+  },
+} as const
+
+type SeededTitles = (typeof SEEDED_DRAFTS)[keyof typeof SEEDED_DRAFTS]
+
+/**
+ * From the next page load on, saving the draft titled `title` fails as it
+ * would without a connection: it stays a draft on this device only.
+ */
+export async function keepDraftOffline(page: Page, title: string) {
+  await page.addInitScript((offline) => {
+    const send = window.fetch.bind(window)
+    window.fetch = (input, init) => {
+      const body = typeof init?.body === 'string' ? init.body : ''
+      if (body.includes(JSON.stringify(offline))) return Promise.reject(new TypeError('Failed to fetch'))
+      return send(input, init)
+    }
+  }, title)
+}
+
+/**
+ * Saved drafts as an account accumulates them: four in the account (one
+ * untitled, one with a long title), plus on this device newer words over one
+ * of them that was saved elsewhere since (a conflict) and a draft the account
+ * does not have (sent on the next load; see `keepDraftOffline`). Call signed
+ * in, then load the page again.
+ */
+export async function seedSavedDrafts(page: Page, titles: SeededTitles = SEEDED_DRAFTS.ko) {
+  await page.evaluate(async (t) => {
+    const session = JSON.parse(localStorage.getItem('ax-request-portal:session') ?? '{}') as {
+      state?: { token?: string; user?: { id: string } }
+    }
+    const post = async (step: number, content: object) => {
+      const response = await fetch('/api/drafts', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.state?.token ?? ''}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ step, content }),
+      })
+      return (await response.json()) as { id: string; version: number }
+    }
+    await post(1, { projectId: 'p-admin' })
+    const conflicted = await post(4, { projectId: 'p-portal', type: 'change', title: t.conflict })
+    await post(3, { projectId: 'p-portal', type: 'change', title: t.long })
+    await post(3, { projectId: 'p-field', type: 'bug', title: t.field })
+    const values = (title: string, projectId: string) => ({
+      projectId,
+      type: 'change',
+      targetIds: [],
+      targetOther: '',
+      title,
+      currentBehavior: '',
+      desiredBehavior: '',
+      acceptanceCriteria: [{ text: '' }],
+      checklistSource: '',
+      checklist: [],
+      outOfScope: '',
+      attachments: [],
+      desiredDate: '',
+      desiredDateReason: '',
+    })
+    const updatedAt = new Date().toISOString()
+    localStorage.setItem(
+      `ax-request-portal:drafts:${session.state?.user?.id ?? ''}`,
+      JSON.stringify({
+        v: 1,
+        entries: {
+          [conflicted.id]: {
+            localId: conflicted.id,
+            draftId: conflicted.id,
+            baseVersion: conflicted.version,
+            step: 4,
+            content: values(t.conflictHere, 'p-portal'),
+            updatedAt,
+            dirty: true,
+            conflict: true,
+          },
+          'local-seeded': {
+            localId: 'local-seeded',
+            step: 2,
+            content: values(t.offline, 'p-field'),
+            updatedAt,
+            dirty: true,
+          },
+        },
+        aliases: {},
+      }),
+    )
+  }, titles)
+}

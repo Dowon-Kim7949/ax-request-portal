@@ -2,8 +2,8 @@
  * Visual capture of key screens for manual review (not an assertion suite).
  * Run: SCREENS=1 npx playwright test e2e/screens.spec.ts
  */
-import { test } from './fixtures.ts'
-import { loginAs } from './helpers.ts'
+import { expect, test } from './fixtures.ts'
+import { keepDraftOffline, loginAs, openInApp, SEEDED_DRAFTS, seedSavedDrafts } from './helpers.ts'
 
 test.skip(!process.env.SCREENS, 'set SCREENS=1 to capture screenshots')
 
@@ -59,4 +59,45 @@ test('capture developer, executive and admin screens', async ({ page }, info) =>
   await page.goto('/admin/projects')
   await page.getByText('고객 포털 웹').first().waitFor()
   await shot('admin-projects')
+})
+
+test('capture saved drafts', async ({ page }, info) => {
+  const shot = async (name: string) => {
+    await page.evaluate(() => document.fonts.ready)
+    await page.screenshot({ path: `${OUT}/${info.project.name}-${name}.png`, fullPage: true })
+  }
+  const settled = () => expect(page.locator('.animate-pulse.bg-line\\/70')).toHaveCount(0)
+  const { offline } = SEEDED_DRAFTS.ko
+  await keepDraftOffline(page, offline)
+  await loginAs(page, '요청자')
+  await seedSavedDrafts(page)
+  await page.reload()
+  await page.getByRole('region', { name: '임시 저장' }).getByText('4/20').waitFor()
+  await settled()
+  await shot('drafts-home')
+
+  await openInApp(page, '/requests')
+  await page.locator('#drafts').getByText('이 기기에만').waitFor()
+  await settled()
+  await shot('drafts-requests')
+  await page.getByRole('button', { name: /모두 보기/ }).click()
+  await shot('drafts-requests-all')
+  await page.getByRole('button', { name: `${offline} 삭제` }).click()
+  await page.getByRole('dialog').waitFor()
+  await shot('drafts-delete')
+  await page.keyboard.press('Escape')
+
+  await openInApp(page, '/')
+  await openInApp(page, '/requests/new')
+  await page.getByRole('link', { name: /임시 저장된 초안/ }).waitFor()
+  await shot('drafts-wizard-notice')
+
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await openInApp(page, '/requests')
+  await page.locator('#drafts').getByText('이 기기에만').waitFor()
+  await shot('drafts-requests-dark')
+  await openInApp(page, '/')
+  await page.getByRole('region', { name: '임시 저장' }).waitFor()
+  await settled()
+  await shot('drafts-home-dark')
 })
