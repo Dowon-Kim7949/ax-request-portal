@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/field'
 import { Segmented } from '@/components/ui/segmented'
 import { isTerminal, turnOf } from '@/domain/lifecycle'
 import type { WorkRequestSummary } from '@/domain/model'
+import { DraftsSection } from '@/features/drafts/drafts-section'
 
 type Filter = 'open' | 'myTurn' | 'closed' | 'all'
 
@@ -59,6 +60,8 @@ export default function MyRequestsPage() {
           </Button>
         }
       />
+      {/* Above the requests, apart from their filter and search. */}
+      <DraftsSection variant="page" className="mb-6" />
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Segmented
           label={t('requests.title')}

@@ -5,6 +5,11 @@ import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import '@/i18n'
+import { call } from '@/api/client'
+import { api } from '@/api/contract'
+import { keys } from '@/api/queries'
+import { resetDraftSync } from '@/features/drafts/sync'
+import { clearDrafts } from '@/stores/draft'
 import { createTestApi } from '@/test/mock-api'
 import { signInAs, testQueryClient } from '@/test/session'
 import HomePage from './home-page'
@@ -31,6 +36,39 @@ function renderHome(qc = testQueryClient()) {
     </QueryClientProvider>,
   )
 }
+
+describe('saved drafts on the home screen', () => {
+  afterEach(async () => {
+    for (const draft of await call(api.listDrafts)) await call(api.deleteDraft, { params: { id: draft.id } })
+    resetDraftSync()
+    clearDrafts('u-kim')
+  })
+
+  it('lists them beside what needs the person, with the way to all of them', async () => {
+    const draft = await call(api.createDraft, {
+      body: { step: 3, content: { title: '공지 검색 추가', projectId: 'p-portal' } },
+    })
+    renderHome()
+
+    const drafts = await screen.findByRole('region', { name: '임시 저장' })
+    expect(await within(drafts).findByText('공지 검색 추가')).toBeInTheDocument()
+    expect(within(drafts).getByRole('link', { name: /이어 쓰기/ })).toHaveAttribute(
+      'href',
+      `/requests/new?draft=${draft.id}&step=3`,
+    )
+    expect(within(drafts).getByRole('link', { name: '임시 저장함 전체 보기' })).toHaveAttribute(
+      'href',
+      '/requests#drafts',
+    )
+  })
+
+  it('has no section when there are none', async () => {
+    const qc = testQueryClient()
+    renderHome(qc)
+    await waitFor(() => expect(qc.getQueryState(keys.drafts())?.status).toBe('success'))
+    expect(screen.queryByRole('region', { name: '임시 저장' })).toBeNull()
+  })
+})
 
 describe('home screen when loading fails', () => {
   it('says the requests could not be loaded instead of showing none, and loads them on retry', async () => {

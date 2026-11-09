@@ -285,6 +285,26 @@ describe('the draft in the account', () => {
     expect(await screen.findByLabelText('요청 제목')).toHaveValue('공지사항 검색 추가')
     expect(screen.getByText('계정에 저장됨', STATUS)).toBeInTheDocument()
     expect(listLocalDrafts(USER)).toEqual([])
+    // Continuing a draft: no pointer to the others.
+    expect(screen.queryByRole('link', { name: /임시 저장된 초안/ })).toBeNull()
+  })
+
+  it('points a new request to the drafts there are to continue, until this one is being saved', async () => {
+    await saveToAccount(READY)
+    keepLocal({ ...READY, title: '기기에만 있는 초안' })
+    renderWizard('/requests/new?project=p-portal')
+    const notice = await screen.findByRole('link', { name: /임시 저장된 초안 2개/ })
+    expect(notice).toHaveAttribute('href', '/requests#drafts')
+    expect(notice).toHaveAccessibleName(/이어 쓰기$/)
+
+    await userEvent.click(screen.getByRole('radio', { name: /기존 기능 변경/ }))
+    await screen.findByRole('heading', { name: '어느 화면이나 기능인가요?' })
+    expect(screen.getByRole('link', { name: /임시 저장된 초안 2개/ })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '다음' }))
+    await userEvent.type(await screen.findByLabelText('요청 제목'), '새 요청')
+    // The save state takes the line once this one is written.
+    expect(await screen.findByText('계정에 저장됨', STATUS, SYNCED)).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /임시 저장된 초안/ })).toBeNull()
   })
 
   it('continues this device’s newer copy written over the account’s version, and saves it', async () => {

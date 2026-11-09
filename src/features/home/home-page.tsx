@@ -23,6 +23,7 @@ import { Meter } from '@/components/ui/controls'
 import { EmptyState, ListSkeleton, Skeleton } from '@/components/ui/feedback'
 import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { isTerminal, turnOf } from '@/domain/lifecycle'
+import { DraftsSection } from '@/features/drafts/drafts-section'
 import { formatKrw, formatMonth } from '@/lib/format'
 
 function RequesterSection() {
@@ -89,6 +90,8 @@ function RequesterSection() {
             </p>
           )}
         </section>
+
+        <DraftsSection variant="home" />
       </div>
 
       <Card aria-labelledby="pick-service">

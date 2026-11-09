@@ -25,6 +25,7 @@ import { ErrorState, Spinner } from '@/components/ui/feedback'
 import { LoadFailed } from '@/components/ui/load-failed'
 import { Sheet } from '@/components/ui/sheet'
 import type { PrecheckIssue } from '@/domain/model'
+import { DraftsNotice } from '@/features/drafts/drafts-section'
 import { useDiscardDraft, useDraftSaveState } from '@/features/drafts/hooks'
 import { DRAFT_SETTLE_TIMEOUT_MS, draftSync } from '@/features/drafts/sync'
 import { unlinked } from '@/features/drafts/sync-core'
@@ -742,6 +743,8 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
         <DraftStatusBar
           state={saveState}
           onDiscard={draftKey || onServer ? () => setConfirmDiscard(true) : undefined}
+          // A new request: the drafts there are to continue instead, until this one is saved.
+          idle={start.key === null ? <DraftsNotice exclude={[draftKey]} /> : undefined}
         />
         {saveState === 'conflict' ? (
           <ConflictNotice
