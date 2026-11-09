@@ -91,6 +91,23 @@ describe('the drafts kept on this device', () => {
     expect(listLocalDrafts(USER)).toEqual([])
   })
 
+  it('finds nothing under a name every object inherits', () => {
+    putLocalDraft(USER, entry())
+    settleLocalDraft(USER, 'local-a', null, { id: 'draft-1', version: 1 })
+    for (const id of ['__proto__', 'constructor', 'toString', 'hasOwnProperty']) {
+      expect(getLocalDraft(USER, id)).toBeUndefined()
+      expect(resolveDraftId(USER, id)).toEqual({ id })
+    }
+    // Even when storage holds such a key: it is just a key.
+    localStorage.setItem(
+      draftsKey(USER),
+      `{"v":1,"entries":{"__proto__":${JSON.stringify(entry({ localId: '__proto__' }))}},"aliases":{}}`,
+    )
+    expect(getLocalDraft(USER, '__proto__')).toMatchObject({ localId: '__proto__' })
+    expect(getLocalDraft(USER, 'constructor')).toBeUndefined()
+    expect(listLocalDrafts(USER).map((e) => e.localId)).toEqual(['__proto__'])
+  })
+
   it('changes and removes one draft', () => {
     putLocalDraft(USER, entry())
     updateLocalDraft(USER, 'local-a', (e) => ({ ...e, conflict: true }))

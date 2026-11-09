@@ -53,12 +53,17 @@ export type Opening =
   | { kind: 'server'; key: string; entry?: LocalDraft }
   | { kind: 'missing' }
 
+/** What ?draft= can name: a local id, or a server id (DRAFT_ID_PATTERN in the contract). */
+const DRAFT_PARAM = /^[A-Za-z0-9_-]{1,100}$/
+
 /**
  * Reads ?draft= against this device. A local id the server has since saved
- * leads to that server id.
+ * leads to that server id. Anything that cannot be a draft's id (a link
+ * mistyped or made up) is a draft that cannot be found.
  */
 export function openDraft(userId: string, param: string | null): Opening {
   if (!param) return { kind: 'new' }
+  if (!DRAFT_PARAM.test(param)) return { kind: 'missing' }
   const { id } = resolveDraftId(userId, param)
   const entry = getLocalDraft(userId, id)
   if (isLocalId(id)) return entry ? { kind: 'local', key: id, entry } : { kind: 'missing' }

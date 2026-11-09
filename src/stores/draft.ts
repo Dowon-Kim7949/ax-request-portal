@@ -80,7 +80,18 @@ interface Stored {
   aliases: Record<string, DraftAlias>
 }
 
-const empty = (): Stored => ({ v: 1, entries: {}, aliases: {} })
+/**
+ * A map with no inherited keys: ids come from links (?draft=), so "__proto__"
+ * or "constructor" must find nothing rather than Object.prototype's own.
+ */
+const table = <T>(from: Record<string, T> = {}): Record<string, T> =>
+  Object.assign(Object.create(null) as Record<string, T>, from)
+
+const empty = (): Stored => ({ v: 1, entries: table(), aliases: table() })
+
+/** `record[key]`, only when the record holds it itself. */
+const own = <T>(record: Record<string, T>, key: string): T | undefined =>
+  Object.hasOwn(record, key) ? record[key] : undefined
 
 /**
  * What became of a write: kept whole, kept without the attachments' data
@@ -133,7 +144,7 @@ function readStorage(userId: string): Stored {
   return clone(stored)
 }
 
-const clone = (s: Stored): Stored => ({ v: 1, entries: { ...s.entries }, aliases: { ...s.aliases } })
+const clone = (s: Stored): Stored => ({ v: 1, entries: table(s.entries), aliases: table(s.aliases) })
 
 /**
  * What this tab holds that storage could not: the whole state when the last
@@ -150,7 +161,7 @@ function load(userId: string): Stored {
   const stored = readStorage(userId)
   for (const [key, full] of fullCopies.get(userId) ?? []) {
     // Only over the very write it was kept for: another tab may have written that draft since.
-    if (stored.entries[key]?.updatedAt === full.updatedAt) stored.entries[key] = full
+    if (own(stored.entries, key)?.updatedAt === full.updatedAt) stored.entries[key] = full
   }
   return stored
 }
@@ -161,7 +172,7 @@ export function listLocalDrafts(userId: string): LocalDraft[] {
 }
 
 export function getLocalDraft(userId: string, localId: string): LocalDraft | undefined {
-  return load(userId).entries[localId]
+  return own(load(userId).entries, localId)
 }
 
 /**
@@ -173,7 +184,7 @@ export function resolveDraftId(userId: string, id: string): { id: string; versio
   const { aliases } = load(userId)
   let current: { id: string; version?: number } = { id }
   for (let hops = 0; hops < 5; hops++) {
-    const alias = aliases[current.id]
+    const alias = own(aliases, current.id)
     if (!alias) break
     current = { id: alias.id, version: alias.version }
   }
@@ -185,7 +196,7 @@ export function resolveDraftId(userId: string, id: string): { id: string; versio
 /** The same state with every inline attachment's data (its URL) left out; null when there was none. */
 function withoutAttachmentData(state: Stored): { state: Stored; stripped: Set<string> } | null {
   const stripped = new Set<string>()
-  const entries: Record<string, LocalDraft> = {}
+  const entries = table<LocalDraft>()
   for (const [key, entry] of Object.entries(state.entries)) {
     const content = entry.content as { attachments?: unknown } | null
     const list = content && typeof content === 'object' ? content.attachments : undefined

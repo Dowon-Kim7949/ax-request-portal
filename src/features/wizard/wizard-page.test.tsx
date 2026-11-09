@@ -79,6 +79,10 @@ const saveToAccount = (values: WizardValues, step = 3) =>
 const accountDrafts = () => call(api.listDrafts)
 
 function renderWizard(at: string) {
+  return renderWizardOnce(at).router
+}
+
+function renderWizardOnce(at: string) {
   const router = createMemoryRouter(
     [
       {
@@ -99,12 +103,12 @@ function renderWizard(at: string) {
     ],
     { initialEntries: [at] },
   )
-  render(
+  const { unmount } = render(
     <QueryClientProvider client={testQueryClient()}>
       <RouterProvider router={router} />
     </QueryClientProvider>,
   )
-  return router
+  return { router, unmount }
 }
 
 const draftParam = (router: ReturnType<typeof renderWizard>) =>
@@ -420,6 +424,14 @@ describe('the draft in the account', () => {
     expect(screen.getByRole('link', { name: '임시 저장함 보기' })).toHaveAttribute('href', '/requests#drafts')
     await userEvent.click(screen.getByRole('link', { name: '새 요청 쓰기' }))
     expect(await screen.findByRole('heading', { name: '어느 서비스에 대한 요청인가요?' })).toBeInTheDocument()
+  })
+
+  it('takes a link naming something that cannot be a draft for a draft not found', async () => {
+    for (const id of ['__proto__', 'constructor', 'toString', '../drafts', 'x'.repeat(101)]) {
+      const { unmount } = renderWizardOnce(`/requests/new?draft=${encodeURIComponent(id)}`)
+      expect(await screen.findByText('초안을 찾을 수 없어요')).toBeInTheDocument()
+      unmount()
+    }
   })
 
   it('keeps the draft on this device when the account is full, and says how to make room', async () => {
