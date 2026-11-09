@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { Session, type Session as SessionValue } from '../api/contract'
 import type { User } from '../domain/model'
-import { clearDraft } from './draft'
+import { clearDrafts } from './draft'
 
 /** localStorage key of the persisted session; other tabs watch it to follow sign-ins and sign-outs. */
 export const SESSION_STORAGE_KEY = 'ax-request-portal:session'
@@ -30,8 +30,9 @@ interface SessionState {
   setUser: (user: User) => void
   /**
    * Ends the session. Signing out on purpose means someone else may use this
-   * device next, so the person's unsubmitted request (the wizard's draft) is
-   * deleted too; an expiry keeps it for when they sign in again.
+   * device next, so the person's drafts kept on this device are deleted too
+   * (their account keeps what reached it); an expiry keeps them for when the
+   * same person signs in again.
    */
   clear: (reason: SessionEndReason) => void
 }
@@ -58,8 +59,9 @@ export const useSession = create<SessionState>()(
       setSession: ({ token, user }) => set({ token, user, ended: null }),
       setUser: (user) => set({ user }),
       clear: (reason) => {
-        const userId = get().user?.id ?? null
-        if (reason === 'signedOut' && userId) clearDraft(userId)
+        // A sign-out right after an expiry (a request refused while signing out) is still that person's.
+        const userId = get().user?.id ?? get().ended?.userId ?? null
+        if (reason === 'signedOut' && userId) clearDrafts(userId)
         set({ token: null, user: null, ended: { reason, userId } })
       },
     }),

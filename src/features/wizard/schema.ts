@@ -1,9 +1,7 @@
 import * as z from 'zod'
+import { DRAFT_LIST_MAX, DRAFT_TEXT_MAX, type DraftContent, type SavedDraft } from '@/api/contract'
 import { Attachment, RequestType, type PrecheckIssue, type RequestDraft } from '@/domain/model'
 import { ACCEPTANCE_CRITERIA_MAX, CHECKLIST_ITEMS_MAX } from '@/domain/model'
-import { draftKey } from '@/stores/draft'
-
-export { clearDraft } from '@/stores/draft'
 
 const ChecklistRow = z.object({
   ref: z.string().max(60),
@@ -182,13 +180,17 @@ export function parseChecklist(text: string): ChecklistRow[] {
 }
 
 /* ------------------------------------------------------------------ */
-/* Draft persistence: phones switch apps; the draft must survive it.   */
+/* Drafts: phones switch apps and people change devices; the draft     */
+/* must survive both. The values are kept on this device as they are   */
+/* typed (src/stores/draft.ts) and saved to the account as DraftContent */
+/* (src/features/drafts).                                              */
 /* ------------------------------------------------------------------ */
 
 /**
  * An attachment as a draft stores it: shape only. Whether the URL may be shown
- * is checked per attachment after reading (`restoreDraft`), so a contract rule
- * that grew stricter drops that attachment, not the whole draft.
+ * is checked per attachment after reading (`readDraftValues`), so a contract
+ * rule that grew stricter drops that attachment, not the whole draft. A draft
+ * written while storage was full keeps the attachment without its URL.
  */
 const DraftAttachment = z.object({
   id: z.string(),
@@ -224,38 +226,104 @@ const DraftShape = z
   })
   .partial()
 
-/** A draft read back: the values, and the names of attachments that could not be kept. */
+/** A draft read back: the values, and what could not be kept of its attachments. */
 export interface RestoredDraft {
   values: WizardValues
-  /** Attachments the draft held whose URL is no longer accepted (e.g. a type an earlier version allowed) */
+  /** Names of attachments that could not be shown again (a URL no longer accepted, or not kept on this device) */
   droppedAttachments: string[]
+  /** Attachments the account's copy still lists but that no longer exist; only their number is known */
+  missingAttachments: number
 }
 
-export function restoreDraft(userId: string): RestoredDraft | null {
-  try {
-    const raw = localStorage.getItem(draftKey(userId))
-    if (!raw) return null
-    const parsed = DraftShape.safeParse(JSON.parse(raw))
-    if (!parsed.success) return null
-    const { attachments = [], ...rest } = parsed.data
-    const kept: Attachment[] = []
-    const droppedAttachments: string[] = []
-    for (const a of attachments) {
-      const ok = Attachment.safeParse(a)
-      if (ok.success) kept.push(ok.data)
-      else droppedAttachments.push(a.name)
-    }
-    const values: WizardValues = { ...EMPTY_VALUES, ...rest, attachments: kept }
-    if (!values.acceptanceCriteria.length) values.acceptanceCriteria = [{ text: '' }]
-    if (!values.checklist.length) values.checklist = [EMPTY_ROW]
-    return { values, droppedAttachments }
-  } catch {
-    return null
+/** Fills what a draft left out, so every field the form expects is there. */
+function completeValues(partial: Partial<WizardValues>): WizardValues {
+  const values: WizardValues = { ...EMPTY_VALUES, ...partial }
+  if (!values.acceptanceCriteria.length) values.acceptanceCriteria = [{ text: '' }]
+  if (!values.checklist.length) values.checklist = [EMPTY_ROW]
+  return values
+}
+
+/**
+ * The wizard values in a draft kept on this device, or null when it is not a
+ * draft at all. An attachment whose URL cannot be shown is taken from
+ * `known` (the account's copy of the same draft) when it has it, and named
+ * as dropped otherwise.
+ */
+export function readDraftValues(content: unknown, known: readonly Attachment[] = []): RestoredDraft | null {
+  const parsed = DraftShape.safeParse(content)
+  if (!parsed.success) return null
+  const { attachments = [], ...rest } = parsed.data
+  const kept: Attachment[] = []
+  const droppedAttachments: string[] = []
+  for (const a of attachments) {
+    const ok = Attachment.safeParse(a)
+    const fallback = ok.success ? undefined : known.find((k) => k.id === a.id)
+    if (ok.success) kept.push(ok.data)
+    else if (fallback) kept.push(fallback)
+    else droppedAttachments.push(a.name)
+  }
+  return { values: completeValues({ ...rest, attachments: kept }), droppedAttachments, missingAttachments: 0 }
+}
+
+/**
+ * The wizard values of a draft saved to the account. Its attachments come
+ * from `attachments` (the ones that still exist); those it lists but the
+ * server no longer has are counted.
+ */
+export function savedDraftValues(saved: SavedDraft): RestoredDraft {
+  const { attachmentIds = [], ...rest } = saved.content
+  const byId = new Map(saved.attachments.map((a) => [a.id, a]))
+  const attachments = [...new Set(attachmentIds)].flatMap((id) => byId.get(id) ?? [])
+  return {
+    values: completeValues({ ...rest, attachments }),
+    droppedAttachments: [],
+    missingAttachments: new Set(attachmentIds).size - attachments.length,
   }
 }
 
-export function loadDraft(userId: string): WizardValues | null {
-  return restoreDraft(userId)?.values ?? null
+const clip = (s: string) => s.slice(0, DRAFT_TEXT_MAX)
+const clipList = <T>(list: readonly T[]) => list.slice(0, DRAFT_LIST_MAX)
+
+/**
+ * The account's copy of the wizard values: attachments by id, within the
+ * contract's ceilings (nothing a person types comes near them; what would
+ * not fit is cut rather than refused, the device keeps the whole).
+ */
+export function toDraftContent(v: WizardValues): DraftContent {
+  return {
+    projectId: clip(v.projectId),
+    type: v.type,
+    targetIds: clipList(v.targetIds).map(clip),
+    targetOther: clip(v.targetOther),
+    title: clip(v.title),
+    currentBehavior: clip(v.currentBehavior),
+    desiredBehavior: clip(v.desiredBehavior),
+    acceptanceCriteria: clipList(v.acceptanceCriteria).map((c) => ({ text: clip(c.text) })),
+    checklistSource: clip(v.checklistSource),
+    checklist: clipList(v.checklist).map((r) => ({
+      ref: clip(r.ref),
+      clause: clip(r.clause),
+      finding: clip(r.finding),
+      expected: clip(r.expected),
+    })),
+    outOfScope: clip(v.outOfScope),
+    attachmentIds: clipList(v.attachments.map((a) => a.id)),
+    desiredDate: clip(v.desiredDate),
+    desiredDateReason: clip(v.desiredDateReason),
+  }
+}
+
+/**
+ * The account's copy of a draft kept on this device, or null when it is not a
+ * draft. Every attachment id goes, the ones this device could not keep
+ * whole included: the server still has them.
+ */
+export function draftContentOf(content: unknown): DraftContent | null {
+  const parsed = DraftShape.safeParse(content)
+  if (!parsed.success) return null
+  const { attachments = [], ...rest } = parsed.data
+  const values = completeValues(rest)
+  return { ...toDraftContent(values), attachmentIds: clipList(attachments.map((a) => a.id)) }
 }
 
 /**
@@ -275,35 +343,8 @@ export function missingAttachmentIds(
   return [...new Set(ids)]
 }
 
-/** How long typing pauses before the draft is written (every keystroke would re-serialise attachments). */
+/** How long typing pauses before the draft is written on this device (every keystroke would re-serialise attachments). */
 export const DRAFT_SAVE_DELAY_MS = 300
-
-/** What became of a draft save: kept whole, kept without its attachments, or not kept at all. */
-export type DraftSaveResult = 'saved' | 'withoutAttachments' | 'failed'
-
-export function saveDraft(userId: string, values: WizardValues): DraftSaveResult {
-  const key = draftKey(userId)
-  try {
-    localStorage.setItem(key, JSON.stringify(values))
-    return 'saved'
-  } catch {
-    // Quota exceeded, or storage blocked. Fall through.
-  }
-  // Inline attachments (data URLs in the demo) fill the quota first: keep the words at least.
-  if (values.attachments.length) {
-    try {
-      localStorage.setItem(key, JSON.stringify({ ...values, attachments: [] }))
-      return 'withoutAttachments'
-    } catch {
-      // Still too large: the previous draft, if any, stays as it was.
-    }
-  }
-  return 'failed'
-}
-
-export function isEmptyDraft(v: WizardValues): boolean {
-  return !v.projectId && !v.title && !v.desiredBehavior
-}
 
 /**
  * Something the person wrote or attached — worth a "leave anyway?" question.

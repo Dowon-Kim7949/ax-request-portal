@@ -227,14 +227,14 @@ export const DRAFT_MUTATION_KEY = ['drafts'] as const
  */
 const draftScope = (id: string) => ({ id: `draft:${id}` })
 
-/** After a draft was saved: the open copy is the answer, and the list is read again. */
-function onDraftSaved(qc: QueryClient, draft: SavedDraft) {
+/** After a draft was saved (here or by the draft sync): the open copy is the answer, and the list is read again. */
+export function storeSavedDraft(qc: QueryClient, draft: SavedDraft) {
   qc.setQueryData(keys.draft(draft.id), draft)
   void qc.invalidateQueries({ queryKey: keys.drafts() })
 }
 
 /** After a draft was deleted or submitted: it leaves the list at once, then the list is read again. */
-function onDraftGone(qc: QueryClient, id: string) {
+export function dropSavedDraft(qc: QueryClient, id: string) {
   qc.removeQueries({ queryKey: keys.draft(id), exact: true })
   qc.setQueryData<SavedDraftSummary[]>(keys.drafts(), (list) => list?.filter((d) => d.id !== id))
   void qc.invalidateQueries({ queryKey: keys.drafts() })
@@ -261,7 +261,8 @@ export function useLogin() {
 
 /**
  * Signing out on purpose: the login screen then starts fresh, without `next`
- * (see RequireAuth), and the person's unsubmitted draft is deleted (see useSession).
+ * (see RequireAuth), and the person's drafts kept on this device are deleted
+ * (see useSession). The shell sends what is waiting first (useSignOut, src/app/sign-out.tsx).
  */
 export function useLogout() {
   const clear = useSession((s) => s.clear)
@@ -303,7 +304,7 @@ export function useCreateRequest(
     mutationFn: (body: BodyOf<typeof api.createRequest>) => call(api.createRequest, { body }),
     onSuccess: (req, body) => {
       onRequestChanged(qc, req)
-      if (body.draftId) onDraftGone(qc, body.draftId)
+      if (body.draftId) dropSavedDraft(qc, body.draftId)
       else void qc.invalidateQueries({ queryKey: keys.drafts() })
       onCreated?.(req)
     },
@@ -317,7 +318,7 @@ export function useCreateDraft() {
   return useMutation({
     mutationKey: [...DRAFT_MUTATION_KEY, 'create'],
     mutationFn: (body: BodyOf<typeof api.createDraft>) => call(api.createDraft, { body }),
-    onSuccess: (draft) => onDraftSaved(qc, draft),
+    onSuccess: (draft) => storeSavedDraft(qc, draft),
   })
 }
 
@@ -331,7 +332,7 @@ export function useUpdateDraft(id: string) {
     mutationKey: [...DRAFT_MUTATION_KEY, 'update', id],
     mutationFn: (body: BodyOf<typeof api.updateDraft>) => call(api.updateDraft, { params: { id }, body }),
     scope: draftScope(id),
-    onSuccess: (draft) => onDraftSaved(qc, draft),
+    onSuccess: (draft) => storeSavedDraft(qc, draft),
     onError: (error) => onDraftRefused(qc, error),
   })
 }
@@ -348,7 +349,7 @@ export function useDeleteDraft() {
         if (!(error instanceof ApiError && error.status === 404)) throw error
       }
     },
-    onSuccess: (_void, id) => onDraftGone(qc, id),
+    onSuccess: (_void, id) => dropSavedDraft(qc, id),
   })
 }
 

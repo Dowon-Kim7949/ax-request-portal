@@ -233,12 +233,45 @@ const ko = {
   wizard: {
     title: '새 요청',
     step: '{{current}}/{{total}}',
-    draftRestored: '작성 중이던 요청서를 불러왔어요.',
-    discard: '처음부터 다시 쓰기',
     draftNotSaved:
-      '저장 공간이 부족해 이 기기에 초안을 저장하지 못했어요. 제출할 때까지 이 화면을 닫지 말아 주세요.',
-    draftWithoutAttachments: '저장 공간이 부족해 첨부 파일은 빼고 초안을 저장했어요.',
+      '저장 공간이 부족해 이 기기에 초안을 저장하지 못했어요. 계정에 저장될 때까지 이 화면을 닫지 말아 주세요.',
+    draftWithoutAttachments:
+      '저장 공간이 부족해 이 기기에는 첨부 파일을 빼고 저장했어요. 계정에는 첨부 파일도 함께 저장돼요.',
     draftAttachmentsDropped: '초안의 첨부 파일 일부는 불러오지 못했어요. 다시 올려 주세요: {{names}}',
+    draftAttachmentsMissing: '초안의 첨부 파일 {{count}}개를 찾을 수 없어요. 다시 올려 주세요.',
+    loadingDraft: '초안을 불러오고 있어요…',
+    draftGone: '이 초안은 다른 곳에서 지워졌거나 제출됐어요. 이 화면의 내용은 새 초안으로 저장할게요.',
+    notFound: {
+      title: '초안을 찾을 수 없어요',
+      body: '다른 기기에서 지웠거나 이미 제출했을 수 있어요.',
+      drafts: '임시 저장함 보기',
+      newRequest: '새 요청 쓰기',
+    },
+    save: {
+      saving: '저장 중…',
+      saved: '계정에 저장됨',
+      local: '이 기기에만 저장됨 · 연결되면 올려요',
+      limited: '이 기기에만 저장됨',
+      conflict: '저장 충돌',
+    },
+    conflict: {
+      title: '다른 곳에서 이 초안이 먼저 저장됐어요',
+      body: '이 화면의 내용은 그대로 있어요. 어느 쪽을 남길지 골라 주세요.',
+      keepMine: '이 화면 내용으로 저장',
+      loadSaved: '저장된 내용 불러오기',
+    },
+    limit: {
+      body: '임시 저장함이 가득 찼어요(최대 {{max}}개). 다른 초안을 지우면 계정에 저장돼요.',
+      drafts: '임시 저장함',
+    },
+    discardDraft: {
+      button: '초안 삭제',
+      title: '이 초안을 삭제할까요?',
+      body: '이 기기와 계정에서 모두 지워지고 되돌릴 수 없어요.',
+      confirm: '삭제',
+      done: '초안을 삭제했어요.',
+      failed: '계정의 초안은 지우지 못했어요. 임시 저장함에서 다시 지워 주세요.',
+    },
     sendingEarlier: {
       title: '앞서 제출한 요청을 보내고 있어요…',
       body: '접수되면 새 요청을 쓸 수 있어요.',
@@ -252,10 +285,7 @@ const ko = {
     },
     leave: {
       title: '작성을 멈추고 나갈까요?',
-      saved: '지금까지 쓴 내용은 초안으로 저장돼 있어요. 새 요청을 다시 열면 이어서 쓸 수 있어요.',
-      savedWithoutAttachments:
-        '글은 초안으로 저장돼 있지만 첨부 파일은 저장하지 못했어요. 다시 열면 첨부를 다시 올려 주세요.',
-      unsaved: '초안을 저장하지 못해서, 나가면 지금까지 쓴 내용이 사라져요.',
+      unsaved: '이 기기에도 계정에도 초안을 저장하지 못해서, 나가면 지금까지 쓴 내용이 사라져요.',
       stay: '계속 쓰기',
       go: '나가기',
     },

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { User } from '../domain/model'
-import { draftKey } from './draft'
+import { draftsKey, legacyDraftKey } from './draft'
 import { SESSION_STORAGE_KEY, sessionChangeFrom, useSession } from './session'
 
 const kim: User = {
@@ -89,14 +89,36 @@ describe('the persisted session', () => {
     expect(useSession.getState()).not.toHaveProperty('endReason')
   })
 
-  it('deletes the draft when the person signs out, and keeps it when the session expires', () => {
-    localStorage.setItem(draftKey(kim.id), '{"title":"검색"}')
+  it('deletes the drafts kept on this device when the person signs out, and keeps them when the session expires', () => {
+    const fill = () => {
+      localStorage.setItem(draftsKey(kim.id), '{"v":1,"entries":{}}')
+      localStorage.setItem(legacyDraftKey(kim.id), '{"title":"검색"}')
+    }
+    fill()
     useSession.getState().setSession({ token: 'token-1', user: kim })
     useSession.getState().clear('expired')
-    expect(localStorage.getItem(draftKey(kim.id))).not.toBeNull()
+    expect(localStorage.getItem(draftsKey(kim.id))).not.toBeNull()
+    expect(localStorage.getItem(legacyDraftKey(kim.id))).not.toBeNull()
 
     useSession.getState().setSession({ token: 'token-2', user: kim })
     useSession.getState().clear('signedOut')
-    expect(localStorage.getItem(draftKey(kim.id))).toBeNull()
+    expect(localStorage.getItem(draftsKey(kim.id))).toBeNull()
+    expect(localStorage.getItem(legacyDraftKey(kim.id))).toBeNull()
+  })
+
+  it('still deletes them when the sign-out comes right after an expiry', () => {
+    // A request refused while signing out ends the session as expired first; the sign-out is still theirs.
+    localStorage.setItem(draftsKey(kim.id), '{"v":1,"entries":{}}')
+    useSession.getState().setSession({ token: 'token-1', user: kim })
+    useSession.getState().clear('expired')
+    useSession.getState().clear('signedOut')
+    expect(localStorage.getItem(draftsKey(kim.id))).toBeNull()
+  })
+
+  it('leaves someone else’s drafts alone', () => {
+    localStorage.setItem(draftsKey(han.id), '{"v":1,"entries":{}}')
+    useSession.getState().setSession({ token: 'token-1', user: kim })
+    useSession.getState().clear('signedOut')
+    expect(localStorage.getItem(draftsKey(han.id))).not.toBeNull()
   })
 })

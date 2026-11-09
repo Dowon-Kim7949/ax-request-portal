@@ -3,22 +3,36 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { createMemoryRouter, Outlet, RouterProvider } from 'react-router'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import '@/i18n'
 import { call } from '@/api/client'
 import { api } from '@/api/contract'
 import { SessionSync } from '@/app/guards'
+import { appConfig } from '@/config/app.config'
+import { resetDraftSync } from '@/features/drafts/sync'
 import { DEMO_PASSWORD } from '@/mocks/seed'
+import {
+  clearDrafts,
+  draftsKey,
+  getLocalDraft,
+  listLocalDrafts,
+  putLocalDraft,
+  type LocalDraft,
+} from '@/stores/draft'
 import { SESSION_STORAGE_KEY, useSession } from '@/stores/session'
 import { createTestApi } from '@/test/mock-api'
 import { signInAs, testQueryClient } from '@/test/session'
-import { EMPTY_VALUES, loadDraft, saveDraft, type WizardValues } from './schema'
+import { EMPTY_VALUES, toDraftContent, type WizardValues } from './schema'
 import WizardPage from './wizard-page'
 
 const t = createTestApi()
 const USER = 'u-kim'
-const DRAFT_KEY = `ax-request-portal:draft:${USER}`
-const REVIEW = '/requests/new?step=6'
+const LOCAL = 'local-test'
+const REVIEW = `/requests/new?draft=${LOCAL}&step=6`
+/** The draft sync waits a second after typing stops. */
+const SYNCED = { timeout: 4_000 }
+/** The save state line (a screen reader hears it from its own live region, not this text) */
+const STATUS = { selector: 'span' }
 
 /** A request ready to submit; the second criterion is vague, so the check has advice. */
 const READY: WizardValues = {
@@ -37,15 +51,32 @@ const READY: WizardValues = {
 
 beforeAll(() => t.server.listen({ onUnhandledFrame: 'error' }))
 beforeEach(async () => {
-  localStorage.removeItem(DRAFT_KEY)
-  vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
-  await signInAs(USER)
-})
-afterEach(() => {
   t.server.resetHandlers()
   vi.restoreAllMocks()
+  resetDraftSync()
+  clearDrafts(USER)
+  vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+  await signInAs(USER)
+  for (const draft of await call(api.listDrafts)) await call(api.deleteDraft, { params: { id: draft.id } })
 })
 afterAll(() => t.server.close())
+
+/** A draft written on this device that the account does not have yet. */
+function keepLocal(values: WizardValues, over: Partial<LocalDraft> = {}) {
+  putLocalDraft(USER, {
+    localId: LOCAL,
+    step: 3,
+    content: values,
+    updatedAt: new Date().toISOString(),
+    dirty: true,
+    ...over,
+  })
+}
+
+/** A draft in the account, as another device saved it. */
+const saveToAccount = (values: WizardValues, step = 3) =>
+  call(api.createDraft, { body: { step, content: toDraftContent(values) } })
+const accountDrafts = () => call(api.listDrafts)
 
 function renderWizard(at: string) {
   const router = createMemoryRouter(
@@ -60,6 +91,7 @@ function renderWizard(at: string) {
         ),
         children: [
           { path: '/', element: <h1>홈 화면</h1> },
+          { path: '/requests', element: <h1>내 요청</h1> },
           { path: '/requests/new', element: <WizardPage /> },
           { path: '/requests/:id', element: <h1>요청 상세</h1> },
         ],
@@ -75,6 +107,9 @@ function renderWizard(at: string) {
   return router
 }
 
+const draftParam = (router: ReturnType<typeof renderWizard>) =>
+  new URLSearchParams(router.state.location.search).get('draft')
+
 /** A promise the test resolves when it wants a held-back answer to go out. */
 function gate() {
   let open!: () => void
@@ -84,7 +119,7 @@ function gate() {
 
 describe('submitting', () => {
   it('deletes the draft once the request is created, even if the wizard was left meanwhile', async () => {
-    saveDraft(USER, READY)
+    keepLocal(READY)
     const hold = gate()
     // Hold the answer back, then let the mock create the request as usual.
     t.server.use(
@@ -94,6 +129,7 @@ describe('submitting', () => {
     )
     const router = renderWizard(REVIEW)
     expect(await screen.findByText(/확인해 보면 좋은 점 \d+개/)).toBeInTheDocument()
+    expect(await screen.findByText('계정에 저장됨', STATUS, SYNCED)).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: '요청 제출' }))
     expect(await screen.findByRole('button', { name: '제출 중…' })).toBeInTheDocument()
@@ -101,15 +137,17 @@ describe('submitting', () => {
     // Leaving while it is sent asks nothing: the submission carries on without the screen.
     await act(() => router.navigate('/'))
     expect(screen.getByRole('heading', { name: '홈 화면' })).toBeInTheDocument()
-    expect(localStorage.getItem(DRAFT_KEY)).not.toBeNull()
+    expect(await accountDrafts()).toHaveLength(1)
 
     hold.open()
-    await waitFor(() => expect(localStorage.getItem(DRAFT_KEY)).toBeNull())
+    // The request named the draft, so the server deleted it with the submission.
+    await waitFor(async () => expect(await accountDrafts()).toEqual([]))
+    expect(listLocalDrafts(USER)).toEqual([])
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('waits for a submission still on its way instead of opening its draft again', async () => {
-    saveDraft(USER, READY)
+  it('waits for a submission still on its way instead of starting a new request', async () => {
+    keepLocal(READY)
     const hold = gate()
     let posts = 0
     t.server.use(
@@ -124,15 +162,38 @@ describe('submitting', () => {
     await screen.findByRole('button', { name: '제출 중…' })
 
     await act(() => router.navigate('/'))
-    await act(() => router.navigate(REVIEW))
+    await act(() => router.navigate('/requests/new?step=6'))
     expect(await screen.findByText('앞서 제출한 요청을 보내고 있어요…')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '요청 제출' })).toBeNull()
 
     hold.open()
-    // Once it has arrived, the form starts empty: that draft became the request.
+    // Once it has arrived, a new request starts empty: that draft became the request.
     expect(await screen.findByRole('heading', { name: '어느 서비스에 대한 요청인가요?' })).toBeInTheDocument()
-    expect(localStorage.getItem(DRAFT_KEY)).toBeNull()
+    await waitFor(() => expect(listLocalDrafts(USER)).toEqual([]))
     expect(posts).toBe(1)
+  })
+
+  it('a save on its way when the request is sent still ends with no draft left', async () => {
+    keepLocal(READY)
+    const posted = gate()
+    // The draft's first save is slow; the person submits meanwhile.
+    t.server.use(
+      http.post('*/api/drafts', async () => {
+        await posted.closed
+      }),
+    )
+    const router = renderWizard(REVIEW)
+    await screen.findByText(/확인해 보면 좋은 점 \d+개/)
+    expect(screen.getByText('저장 중…', STATUS)).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: '요청 제출' }))
+    // The wizard waits a moment for the save, then sends the request without it.
+    expect(await screen.findByRole('heading', { name: '요청 상세' }, { timeout: 5_000 })).toBeInTheDocument()
+    expect(router.state.location.pathname).toMatch(/^\/requests\/\d+$/)
+
+    // The save arrives late and creates the draft: it is deleted at once.
+    posted.open()
+    await waitFor(async () => expect(await accountDrafts()).toEqual([]))
+    expect(listLocalDrafts(USER)).toEqual([])
   })
 
   it('names the attachments the server could not find and leads back to them', async () => {
@@ -143,12 +204,12 @@ describe('submitting', () => {
       mimeType: 'image/png',
       url: 'data:image/png;base64,iVBORw==',
     }
-    saveDraft(USER, { ...READY, attachments: [photo] })
+    keepLocal({ ...READY, attachments: [photo] })
     renderWizard(REVIEW)
     await screen.findByText(/확인해 보면 좋은 점 \d+개/)
     await userEvent.click(screen.getByRole('button', { name: '요청 제출' }))
 
-    const alert = await screen.findByRole('alert')
+    const alert = await screen.findByRole('alert', {}, { timeout: 5_000 })
     expect(alert).toHaveTextContent('찾을 수 없는 첨부가 있어요')
     expect(alert).toHaveTextContent('screen.png')
     await userEvent.click(screen.getByRole('button', { name: '첨부 고치기' }))
@@ -158,21 +219,22 @@ describe('submitting', () => {
     expect(screen.queryByText('찾을 수 없는 첨부가 있어요')).toBeNull()
   })
 
-  it('opens the new request and leaves no draft behind', async () => {
-    saveDraft(USER, READY)
-    renderWizard(REVIEW)
+  it('opens the new request and leaves no draft behind, here or in the account', async () => {
+    const draft = await saveToAccount(READY, 6)
+    renderWizard(`/requests/new?draft=${draft.id}&step=6`)
     await screen.findByText(/확인해 보면 좋은 점 \d+개/)
     await userEvent.click(screen.getByRole('button', { name: '요청 제출' }))
 
     expect(await screen.findByRole('heading', { name: '요청 상세' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).toBeNull()
-    expect(localStorage.getItem(DRAFT_KEY)).toBeNull()
+    expect(listLocalDrafts(USER)).toEqual([])
+    expect(await accountDrafts()).toEqual([])
   })
 })
 
 describe('the submission check', () => {
   it('says when it could not run, drops the earlier advice and can run again', async () => {
-    saveDraft(USER, READY)
+    keepLocal(READY)
     const router = renderWizard(REVIEW)
     expect(await screen.findByText(/확인해 보면 좋은 점 \d+개/)).toBeInTheDocument()
 
@@ -181,8 +243,9 @@ describe('the submission check', () => {
         HttpResponse.json({ code: 'internal', message: 'down' }, { status: 500 }),
       ),
     )
-    await act(() => router.navigate('/requests/new?step=5'))
-    await act(() => router.navigate(REVIEW))
+    const draft = draftParam(router)
+    await act(() => router.navigate(`/requests/new?draft=${draft}&step=5`))
+    await act(() => router.navigate(`/requests/new?draft=${draft}&step=6`))
 
     expect(await screen.findByText(/점검을 하지 못했어요/)).toBeInTheDocument()
     expect(screen.queryByText(/확인해 보면 좋은 점/)).toBeNull()
@@ -195,17 +258,190 @@ describe('the submission check', () => {
   })
 })
 
+describe('the draft in the account', () => {
+  it('starts a draft once something is written, and moves to its server id once saved', async () => {
+    const router = renderWizard('/requests/new?project=p-portal')
+    await userEvent.click(await screen.findByRole('radio', { name: /기존 기능 변경/ }))
+    await screen.findByRole('heading', { name: '어느 화면이나 기능인가요?' })
+    // One-tap choices alone make no draft.
+    expect(draftParam(router)).toBeNull()
+    await userEvent.click(screen.getByRole('button', { name: '다음' }))
+    await userEvent.type(await screen.findByLabelText('요청 제목'), '공지 검색')
+
+    await waitFor(() => expect(draftParam(router)).toMatch(/^local-/))
+    expect(await screen.findByText('계정에 저장됨', STATUS, SYNCED)).toBeInTheDocument()
+    const [saved] = await accountDrafts()
+    expect(saved).toMatchObject({ title: '공지 검색', step: 3, projectId: 'p-portal' })
+    expect(draftParam(router)).toBe(saved!.id)
+    expect(new URLSearchParams(router.state.location.search).get('step')).toBe('3')
+    // The account has it all: nothing stays on this device.
+    expect(listLocalDrafts(USER)).toEqual([])
+  })
+
+  it('opens a draft from the account with its words', async () => {
+    const draft = await saveToAccount(READY)
+    renderWizard(`/requests/new?draft=${draft.id}&step=3`)
+    expect(screen.getByText('초안을 불러오고 있어요…')).toBeInTheDocument()
+    expect(await screen.findByLabelText('요청 제목')).toHaveValue('공지사항 검색 추가')
+    expect(screen.getByText('계정에 저장됨', STATUS)).toBeInTheDocument()
+    expect(listLocalDrafts(USER)).toEqual([])
+  })
+
+  it('continues this device’s newer copy written over the account’s version, and saves it', async () => {
+    const draft = await saveToAccount(READY)
+    keepLocal(
+      { ...READY, title: '이 기기에서 고친 제목' },
+      { localId: draft.id, draftId: draft.id, baseVersion: draft.version },
+    )
+    renderWizard(`/requests/new?draft=${draft.id}&step=3`)
+    expect(await screen.findByLabelText('요청 제목')).toHaveValue('이 기기에서 고친 제목')
+    await waitFor(
+      async () =>
+        expect(await call(api.getDraft, { params: { id: draft.id } })).toMatchObject({
+          title: '이 기기에서 고친 제목',
+          version: 2,
+        }),
+      SYNCED,
+    )
+  })
+
+  describe('saved elsewhere meanwhile', () => {
+    async function openConflict() {
+      const draft = await saveToAccount(READY)
+      await call(api.updateDraft, {
+        params: { id: draft.id },
+        body: {
+          baseVersion: 1,
+          step: 3,
+          content: toDraftContent({ ...READY, title: '다른 기기에서 고친 제목' }),
+        },
+      })
+      keepLocal(
+        { ...READY, title: '이 기기에서 고친 제목' },
+        { localId: draft.id, draftId: draft.id, baseVersion: 1 },
+      )
+      const router = renderWizard(`/requests/new?draft=${draft.id}&step=3`)
+      expect(await screen.findByText('다른 곳에서 이 초안이 먼저 저장됐어요')).toBeInTheDocument()
+      // Nothing on screen is lost while the person decides.
+      expect(screen.getByLabelText('요청 제목')).toHaveValue('이 기기에서 고친 제목')
+      expect(screen.getByText('저장 충돌', STATUS)).toBeInTheDocument()
+      return { draft, router }
+    }
+
+    it('keeps what is on screen, saved over the newer version', async () => {
+      const { draft } = await openConflict()
+      await userEvent.click(screen.getByRole('button', { name: '이 화면 내용으로 저장' }))
+      await waitFor(async () =>
+        expect(await call(api.getDraft, { params: { id: draft.id } })).toMatchObject({
+          title: '이 기기에서 고친 제목',
+          version: 3,
+        }),
+      )
+      await waitFor(() => expect(screen.queryByText('다른 곳에서 이 초안이 먼저 저장됐어요')).toBeNull())
+      expect(listLocalDrafts(USER)).toEqual([])
+    })
+
+    it('or loads the saved version in place of what is on screen', async () => {
+      const { draft } = await openConflict()
+      await userEvent.click(screen.getByRole('button', { name: '저장된 내용 불러오기' }))
+      await waitFor(() => expect(screen.getByLabelText('요청 제목')).toHaveValue('다른 기기에서 고친 제목'))
+      expect(screen.queryByText('다른 곳에서 이 초안이 먼저 저장됐어요')).toBeNull()
+      expect(getLocalDraft(USER, draft.id)).toBeUndefined()
+      expect(await call(api.getDraft, { params: { id: draft.id } })).toMatchObject({ version: 2 })
+    })
+  })
+
+  it('goes on as a new draft when the account’s draft was deleted elsewhere and this device has more', async () => {
+    const draft = await saveToAccount(READY)
+    await call(api.deleteDraft, { params: { id: draft.id } })
+    keepLocal(
+      { ...READY, title: '이 기기에서 더 쓴 것' },
+      { localId: draft.id, draftId: draft.id, baseVersion: 1 },
+    )
+    const router = renderWizard(`/requests/new?draft=${draft.id}&step=3`)
+    expect(await screen.findByLabelText('요청 제목')).toHaveValue('이 기기에서 더 쓴 것')
+    await waitFor(async () => expect((await accountDrafts())[0]?.title).toBe('이 기기에서 더 쓴 것'), SYNCED)
+    const [again] = await accountDrafts()
+    await waitFor(() => expect(draftParam(router)).toBe(again!.id))
+  })
+
+  it('says so when the draft is not in the account and not on this device', async () => {
+    renderWizard('/requests/new?draft=draft-999')
+    expect(await screen.findByText('초안을 찾을 수 없어요')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '임시 저장함 보기' })).toHaveAttribute('href', '/requests#drafts')
+    await userEvent.click(screen.getByRole('link', { name: '새 요청 쓰기' }))
+    expect(await screen.findByRole('heading', { name: '어느 서비스에 대한 요청인가요?' })).toBeInTheDocument()
+  })
+
+  it('keeps the draft on this device when the account is full, and says how to make room', async () => {
+    await Promise.all(
+      Array.from({ length: appConfig.drafts.maxPerAccount }, (_, i) =>
+        saveToAccount({ ...EMPTY_VALUES, title: `초안 ${i}` }),
+      ),
+    )
+    keepLocal(READY)
+    renderWizard(`/requests/new?draft=${LOCAL}&step=3`)
+    expect(await screen.findByText(/임시 저장함이 가득 찼어요\(최대 20개\)/, {}, SYNCED)).toBeInTheDocument()
+    expect(screen.getByText('이 기기에만 저장됨', STATUS)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '임시 저장함' })).toHaveAttribute('href', '/requests#drafts')
+    expect(getLocalDraft(USER, LOCAL)).toMatchObject({ limited: true })
+  })
+
+  it('says when the account cannot be reached, and keeps the draft on this device', async () => {
+    t.server.use(http.post('*/api/drafts', () => HttpResponse.error()))
+    keepLocal(READY)
+    renderWizard(`/requests/new?draft=${LOCAL}&step=3`)
+    expect(
+      await screen.findByText('이 기기에만 저장됨 · 연결되면 올려요', STATUS, SYNCED),
+    ).toBeInTheDocument()
+    // Told once, as it changes; not on every save.
+    expect(document.querySelector('[aria-live="polite"]')).toHaveTextContent('이 기기에만 저장됨')
+    expect(getLocalDraft(USER, LOCAL)).toBeDefined()
+  })
+
+  it('deletes the draft here and in the account, after asking', async () => {
+    const draft = await saveToAccount(READY)
+    const router = renderWizard(`/requests/new?draft=${draft.id}&step=3`)
+    await screen.findByLabelText('요청 제목')
+    await userEvent.click(screen.getByRole('button', { name: '초안 삭제' }))
+    const dialog = await screen.findByRole('dialog', { name: '이 초안을 삭제할까요?' })
+    expect(dialog).toHaveTextContent('되돌릴 수 없어요')
+    await userEvent.click(screen.getByRole('button', { name: '삭제' }))
+
+    expect(await screen.findByRole('heading', { name: '어느 서비스에 대한 요청인가요?' })).toBeInTheDocument()
+    expect(draftParam(router)).toBeNull()
+    expect(await accountDrafts()).toEqual([])
+    expect(listLocalDrafts(USER)).toEqual([])
+  })
+})
+
 describe('leaving', () => {
-  it('asks before leaving what was written, and keeps the draft either way', async () => {
-    saveDraft(USER, { ...READY, title: '' })
-    const router = renderWizard('/requests/new?step=3')
+  it('leaves without asking once the draft is kept, and sends it on its way', async () => {
+    keepLocal({ ...READY, title: '' })
+    const router = renderWizard(`/requests/new?draft=${LOCAL}&step=3`)
+    await userEvent.type(await screen.findByLabelText('요청 제목'), '사진이 안 올라감')
+
+    await act(() => router.navigate('/'))
+    expect(await screen.findByRole('heading', { name: '홈 화면' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    await waitFor(async () => expect((await accountDrafts())[0]?.title).toBe('사진이 안 올라감'), SYNCED)
+  })
+
+  it('asks before leaving only when the draft could not be kept anywhere', async () => {
+    keepLocal({ ...READY, title: '' })
+    // Storage full, and no connection to the account.
+    const original = Storage.prototype.setItem
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
+      if (key === draftsKey(USER)) throw new DOMException('full', 'QuotaExceededError')
+      original.call(this, key, value)
+    })
+    t.server.use(http.post('*/api/drafts', () => HttpResponse.error()))
+    const router = renderWizard(`/requests/new?draft=${LOCAL}&step=3`)
     await userEvent.type(await screen.findByLabelText('요청 제목'), '사진이 안 올라감')
 
     await act(() => router.navigate('/'))
     const dialog = await screen.findByRole('dialog', { name: '작성을 멈추고 나갈까요?' })
-    expect(dialog).toHaveTextContent('초안으로 저장돼 있어요')
-    // Asking wrote the pending draft at once.
-    expect(loadDraft(USER)?.title).toBe('사진이 안 올라감')
+    expect(dialog).toHaveTextContent('이 기기에도 계정에도 초안을 저장하지 못해서')
 
     await userEvent.click(screen.getByRole('button', { name: '계속 쓰기' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
@@ -214,12 +450,11 @@ describe('leaving', () => {
     await act(() => router.navigate('/'))
     await userEvent.click(await screen.findByRole('button', { name: '나가기' }))
     expect(await screen.findByRole('heading', { name: '홈 화면' })).toBeInTheDocument()
-    expect(loadDraft(USER)?.title).toBe('사진이 안 올라감')
   })
 
   it('moves on without asking when another tab signs in as someone else', async () => {
-    saveDraft(USER, { ...READY, title: '' })
-    renderWizard('/requests/new?step=3')
+    keepLocal({ ...READY, title: '' })
+    renderWizard(`/requests/new?draft=${LOCAL}&step=3`)
     await userEvent.type(await screen.findByLabelText('요청 제목'), '사진이 안 올라감')
     const other = await call(api.login, { body: { email: 'admin@example.com', password: DEMO_PASSWORD } })
 
@@ -237,13 +472,14 @@ describe('leaving', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(useSession.getState().user?.id).toBe(other.user.id)
     // What was written stays the first person's draft, not the new person's.
-    expect(loadDraft(USER)?.title).toBe('사진이 안 올라감')
-    expect(loadDraft(other.user.id)).toBeNull()
+    const [kept] = listLocalDrafts(USER)
+    expect(kept?.content).toMatchObject({ title: '사진이 안 올라감' })
+    expect(listLocalDrafts(other.user.id)).toEqual([])
   })
 
   it('a sign-out in another tab deletes the draft, and the wizard does not write it back', async () => {
-    saveDraft(USER, { ...READY, title: '' })
-    const router = renderWizard('/requests/new?step=3')
+    keepLocal({ ...READY, title: '' })
+    const router = renderWizard(`/requests/new?draft=${LOCAL}&step=3`)
     await userEvent.type(await screen.findByLabelText('요청 제목'), '사진이 안 올라감')
 
     act(() => {
@@ -260,15 +496,17 @@ describe('leaving', () => {
     })
     expect(useSession.getState().ended?.reason).toBe('signedOut')
     await act(() => router.navigate('/'))
-    // Past the moment the pending save would have run.
-    await act(() => new Promise((resolve) => setTimeout(resolve, 400)))
-    expect(localStorage.getItem(DRAFT_KEY)).toBeNull()
+    // Past the moment the pending save and the sync would have run.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 1_500)))
+    expect(localStorage.getItem(draftsKey(USER))).toBeNull()
   })
 
-  it('says when the draft was kept without its attachments', async () => {
+  it('leaves without asking when only the attachments’ files did not fit on this device', async () => {
     const original = Storage.prototype.setItem
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
-      if (key === DRAFT_KEY && value.includes('data:')) throw new DOMException('full', 'QuotaExceededError')
+      if (key === draftsKey(USER) && value.includes('data:')) {
+        throw new DOMException('full', 'QuotaExceededError')
+      }
       original.call(this, key, value)
     })
     const photo = {
@@ -278,13 +516,22 @@ describe('leaving', () => {
       mimeType: 'image/png',
       url: 'data:image/png;base64,QQ==',
     }
-    original.call(localStorage, DRAFT_KEY, JSON.stringify({ ...READY, title: '', attachments: [photo] }))
-    const router = renderWizard('/requests/new?step=3')
+    // Kept off the account, so this device's copy stays to look at.
+    t.server.use(http.post('*/api/drafts', () => HttpResponse.error()))
+    keepLocal({ ...READY, title: '', attachments: [photo] })
+    const router = renderWizard(`/requests/new?draft=${LOCAL}&step=3`)
     await userEvent.type(await screen.findByLabelText('요청 제목'), '사진이 안 올라감')
+    await waitFor(() =>
+      expect(JSON.parse(localStorage.getItem(draftsKey(USER)) ?? '{}')).toMatchObject({
+        entries: {
+          [LOCAL]: { content: { title: '사진이 안 올라감', attachments: [{ id: 'att-1', url: '' }] } },
+        },
+      }),
+    )
 
     await act(() => router.navigate('/'))
-    const dialog = await screen.findByRole('dialog', { name: '작성을 멈추고 나갈까요?' })
-    expect(dialog).toHaveTextContent('첨부 파일은 저장하지 못했어요')
+    expect(await screen.findByRole('heading', { name: '홈 화면' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 
   it('does not ask when nothing has been written', async () => {
@@ -293,12 +540,14 @@ describe('leaving', () => {
     await act(() => router.navigate('/'))
     expect(screen.getByRole('heading', { name: '홈 화면' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog')).toBeNull()
+    expect(listLocalDrafts(USER)).toEqual([])
   })
 
-  it('keeps writing the draft, a moment after typing stops', async () => {
-    saveDraft(USER, { ...READY, title: '' })
-    renderWizard('/requests/new?step=3')
+  it('keeps writing the draft on this device, a moment after typing stops', async () => {
+    t.server.use(http.post('*/api/drafts', () => HttpResponse.error()))
+    keepLocal({ ...READY, title: '' })
+    renderWizard(`/requests/new?draft=${LOCAL}&step=3`)
     await userEvent.type(await screen.findByLabelText('요청 제목'), '검색')
-    await waitFor(() => expect(loadDraft(USER)?.title).toBe('검색'))
+    await waitFor(() => expect(getLocalDraft(USER, LOCAL)?.content).toMatchObject({ title: '검색' }))
   })
 })

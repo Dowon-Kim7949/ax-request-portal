@@ -1,37 +1,65 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useIsMutating } from '@tanstack/react-query'
+import { useIsMutating, useQuery } from '@tanstack/react-query'
 import { ChevronLeft, X } from 'lucide-react'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { useBlocker, useNavigate, useSearchParams } from 'react-router'
+import {
+  Link,
+  UNSAFE_DataRouterContext,
+  useBlocker,
+  useLocation,
+  useNavigate,
+  useNavigationType,
+  useSearchParams,
+} from 'react-router'
 import { toast } from 'sonner'
-import { ApiError } from '@/api/client'
+import { ApiError, call } from '@/api/client'
+import { api, type SavedDraft } from '@/api/contract'
 import { errorText } from '@/api/error-text'
-import { CREATE_REQUEST_KEY, useCreateRequest, usePrecheck } from '@/api/queries'
+import { CREATE_REQUEST_KEY, keys, useCreateRequest, usePrecheck } from '@/api/queries'
 import { useCurrentUser, useDirectory } from '@/app/hooks'
 import { usePageTitle } from '@/app/title'
 import { Button } from '@/components/ui/button'
-import { Spinner } from '@/components/ui/feedback'
+import { ErrorState, Spinner } from '@/components/ui/feedback'
+import { LoadFailed } from '@/components/ui/load-failed'
 import { Sheet } from '@/components/ui/sheet'
 import type { PrecheckIssue } from '@/domain/model'
+import { useDiscardDraft, useDraftSaveState } from '@/features/drafts/hooks'
+import { DRAFT_SETTLE_TIMEOUT_MS, draftSync } from '@/features/drafts/sync'
+import { unlinked } from '@/features/drafts/sync-core'
 import { debounce } from '@/lib/debounce'
+import {
+  getLocalDraft,
+  newLocalId,
+  putLocalDraft,
+  resolveDraftId,
+  updateLocalDraft,
+  type LocalSaveResult,
+} from '@/stores/draft'
 import { useSession } from '@/stores/session'
 import {
+  baselineOf,
+  baselineOfContent,
+  openDraft,
+  startLocal,
+  startNew,
+  startServer,
+  type FormStart,
+  type ServerCopy,
+} from './draft-opening'
+import { ConflictNotice, DRAFTS_LIST_PATH, DraftStatusBar, LimitNotice } from './draft-status'
+import {
   adviceByField,
-  clearDraft,
   DRAFT_SAVE_DELAY_MS,
   EMPTY_VALUES,
   firstInvalidStep,
   hasWrittenContent,
-  isEmptyDraft,
   missingAttachmentIds,
-  restoreDraft,
-  saveDraft,
+  savedDraftValues,
   STEPS,
   toDraft,
   WizardSchema,
-  type DraftSaveResult,
   type WizardValues,
 } from './schema'
 import {
@@ -46,6 +74,30 @@ import {
 
 const LAST = STEPS.length - 1
 const EXTRA = STEPS.findIndex((s) => s.key === 'extra')
+
+/** ?draft= set to `id`, everything else kept. */
+const withDraft = (id: string) => (params: URLSearchParams) => {
+  const next = new URLSearchParams(params)
+  next.set('draft', id)
+  return next
+}
+/** The form's own moves of ?draft= do not add history or scroll. */
+const OWN_MOVE = { replace: true, preventScrollReset: true } as const
+
+/**
+ * The search params as the router holds them now. A render can be behind:
+ * the router commits navigations as transitions, so a render for anything
+ * else (a save that just finished) may still show the previous step, and a
+ * URL built from it would undo the step the person just moved to.
+ */
+function useLiveSearch(): () => URLSearchParams {
+  const dataRouter = useContext(UNSAFE_DataRouterContext)
+  const [params] = useSearchParams()
+  return useCallback(
+    () => new URLSearchParams(dataRouter ? dataRouter.router.state.location.search : params),
+    [dataRouter, params],
+  )
+}
 
 /**
  * The new-request wizard. A request submitted from an earlier visit may still
@@ -68,31 +120,155 @@ export default function WizardPage() {
       </div>
     )
   }
-  return <WizardForm />
+  return <WizardSession />
 }
 
-function WizardForm() {
+/**
+ * Which draft the form is for (?draft=). The form moves ?draft= itself (a
+ * local id once something is written, the server id once saved) and stays;
+ * going back through its own steps stays too. Any other draft, or a new
+ * request opened from a link, starts a fresh form.
+ */
+function WizardSession() {
+  const [params] = useSearchParams()
+  const location = useLocation()
+  const navigationType = useNavigationType()
+  const draftParam = params.get('draft')
+  const [session, setSession] = useState(() => ({
+    n: 0,
+    owned: new Set<string>(draftParam ? [draftParam] : []),
+    location: location.key,
+  }))
+  const moved = location.key !== session.location
+  const foreign = draftParam
+    ? !session.owned.has(draftParam)
+    : moved && session.owned.size > 0 && navigationType !== 'POP'
+  if (foreign) {
+    setSession({ n: session.n + 1, owned: new Set(draftParam ? [draftParam] : []), location: location.key })
+    return null
+  }
+  if (moved) setSession({ ...session, location: location.key })
+  return <WizardOpener key={session.n} draftParam={draftParam} owned={session.owned} />
+}
+
+/** Reads the draft to continue (from this device and the account), then shows the form. */
+function WizardOpener({ draftParam, owned }: { draftParam: string | null; owned: Set<string> }) {
+  const { t } = useTranslation()
+  const user = useCurrentUser()
+  const [params, setParams] = useSearchParams()
+  const presetProject = params.get('project')
+  const [opening] = useState(() => openDraft(user.id, draftParam))
+  const serverKey = opening.kind === 'server' ? opening.key : undefined
+  const read = useQuery({
+    queryKey: keys.draft(serverKey ?? ''),
+    queryFn: ({ signal }) => call(api.getDraft, { params: { id: serverKey! }, signal }),
+    enabled: Boolean(serverKey),
+    // Another device may have saved it since this tab last read it.
+    refetchOnMount: 'always',
+    // With a copy on this device there is something to show at once when the account cannot be reached.
+    ...(opening.kind === 'server' && opening.entry ? { retry: false } : {}),
+  })
+  const [start, setStart] = useState<FormStart | 'notFound' | 'failed' | null>(() => {
+    switch (opening.kind) {
+      case 'new':
+        // A ?project= link from the home screen picks the project.
+        return startNew(presetProject ? { ...EMPTY_VALUES, projectId: presetProject } : EMPTY_VALUES)
+      case 'missing':
+        return 'notFound'
+      case 'local':
+        return startLocal(opening.entry) ?? 'notFound'
+      case 'server':
+        return null
+    }
+  })
+
+  // A local id the server has since saved: show its server id.
+  useEffect(() => {
+    if ((opening.kind === 'local' || opening.kind === 'server') && opening.key !== draftParam) {
+      owned.add(opening.key)
+      setParams(withDraft(opening.key), OWN_MOVE)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, for the draft opened
+  }, [])
+
+  useEffect(() => {
+    if (start !== null || !serverKey || read.isFetching || !read.isFetchedAfterMount) return
+    const entry = opening.kind === 'server' ? opening.entry : undefined
+    setStart(
+      startServer(user.id, serverKey, entry, read.isError ? { error: read.error } : { data: read.data! }),
+    )
+  }, [
+    start,
+    serverKey,
+    read.isFetching,
+    read.isFetchedAfterMount,
+    read.isError,
+    read.error,
+    read.data,
+    opening,
+    user.id,
+  ])
+
+  if (start === null) {
+    return (
+      <div className="mx-auto flex max-w-2xl justify-center py-16">
+        <Spinner label={t('wizard.loadingDraft')} />
+      </div>
+    )
+  }
+  if (start === 'failed') {
+    return (
+      <div className="mx-auto max-w-2xl py-6">
+        <LoadFailed
+          error={read.error}
+          retrying={read.isFetching}
+          onRetry={() => {
+            setStart(null)
+            void read.refetch()
+          }}
+        />
+      </div>
+    )
+  }
+  if (start === 'notFound') {
+    return (
+      <div className="mx-auto max-w-2xl py-6">
+        <ErrorState
+          title={t('wizard.notFound.title')}
+          body={t('wizard.notFound.body')}
+          action={
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button asChild>
+                <Link to={DRAFTS_LIST_PATH}>{t('wizard.notFound.drafts')}</Link>
+              </Button>
+              <Button asChild variant="secondary">
+                <Link to="/requests/new">{t('wizard.notFound.newRequest')}</Link>
+              </Button>
+            </div>
+          }
+        />
+      </div>
+    )
+  }
+  return <WizardForm start={start} owned={owned} />
+}
+
+function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) {
   const { t } = useTranslation()
   const user = useCurrentUser()
   const dir = useDirectory()
   const navigate = useNavigate()
-  const [params, setParams] = useSearchParams()
-  const presetProject = params.get('project')
+  const [params] = useSearchParams()
+  const presetProject = start.key ? null : params.get('project')
 
-  // Restore a draft once; a ?project= link from the home screen overrides its project.
-  const [draft] = useState(() => restoreDraft(user.id))
-  const restored = draft?.values ?? null
-  const initial = useMemo<WizardValues>(() => {
-    const base = restored ?? EMPTY_VALUES
-    if (presetProject && presetProject !== base.projectId)
-      return { ...base, projectId: presetProject, targetIds: [] }
-    return base
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- computed once on mount
-  }, [])
+  // The form holds what the person signed in at opening wrote: it is theirs, wherever it is kept.
+  const author = useRef(user.id)
+  const userId = author.current
+  const engine = draftSync(userId)
 
   const form = useForm<WizardValues>({
     resolver: zodResolver(WizardSchema),
-    defaultValues: initial,
+    defaultValues: start.values,
     mode: 'onTouched',
   })
 
@@ -100,12 +276,18 @@ function WizardForm() {
   const requested = rawStep === null ? (presetProject ? 1 : 0) : Number(rawStep)
   const step = Number.isInteger(requested) ? Math.min(Math.max(requested, 0), LAST) : 0
   const current = STEPS[step]!
+  const stepRef = useRef(step)
+  /** Where the draft is kept on this device; null until something worth keeping is written */
+  const [draftKey, setDraftKey] = useState(start.key)
+  const keyRef = useRef(start.key)
 
+  const liveSearch = useLiveSearch()
   const goTo = (next: number, replace = false) => {
-    const p = new URLSearchParams(params)
+    const p = liveSearch()
     p.set('step', String(next))
     p.delete('project')
-    setParams(p, { replace })
+    if (keyRef.current) p.set('draft', keyRef.current)
+    void navigate(`?${p}`, { replace })
   }
 
   // Never show a step whose earlier steps are incomplete (deep links, reloads).
@@ -125,29 +307,100 @@ function WizardForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [presetProject, dir.loading, dir.projectsError])
 
-  /* ---- draft: saved as you type, so switching apps on a phone loses nothing ---- */
-  /** Set once the request is created: from then on nothing may write the draft back. */
-  const submitted = useRef(false)
-  const [lastSave, setLastSave] = useState<DraftSaveResult>('saved')
-  const warned = useRef(new Set<DraftSaveResult>())
-  const draftSaver = useMemo(
-    () =>
-      debounce(() => {
-        if (submitted.current) return
-        // Signed out on purpose (here or in another tab): the draft went with the session, and the
-        // write still pending when the wizard closes must not bring it back.
-        if (useSession.getState().ended?.reason === 'signedOut') return
-        const result = saveDraft(user.id, form.getValues())
-        setLastSave(result)
-        // Storage full: say so once per kind, without stopping the person.
-        if (result !== 'saved' && !warned.current.has(result)) {
-          warned.current.add(result)
-          toast.warning(result === 'failed' ? t('wizard.draftNotSaved') : t('wizard.draftWithoutAttachments'))
+  /* ---- the draft: kept on this device as you type, then saved to the account ---- */
+  /** What the account holds of it, as far as this screen knows */
+  const serverRef = useRef<ServerCopy | null>(start.server)
+  const [onServer, setOnServer] = useState(Boolean(start.server))
+  const saveState = useDraftSaveState(userId, draftKey, onServer)
+  /** Set once the request is created or the draft deleted: from then on nothing may write the draft back. */
+  const finished = useRef(false)
+  /** How the last write on this device went (a full storage keeps the words only, or nothing) */
+  const lastSave = useRef<LocalSaveResult>('saved')
+  const warned = useRef(new Set<LocalSaveResult>())
+
+  /** The draft lives as `next` now: the page keeps this form for it, and the URL follows (below). */
+  const moveTo = (next: string) => {
+    keyRef.current = next
+    owned.add(next)
+    setDraftKey(next)
+  }
+  // ?draft= names where the draft lives, also after going back to a step from before it moved. Set
+  // here rather than in `moveTo`: a write made while leaving must not bring the person back.
+  useEffect(() => {
+    const p = liveSearch()
+    if (!draftKey || p.get('draft') === draftKey) return
+    p.set('draft', draftKey)
+    void navigate(`?${p}`, OWN_MOVE)
+  }, [draftKey, params, liveSearch, navigate])
+
+  const writeLocal = () => {
+    if (finished.current) return
+    // Signed out on purpose (here or in another tab): the drafts went with the session, and the
+    // write still pending when the wizard closes must not bring them back.
+    if (useSession.getState().ended?.reason === 'signedOut') return
+    const values = form.getValues()
+    const stepNow = stepRef.current
+    let key = keyRef.current
+    if (!key) {
+      // Picking the service or type alone is not worth a draft: each takes one tap to redo.
+      if (!hasWrittenContent(values)) return
+      key = newLocalId()
+      moveTo(key)
+    } else {
+      // Another tab saved this draft under its server id meanwhile.
+      const resolved = resolveDraftId(userId, key)
+      if (resolved.id !== key) {
+        if (resolved.version !== undefined && !getLocalDraft(userId, resolved.id)) {
+          serverRef.current = { id: resolved.id, version: resolved.version, baseline: '' }
+          setOnServer(true)
         }
-      }, DRAFT_SAVE_DELAY_MS),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `t` is read when the save runs
-    [form, user.id],
-  )
+        key = resolved.id
+        moveTo(key)
+      }
+    }
+    const existing = getLocalDraft(userId, key)
+    const server = serverRef.current
+    // Nothing the account does not already have.
+    if (!existing && server?.id === key && server.baseline === baselineOf(stepNow, values)) return
+    // Which server version it was written over is the sync's to keep; a fresh copy starts from what this screen knows.
+    const link = existing
+      ? {
+          draftId: existing.draftId,
+          baseVersion: existing.baseVersion,
+          conflict: existing.conflict,
+          limited: existing.limited,
+        }
+      : server?.id === key
+        ? { draftId: server.id, baseVersion: server.version }
+        : {}
+    const result = putLocalDraft(userId, {
+      localId: key,
+      ...link,
+      step: stepNow,
+      content: values,
+      updatedAt: new Date().toISOString(),
+      dirty: true,
+    })
+    lastSave.current = result
+    // Storage full: say so once per kind, without stopping the person.
+    if (result !== 'saved' && !warned.current.has(result)) {
+      warned.current.add(result)
+      toast.warning(result === 'failed' ? t('wizard.draftNotSaved') : t('wizard.draftWithoutAttachments'))
+    }
+    engine.schedule(key)
+  }
+  const writeRef = useRef(writeLocal)
+  writeRef.current = writeLocal
+  const draftSaver = useMemo(() => debounce(() => writeRef.current(), DRAFT_SAVE_DELAY_MS), [])
+
+  /** Sends what is waiting now (the person moved on, or left). */
+  const sendNow = (trigger: 'step' | 'leave') => {
+    draftSaver.flush()
+    if (keyRef.current) void engine.sync(trigger, keyRef.current)
+  }
+  const sendNowRef = useRef(sendNow)
+  sendNowRef.current = sendNow
+
   useEffect(() => {
     const sub = form.watch(() => draftSaver.schedule())
     // A phone may discard a hidden tab without warning: write what is pending first.
@@ -160,25 +413,151 @@ function WizardForm() {
       sub.unsubscribe()
       document.removeEventListener('visibilitychange', onHidden)
       window.removeEventListener('pagehide', draftSaver.flush)
-      draftSaver.flush()
+      // Leaving the wizard: write what is pending and send it on its way.
+      sendNowRef.current('leave')
     }
   }, [form, draftSaver])
 
-  const discard = () => {
-    clearDraft(user.id)
-    form.reset(EMPTY_VALUES)
-    goTo(0, true)
-  }
-
+  // A step changed: remember where the person is, and send.
+  const firstStep = useRef(true)
   useEffect(() => {
-    if (restored && !isEmptyDraft(restored)) {
-      toast(t('wizard.draftRestored'), { action: { label: t('wizard.discard'), onClick: discard } })
+    stepRef.current = step
+    if (firstStep.current) {
+      firstStep.current = false
+      return
     }
-    if (draft?.droppedAttachments.length) {
-      toast.warning(t('wizard.draftAttachmentsDropped', { names: draft.droppedAttachments.join(', ') }))
+    draftSaver.cancel()
+    writeLocal()
+    sendNow('step')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step])
+
+  // What the sync learns about this draft.
+  useEffect(
+    () =>
+      engine.subscribe((event) => {
+        if (event.type === 'saved' && event.localId === keyRef.current) {
+          serverRef.current = {
+            id: event.draft.id,
+            version: event.draft.version,
+            // Nothing left on this device: the account has exactly what was sent.
+            baseline: event.next ? '' : baselineOfContent(event.sent.step, event.sent.content),
+          }
+          setOnServer(true)
+          if (event.draft.id !== keyRef.current) moveTo(event.draft.id)
+        } else if (event.type === 'gone' && event.localId === keyRef.current) {
+          serverRef.current = null
+          setOnServer(false)
+          toast.info(t('wizard.draftGone'))
+        }
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `t` and `moveTo` are read when an event comes
+    [engine, form],
+  )
+
+  // Opened: say what could not come back, and send a copy the account does not have yet.
+  useEffect(() => {
+    if (start.gone) toast.info(t('wizard.draftGone'))
+    if (start.droppedAttachments.length) {
+      toast.warning(t('wizard.draftAttachmentsDropped', { names: start.droppedAttachments.join(', ') }))
     }
+    if (start.missingAttachments) {
+      toast.warning(t('wizard.draftAttachmentsMissing', { count: start.missingAttachments }))
+    }
+    if (start.key && getLocalDraft(userId, start.key)) void engine.sync('manual', start.key)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  /* ---- a conflict: the person chooses which version to keep ---- */
+  const [resolving, setResolving] = useState<'keep' | 'load' | null>(null)
+  /** The account's latest copy of the open draft; null when it is gone. */
+  const readLatest = async (key: string): Promise<SavedDraft | null> => {
+    const id = getLocalDraft(userId, key)?.draftId ?? serverRef.current?.id ?? key
+    try {
+      return await call(api.getDraft, { params: { id } })
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null
+      throw error
+    }
+  }
+  /** The account's draft is gone: what is on screen goes on as a new draft. */
+  const goOnAsNew = (key: string) => {
+    updateLocalDraft(userId, key, unlinked)
+    serverRef.current = null
+    setOnServer(false)
+    toast.info(t('wizard.draftGone'))
+    void engine.sync('manual', key)
+  }
+  const keepMine = async () => {
+    const key = keyRef.current
+    if (!key) return
+    setResolving('keep')
+    try {
+      draftSaver.flush()
+      const latest = await readLatest(key)
+      if (!latest) return goOnAsNew(key)
+      // Written over the latest version now: the next save replaces it.
+      updateLocalDraft(userId, key, (entry) => {
+        const { conflict: _conflict, ...rest } = entry
+        return { ...rest, draftId: latest.id, baseVersion: latest.version }
+      })
+      serverRef.current = { id: latest.id, version: latest.version, baseline: '' }
+      void engine.sync('manual', key)
+    } catch (error) {
+      toast.error(errorText(error, t('errors.generic')))
+    } finally {
+      setResolving(null)
+    }
+  }
+  const loadSaved = async () => {
+    const key = keyRef.current
+    if (!key) return
+    setResolving('load')
+    try {
+      draftSaver.flush()
+      const latest = await readLatest(key)
+      if (!latest) return goOnAsNew(key)
+      const restored = savedDraftValues(latest)
+      draftSaver.cancel()
+      engine.forget(key)
+      serverRef.current = {
+        id: latest.id,
+        version: latest.version,
+        baseline: baselineOf(stepRef.current, restored.values),
+      }
+      setOnServer(true)
+      form.reset(restored.values)
+      if (restored.missingAttachments) {
+        toast.warning(t('wizard.draftAttachmentsMissing', { count: restored.missingAttachments }))
+      }
+    } catch (error) {
+      toast.error(errorText(error, t('errors.generic')))
+    } finally {
+      setResolving(null)
+    }
+  }
+
+  /* ---- deleting the draft ---- */
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
+  const [discarding, setDiscarding] = useState(false)
+  const discardDraft = useDiscardDraft()
+  const discard = async () => {
+    setDiscarding(true)
+    finished.current = true
+    draftSaver.cancel()
+    const key = keyRef.current
+    const entry = key ? getLocalDraft(userId, key) : undefined
+    const draftId = entry ? entry.draftId : serverRef.current?.id
+    try {
+      await discardDraft({ localId: key, draftId })
+      toast.success(t('wizard.discardDraft.done'))
+    } catch {
+      toast.error(t('wizard.discardDraft.failed'))
+    }
+    setConfirmDiscard(false)
+    // A fresh form for a new request (WizardSession starts one).
+    void navigate('/requests/new', { replace: true })
+  }
 
   // Move focus to the new question for screen readers and keep the top in view.
   // A layout effect, so focus moves before the step is painted: a passive effect
@@ -214,16 +593,23 @@ function WizardForm() {
       mounted.current = false
     }
   }, [])
+  /** The draft being submitted, as kept on this device */
+  const submittingKey = useRef<string | null>(null)
+  /** Waiting for the draft's save already on its way, before sending the request */
+  const [preparing, setPreparing] = useState(false)
   // Handled by the hook, so the draft is deleted and the outcome told even when
   // the person has left the wizard while the request was on its way.
   const create = useCreateRequest({
     onCreated: () => {
-      submitted.current = true
+      finished.current = true
       draftSaver.cancel()
-      clearDraft(user.id)
+      // The server deleted its copy with the submission; this device's goes too. A save still on
+      // its way that creates the draft again is deleted when it arrives (see settle in sync-core).
+      if (submittingKey.current) engine.forget(submittingKey.current)
       toast.success(t('wizard.review.submitted'))
     },
     onFailed: (e, body) => {
+      if (submittingKey.current) engine.release(submittingKey.current)
       const gone = missingAttachmentIds(e instanceof ApiError ? e.issues : undefined, body.attachmentIds)
       if (!gone.length || !mounted.current) {
         toast.error(errorText(e, t('errors.generic')))
@@ -240,38 +626,53 @@ function WizardForm() {
       })
     },
   })
-  const submit = () => {
-    create.mutate(toDraft(form.getValues()), {
-      onSuccess: (req) => navigate(`/requests/${req.id}`, { replace: true }),
-    })
+  const submitting = preparing || create.isPending
+  const submit = async () => {
+    if (submitting) return
+    setPreparing(true)
+    draftSaver.flush()
+    let key = keyRef.current
+    // A save already on its way finishes first (briefly), so the request names the account's draft
+    // and the server deletes it with the submission. Nothing new is sent for it meanwhile.
+    if (key) key = await engine.pause(key, DRAFT_SETTLE_TIMEOUT_MS)
+    submittingKey.current = key
+    const entry = key ? getLocalDraft(userId, key) : undefined
+    const draftId = entry ? entry.draftId : serverRef.current?.id
+    setPreparing(false)
+    create.mutate(
+      { ...toDraft(form.getValues()), ...(draftId ? { draftId } : {}) },
+      { onSuccess: (req) => navigate(`/requests/${req.id}`, { replace: true }) },
+    )
   }
 
-  /* ---- leaving with something written: confirm (the draft is kept either way) ---- */
-  // The form holds what the person signed in at opening wrote. When another tab signs in as someone
-  // else, this tab moves on without asking: the new person must not continue someone else's request.
-  const author = useRef(user.id)
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      currentLocation.pathname !== nextLocation.pathname &&
-      useSession.getState().user?.id === author.current &&
-      !submitted.current &&
-      // Leaving while it is sent is fine: the hook finishes the job.
-      !create.isPending &&
-      hasWrittenContent(form.getValues()),
-  )
-  useEffect(() => {
-    if (blocker.state === 'blocked') draftSaver.flush()
-  }, [blocker.state, draftSaver])
+  /* ---- leaving: free once the draft is kept somewhere; asked only when it is kept nowhere ---- */
+  /** Nothing would be lost: written on this device, or the account has it. */
+  const keptSomewhere = () => {
+    if (lastSave.current !== 'failed') return true
+    const key = keyRef.current
+    return Boolean(key && !getLocalDraft(userId, key) && serverRef.current)
+  }
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    if (currentLocation.pathname === nextLocation.pathname) return false
+    // Another tab signed in as someone else: this tab moves on without asking (the new person must
+    // not continue someone else's request).
+    if (useSession.getState().user?.id !== author.current) return false
+    // Leaving while it is sent is fine: the hook finishes the job.
+    if (finished.current || submitting) return false
+    draftSaver.flush()
+    return hasWrittenContent(form.getValues()) && !keptSomewhere()
+  })
   useEffect(() => {
     const onBeforeUnload = (event: BeforeUnloadEvent) => {
       draftSaver.flush()
       // A reload would also cut off a submission on its way.
-      if (submitted.current || (!create.isPending && !hasWrittenContent(form.getValues()))) return
-      event.preventDefault()
+      if (finished.current) return
+      if (submitting || (hasWrittenContent(form.getValues()) && !keptSomewhere())) event.preventDefault()
     }
     window.addEventListener('beforeunload', onBeforeUnload)
     return () => window.removeEventListener('beforeunload', onBeforeUnload)
-  }, [form, draftSaver, create.isPending])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `keptSomewhere` reads refs
+  }, [form, draftSaver, submitting])
 
   /* ---- navigation ---- */
   const next = async () => {
@@ -338,12 +739,26 @@ function WizardForm() {
           </span>
         </div>
 
+        <DraftStatusBar
+          state={saveState}
+          onDiscard={draftKey || onServer ? () => setConfirmDiscard(true) : undefined}
+        />
+        {saveState === 'conflict' ? (
+          <ConflictNotice
+            busy={resolving}
+            onKeepMine={() => void keepMine()}
+            onLoadSaved={() => void loadSaved()}
+          />
+        ) : saveState === 'limited' ? (
+          <LimitNotice />
+        ) : null}
+
         <form
           noValidate
-          className="pt-4 pb-32 md:pb-6"
+          className="pt-2 pb-32 md:pb-6"
           onSubmit={(e) => {
             e.preventDefault()
-            if (current.key === 'review') submit()
+            if (current.key === 'review') void submit()
             else void next()
           }}
         >
@@ -353,14 +768,8 @@ function WizardForm() {
           <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur md:static md:mt-8 md:border-0 md:bg-transparent md:p-0">
             <div className="mx-auto flex max-w-2xl gap-2">
               {current.key === 'review' ? (
-                <Button
-                  type="submit"
-                  size="lg"
-                  block
-                  loading={create.isPending}
-                  disabled={precheck.isPending}
-                >
-                  {create.isPending ? t('wizard.review.submitting') : t('wizard.review.submit')}
+                <Button type="submit" size="lg" block loading={submitting} disabled={precheck.isPending}>
+                  {submitting ? t('wizard.review.submitting') : t('wizard.review.submit')}
                 </Button>
               ) : (
                 <Button type="submit" size="lg" block>
@@ -378,13 +787,7 @@ function WizardForm() {
           if (!open && blocker.state === 'blocked') blocker.reset()
         }}
         title={t('wizard.leave.title')}
-        description={
-          lastSave === 'failed'
-            ? t('wizard.leave.unsaved')
-            : lastSave === 'withoutAttachments'
-              ? t('wizard.leave.savedWithoutAttachments')
-              : t('wizard.leave.saved')
-        }
+        description={t('wizard.leave.unsaved')}
         footer={
           <>
             <Button
@@ -401,6 +804,37 @@ function WizardForm() {
               onClick={() => blocker.state === 'blocked' && blocker.reset()}
             >
               {t('wizard.leave.stay')}
+            </Button>
+          </>
+        }
+      />
+
+      <Sheet
+        open={confirmDiscard}
+        onOpenChange={(open) => {
+          if (!open && !discarding) setConfirmDiscard(false)
+        }}
+        title={t('wizard.discardDraft.title')}
+        description={t('wizard.discardDraft.body')}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              size="lg"
+              className="flex-1"
+              disabled={discarding}
+              onClick={() => setConfirmDiscard(false)}
+            >
+              {t('common.cancel')}
+            </Button>
+            <Button
+              variant="danger"
+              size="lg"
+              className="flex-1"
+              loading={discarding}
+              onClick={() => void discard()}
+            >
+              {t('wizard.discardDraft.confirm')}
             </Button>
           </>
         }

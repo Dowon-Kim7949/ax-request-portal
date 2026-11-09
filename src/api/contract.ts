@@ -339,6 +339,8 @@ export const SavedDraftUpdate = named(
       .describe('The version the content was based on; 409 conflict when the draft has been saved since'),
   }),
 )
+export type SavedDraftInput = z.infer<typeof SavedDraftInput>
+export type SavedDraftUpdate = z.infer<typeof SavedDraftUpdate>
 
 const ProviderParam = z.object({ provider: AiProvider })
 

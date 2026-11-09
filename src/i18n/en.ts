@@ -231,14 +231,49 @@ const en: Messages = {
   wizard: {
     title: 'New request',
     step: '{{current}}/{{total}}',
-    draftRestored: 'We restored the request you were writing.',
-    discard: 'Start over',
     draftNotSaved:
-      'There is not enough storage to keep a draft on this device. Please keep this screen open until you submit.',
+      'There is not enough storage to keep a draft on this device. Please keep this screen open until it is saved to your account.',
     draftWithoutAttachments:
-      'There is not enough storage on this device, so the draft was saved without its attachments.',
+      'There is not enough storage on this device, so its copy leaves out the attachments. Your account keeps them.',
     draftAttachmentsDropped:
       'Some attachments in your draft could not be restored. Please upload them again: {{names}}',
+    draftAttachmentsMissing:
+      'Attachments in your draft that could not be found: {{count}}. Please upload them again.',
+    loadingDraft: 'Opening your draft…',
+    draftGone:
+      'This draft was deleted or submitted somewhere else. What is on this screen will be saved as a new draft.',
+    notFound: {
+      title: 'Draft not found',
+      body: 'It may have been deleted on another device, or already submitted.',
+      drafts: 'Open saved drafts',
+      newRequest: 'Write a new request',
+    },
+    save: {
+      saving: 'Saving…',
+      saved: 'Saved to your account',
+      local: 'Saved on this device only · uploads once you are online',
+      limited: 'Saved on this device only',
+      conflict: 'Save conflict',
+    },
+    conflict: {
+      title: 'This draft was saved somewhere else first',
+      body: 'What is on this screen is still here. Choose which to keep.',
+      keepMine: 'Save what is on this screen',
+      loadSaved: 'Load the saved version',
+    },
+    limit: {
+      body: 'Your saved drafts are full (up to {{max}}). Delete another draft and this one will be saved to your account.',
+      drafts: 'Saved drafts',
+    },
+    discardDraft: {
+      button: 'Delete draft',
+      title: 'Delete this draft?',
+      body: 'It will be deleted from this device and your account, and cannot be brought back.',
+      confirm: 'Delete',
+      done: 'Draft deleted.',
+      failed:
+        'The draft in your account could not be deleted. Please delete it again from your saved drafts.',
+    },
     sendingEarlier: {
       title: 'Sending the request you submitted earlier…',
       body: 'You can start a new request once it has gone through.',
@@ -252,11 +287,8 @@ const en: Messages = {
     },
     leave: {
       title: 'Leave this request for now?',
-      saved:
-        'What you have written is saved as a draft. Open a new request again to pick up where you left off.',
-      savedWithoutAttachments:
-        'Your text is saved as a draft, but the attachments could not be saved. When you come back, upload them again.',
-      unsaved: 'The draft could not be saved, so leaving will lose what you have written.',
+      unsaved:
+        'The draft could not be saved on this device or to your account, so leaving will lose what you have written.',
       stay: 'Keep writing',
       go: 'Leave',
     },

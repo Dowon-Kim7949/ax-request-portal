@@ -1,41 +1,38 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
+import type { SavedDraft } from '@/api/contract'
 import {
+  draftContentOf,
   EMPTY_ROW,
   EMPTY_VALUES,
   firstInvalidStep,
   hasWrittenContent,
-  loadDraft,
   missingAttachmentIds,
   parseChecklist,
-  restoreDraft,
-  saveDraft,
+  readDraftValues,
+  savedDraftValues,
   STEPS,
   toDraft,
+  toDraftContent,
 } from './schema'
 
-describe('draft storage', () => {
-  const userId = 'u-draft-test'
-  const photo = {
-    id: 'att-1',
-    name: 'screen.png',
-    size: 120_000,
-    mimeType: 'image/png',
-    url: `data:image/png;base64,${'A'.repeat(64)}`,
-  }
-  afterEach(() => {
-    vi.restoreAllMocks()
-    localStorage.clear()
-  })
+const photo = {
+  id: 'att-1',
+  name: 'screen.png',
+  size: 120_000,
+  mimeType: 'image/png',
+  url: `data:image/png;base64,${'A'.repeat(64)}`,
+}
 
-  it('keeps the words without the attachments when storage is full', () => {
-    const original = Storage.prototype.setItem
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(function (this: Storage, key, value) {
-      if (value.includes('data:')) throw new DOMException('full', 'QuotaExceededError')
-      original.call(this, key, value)
+describe('reading a draft kept on this device', () => {
+  it('fills what a half-written draft leaves out', () => {
+    expect(readDraftValues({ title: '사진이 안 올라감' })?.values).toEqual({
+      ...EMPTY_VALUES,
+      title: '사진이 안 올라감',
     })
-    const values = { ...EMPTY_VALUES, title: '사진이 안 올라감', attachments: [photo] }
-    expect(saveDraft(userId, values)).toBe('withoutAttachments')
-    expect(loadDraft(userId)).toMatchObject({ title: '사진이 안 올라감', attachments: [] })
+    expect(readDraftValues({ acceptanceCriteria: [], checklist: [] })?.values).toMatchObject({
+      acceptanceCriteria: [{ text: '' }],
+      checklist: [EMPTY_ROW],
+    })
   })
 
   it('drops only the attachments whose URL is no longer accepted, and keeps the words', () => {
@@ -47,30 +44,72 @@ describe('draft storage', () => {
       mimeType: 'text/plain',
       url: 'data:text/plain;base64,QQ==',
     }
-    localStorage.setItem(
-      `ax-request-portal:draft:${userId}`,
-      JSON.stringify({ ...EMPTY_VALUES, title: '사진이 안 올라감', attachments: [photo, note] }),
-    )
-    const restored = restoreDraft(userId)
+    const restored = readDraftValues({
+      ...EMPTY_VALUES,
+      title: '사진이 안 올라감',
+      attachments: [photo, note],
+    })
     expect(restored?.values).toMatchObject({ title: '사진이 안 올라감', attachments: [photo] })
     expect(restored?.droppedAttachments).toEqual(['note.txt'])
   })
 
+  it('takes an attachment kept without its file from the account’s copy when it has it', () => {
+    // Written while storage was full: the attachment is there, its data is not.
+    const kept = readDraftValues({ title: '사진', attachments: [{ ...photo, url: '' }] }, [photo])
+    expect(kept?.values.attachments).toEqual([photo])
+    expect(kept?.droppedAttachments).toEqual([])
+    expect(
+      readDraftValues({ title: '사진', attachments: [{ ...photo, url: '' }] })?.droppedAttachments,
+    ).toEqual(['screen.png'])
+  })
+
   it('still drops a draft that is not a draft at all', () => {
-    localStorage.setItem(`ax-request-portal:draft:${userId}`, JSON.stringify({ title: 42 }))
-    expect(restoreDraft(userId)).toBeNull()
-    localStorage.setItem(`ax-request-portal:draft:${userId}`, '{not json')
-    expect(restoreDraft(userId)).toBeNull()
+    expect(readDraftValues({ title: 42 })).toBeNull()
+    expect(readDraftValues('{not json')).toBeNull()
+    expect(readDraftValues(null)).toBeNull()
+  })
+})
+
+describe('the account’s copy of a draft', () => {
+  it('keeps attachments by id, and every id when this device could not keep the file', () => {
+    const values = { ...EMPTY_VALUES, title: '제목', attachments: [photo] }
+    expect(toDraftContent(values)).toMatchObject({ title: '제목', attachmentIds: ['att-1'] })
+    expect(toDraftContent(values)).not.toHaveProperty('attachments')
+    expect(draftContentOf({ ...values, attachments: [{ ...photo, url: '' }] })?.attachmentIds).toEqual([
+      'att-1',
+    ])
+    expect(draftContentOf({ title: 42 })).toBeNull()
   })
 
-  it('reports a draft it could not keep at all', () => {
-    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
-      throw new DOMException('full', 'QuotaExceededError')
+  it('cuts what would not fit the contract instead of being refused', () => {
+    const content = toDraftContent({
+      ...EMPTY_VALUES,
+      title: 'a'.repeat(12_000),
+      targetIds: Array(60).fill('t'),
     })
-    expect(saveDraft(userId, { ...EMPTY_VALUES, title: '제목', attachments: [photo] })).toBe('failed')
-    expect(saveDraft(userId, { ...EMPTY_VALUES, title: '제목' })).toBe('failed')
+    expect(content.title).toHaveLength(10_000)
+    expect(content.targetIds).toHaveLength(50)
   })
 
+  it('reads the account’s copy back, counting attachments that no longer exist', () => {
+    const saved: SavedDraft = {
+      id: 'draft-1',
+      title: '제목',
+      step: 3,
+      attachmentCount: 1,
+      version: 2,
+      createdAt: '2026-11-09T01:00:00.000Z',
+      updatedAt: '2026-11-09T01:00:00.000Z',
+      content: { title: '제목', attachmentIds: ['att-1', 'att-gone', 'att-1'] },
+      attachments: [photo],
+    }
+    const restored = savedDraftValues(saved)
+    expect(restored.values).toEqual({ ...EMPTY_VALUES, title: '제목', attachments: [photo] })
+    expect(restored.missingAttachments).toBe(1)
+  })
+})
+
+describe('what is worth keeping', () => {
   it('counts only what was written, not one-tap choices, as worth asking about', () => {
     expect(hasWrittenContent(EMPTY_VALUES)).toBe(false)
     expect(
