@@ -199,7 +199,7 @@ docs/          openapi.json, README images, llm-wiki/ (agent knowledge base)
 
 ## Quality gates
 
-- `npm run verify`: oxlint with warnings as errors, Prettier, strict TypeScript (`noUncheckedIndexedAccess`), 611 unit tests (including WCAG contrast in both themes and dictionary parity), production build.
+- `npm run verify`: oxlint with warnings as errors, Prettier, strict TypeScript (`noUncheckedIndexedAccess`), 612 unit tests (including WCAG contrast in both themes and dictionary parity), production build.
 - E2E: 253 tests on phone, tablet and desktop, including the skip link and reduced motion. Every flow runs on all three. Every main screen of every role is checked at 320 px (in both languages) and on a landscape tablet. Separate runs walk each role's screens in English, failing on any leftover Korean, and in dark mode. Horizontal overflow is checked after data has loaded.
 - CI runs verify, e2e, the nginx check and the LLM-WIKI checks on every push and pull request. Dependabot keeps dependencies and actions current.
 

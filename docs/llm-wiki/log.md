@@ -24,6 +24,23 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-09 - Fix: Korean day periods on older locale data; a draft-sync test race
+
+- status: needs_review
+- actor: claude-code
+- scope: code, docs
+- changed:
+  - src/lib/format.ts, src/lib/format.test.ts
+  - src/features/drafts/sync-engine.test.ts
+  - docs/llm-wiki/ARCHITECTURE_CONVENTIONS.md
+- summary:
+  - `formatDateTime` maps the Korean day period to 오전 / 오후 through `formatToParts`, because CLDR 47 data (Node 22 and 24, Playwright's WebKit, browsers built on it) writes AM / PM. CI failed on that for Node 22.22.2, 24.15.0 and the phone and tablet E2E projects.
+  - The sync-engine test API counts a delete once the server has answered, so a test that waits for it reads the account after the delete.
+- evidence:
+  - A test that feeds the old data's AM / PM fails without the mapping and passes with it; npx vitest run passes (57 files / 612 tests).
+- caveats:
+  - Only the Korean day period is mapped; other locale-data differences are not normalised.
+
 ## 2026-11-09 - Saved drafts on every home that may file requests; list step names; no unused draft hooks
 
 - status: needs_review
