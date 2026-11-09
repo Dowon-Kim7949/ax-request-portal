@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import i18n from '@/i18n'
 import { usePreferences } from '@/stores/preferences'
 import {
@@ -32,6 +32,42 @@ describe('timestamps', () => {
     expect(formatDateTime(AT, { timeZone: SEOUL })).toBe('11월 5일 오전 11:00')
     usePreferences.setState({ timeZone: 'America/New_York' })
     expect(formatDateTime(AT)).toBe('11월 4일 오후 9:00')
+  })
+
+  it('say 오전 / 오후 in Korean even where the locale data says AM / PM', async () => {
+    // CLDR 47 (Node 22 and 24, some browsers) writes Korean day periods as AM / PM.
+    const realParts = Intl.DateTimeFormat.prototype.formatToParts
+    const oldData = function (this: Intl.DateTimeFormat, date?: Date | number) {
+      return realParts
+        .call(this, date)
+        .map((p) =>
+          p.type === 'dayPeriod' && this.resolvedOptions().locale.startsWith('ko')
+            ? { ...p, value: p.value === '오전' ? 'AM' : p.value === '오후' ? 'PM' : p.value }
+            : p,
+        )
+    }
+    const parts = vi.spyOn(Intl.DateTimeFormat.prototype, 'formatToParts').mockImplementation(oldData)
+    // `format` is a getter that returns a bound function (the DOM types call it a method).
+    // (vitest spies on getters only of non-function properties, hence `unknown`.)
+    const proto = Intl.DateTimeFormat.prototype as unknown as { format: unknown }
+    const whole = vi.spyOn(proto, 'format', 'get').mockImplementation(function (this: Intl.DateTimeFormat) {
+      return (date?: Date | number) =>
+        oldData
+          .call(this, date)
+          .map((p) => p.value)
+          .join('')
+    })
+    try {
+      expect(formatDateTime(AT, { timeZone: LA })).toBe('11월 4일 오후 6:00')
+      expect(formatDateTime(AT, { timeZone: SEOUL })).toBe('11월 5일 오전 11:00')
+      // English keeps the locale's own words.
+      await i18n.changeLanguage('en')
+      expect(formatDateTime(AT, { timeZone: LA })).toMatch(/^Nov 4, 6:00\sPM$/)
+    } finally {
+      parts.mockRestore()
+      whole.mockRestore()
+      await i18n.changeLanguage('ko')
+    }
   })
 
   it('add the zone and head-office time when the clock differs', () => {

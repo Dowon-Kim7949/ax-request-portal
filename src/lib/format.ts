@@ -78,15 +78,28 @@ export function formatDate(
   }).format(calendarInstant(calendar))
 }
 
+/**
+ * Korean morning and afternoon. Some locale data (CLDR 47: Node 22 and 24, and
+ * browsers built on it) writes Korean times with "AM" / "PM"; Korean readers
+ * and newer data use 오전 / 오후, so every browser shows the same words.
+ */
+const KO_DAY_PERIOD: Readonly<Record<string, string>> = { AM: '오전', PM: '오후' }
+
 /** ISO timestamp → "11월 2일 오후 3:04" / "Nov 2, 3:04 PM", in the viewer's time zone */
 export function formatDateTime(iso: string, opts: { timeZone?: string } = {}): string {
-  return dateTimeFormat({
+  const format = dateTimeFormat({
     timeZone: opts.timeZone ?? currentTimeView().timeZone,
     month: currentLocale() === 'ko' ? 'long' : 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
-  }).format(new Date(iso))
+  })
+  const date = new Date(iso)
+  if (currentLocale() !== 'ko') return format.format(date)
+  return format
+    .formatToParts(date)
+    .map((p) => (p.type === 'dayPeriod' ? (KO_DAY_PERIOD[p.value] ?? p.value) : p.value))
+    .join('')
 }
 
 /** A timestamp spelled out for a detail screen. */
