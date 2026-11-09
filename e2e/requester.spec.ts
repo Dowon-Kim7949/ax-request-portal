@@ -1,5 +1,11 @@
 import { expect, test } from './fixtures.ts'
-import { expectNoHorizontalScroll, expectSignedIn, loginAs, openInApp } from './helpers.ts'
+import {
+  COLD_START_TIMEOUT,
+  expectNoHorizontalScroll,
+  expectSignedIn,
+  loginAs,
+  openInApp,
+} from './helpers.ts'
 
 test('requester files a request through the wizard', async ({ page }) => {
   await loginAs(page, '요청자')
@@ -54,9 +60,16 @@ test('wizard draft survives a reload', async ({ page }) => {
   await page.getByRole('button', { name: '다음' }).click()
   await page.getByLabel('요청 제목').fill('사진이 가끔 안 올라감')
   await expect(page.getByLabel('요청 제목')).toHaveValue('사진이 가끔 안 올라감')
+  // Saved to the account a moment after typing stops; the address names the draft, the step stays.
+  await expect(page.getByText('계정에 저장됨')).toBeVisible()
+  await expect(page).toHaveURL((url) => /^draft-/.test(url.searchParams.get('draft') ?? ''))
+  const saved = page.url()
   await page.reload()
-  await expect(page.getByText('작성 중이던 요청서를 불러왔어요.')).toBeVisible()
-  await expect(page.getByLabel('요청 제목')).toHaveValue('사진이 가끔 안 올라감')
+  await expect(page.getByLabel('요청 제목')).toHaveValue('사진이 가끔 안 올라감', {
+    timeout: COLD_START_TIMEOUT,
+  })
+  expect(page.url()).toBe(saved)
+  await expectNoHorizontalScroll(page)
 })
 
 test('requester checks the result against the acceptance criteria', async ({ page }) => {
