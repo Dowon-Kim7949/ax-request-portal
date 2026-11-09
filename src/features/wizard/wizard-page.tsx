@@ -52,7 +52,14 @@ import {
   type FormStart,
   type ServerCopy,
 } from './draft-opening'
-import { ConflictNotice, DRAFTS_LIST_PATH, DraftStatusBar, LimitNotice } from './draft-status'
+import {
+  CONFLICT_NOTICE_TEXT,
+  ConflictNotice,
+  DRAFTS_LIST_PATH,
+  DraftStatusBar,
+  LIMIT_NOTICE_TEXT,
+  LimitNotice,
+} from './draft-status'
 import {
   adviceByField,
   DRAFT_SAVE_DELAY_MS,
@@ -67,6 +74,7 @@ import {
   WizardSchema,
   type WizardValues,
 } from './schema'
+import { StepNotice } from './step-notice'
 import {
   CriteriaStep,
   DescribeStep,
@@ -858,7 +866,17 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
             else void next()
           }}
         >
-          <div ref={titleRef}>{body}</div>
+          <StepNotice.Provider
+            value={
+              saveState === 'conflict'
+                ? CONFLICT_NOTICE_TEXT
+                : saveState === 'limited'
+                  ? LIMIT_NOTICE_TEXT
+                  : undefined
+            }
+          >
+            <div ref={titleRef}>{body}</div>
+          </StepNotice.Provider>
 
           {/* actions: pinned to the bottom on phones (tab bar is hidden here), inline from md */}
           <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur md:static md:mt-8 md:border-0 md:bg-transparent md:p-0">

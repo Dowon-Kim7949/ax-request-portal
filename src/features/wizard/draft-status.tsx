@@ -11,7 +11,7 @@ import {
   Trash2,
   TriangleAlert,
 } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,10 @@ import { cn } from '@/lib/cn'
 export const DRAFTS_SECTION_ID = 'drafts'
 /** The saved drafts on the person's requests page (src/features/requests). */
 export const DRAFTS_LIST_PATH = `/requests#${DRAFTS_SECTION_ID}`
+
+/** What describes the step's heading while a notice is shown (see StepNotice in steps.tsx). */
+export const CONFLICT_NOTICE_TEXT = 'draft-conflict-title draft-conflict-body'
+export const LIMIT_NOTICE_TEXT = 'draft-limit-body'
 
 const ICONS = {
   saving: CloudUpload,
@@ -41,9 +45,10 @@ const URGENT: ReadonlySet<DraftSaveState> = new Set(['unsaved', 'conflict'])
  * One line: the save state on the left, "delete draft" on the right once
  * there is something to delete. Screen readers are not told about every save,
  * only when the draft stops reaching the account (no connection, a full
- * account, a conflict). Before anything is saved the line can hold `idle`
- * instead (the drafts to continue), so the form does not move once the save
- * state takes its place.
+ * account, a conflict), once: a save on its way in between (every pause in
+ * typing while offline) does not tell it again. Before anything is saved the
+ * line can hold `idle` instead (the drafts to continue), so the form does not
+ * move once the save state takes its place.
  */
 export function DraftStatusBar({
   state,
@@ -57,8 +62,17 @@ export function DraftStatusBar({
   idle?: ReactNode
 }) {
   const { t } = useTranslation()
-  // Read out on the way into these states only; every other state empties the region.
-  const announcement = state && ALERTS.has(state) ? t(`wizard.save.${state}`) : ''
+  // The state apart from a save on its way, told through the live region: written after the region
+  // is on the page (one that arrives with its words is not read), emptied for a state that needs
+  // nothing, and left alone while it stays the same.
+  const settled = state === 'saving' ? undefined : state
+  const region = useRef<HTMLParagraphElement>(null)
+  const told = useRef<DraftSaveState | null>(null)
+  useEffect(() => {
+    if (settled === undefined || settled === told.current || !region.current) return
+    told.current = settled
+    region.current.textContent = settled && ALERTS.has(settled) ? t(`wizard.save.${settled}`) : ''
+  }, [settled, t])
   const Icon = state ? ICONS[state] : null
   return (
     <div className="flex min-h-11 items-center justify-between gap-2 pt-1">
@@ -75,9 +89,8 @@ export function DraftStatusBar({
       ) : (
         idle
       )}
-      <p className="sr-only" aria-live="polite">
-        {announcement}
-      </p>
+      {/* Written by the effect above, not rendered: React leaves its text alone. */}
+      <p ref={region} className="sr-only" aria-live="polite" />
       {onDiscard ? (
         <Button variant="ghost" className="-mr-3 shrink-0 text-sm text-ink-500" onClick={onDiscard}>
           <Trash2 aria-hidden />
@@ -115,7 +128,9 @@ export function ConflictNotice({
           <p id="draft-conflict-title" className="font-bold">
             {t('wizard.conflict.title')}
           </p>
-          <p className="text-sm">{t('wizard.conflict.body')}</p>
+          <p id="draft-conflict-body" className="text-sm">
+            {t('wizard.conflict.body')}
+          </p>
         </div>
       </div>
       <div className="flex flex-col gap-2 sm:flex-row">
@@ -142,7 +157,7 @@ export function LimitNotice() {
   return (
     <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-muted px-4 py-3 ring-1 ring-line">
       <Smartphone className="size-5 shrink-0 text-ink-500" aria-hidden />
-      <p className="min-w-0 flex-1 text-sm text-ink-700">
+      <p id="draft-limit-body" className="min-w-0 flex-1 text-sm text-ink-700">
         {t('wizard.limit.body', { max: appConfig.drafts.maxPerAccount })}
       </p>
       <Button asChild variant="secondary">

@@ -381,6 +381,19 @@ describe('the draft in the account', () => {
       return { draft, router }
     }
 
+    it('tells a screen reader about it from the heading that takes focus as the draft opens', async () => {
+      await openConflict()
+      const heading = screen.getByRole('heading', { level: 1 })
+      expect(heading).toHaveFocus()
+      expect(heading).toHaveAccessibleDescription(
+        '다른 곳에서 이 초안이 먼저 저장됐어요 이 화면의 내용은 그대로 있어요. 어느 쪽을 남길지 골라 주세요.',
+      )
+      // The live region is written after it is on the page, so it is read too.
+      await waitFor(() =>
+        expect(document.querySelector('[aria-live="polite"]')).toHaveTextContent('저장 충돌'),
+      )
+    })
+
     it('keeps what is on screen, saved over the newer version', async () => {
       const { draft } = await openConflict()
       await userEvent.click(screen.getByRole('button', { name: '이 화면 내용으로 저장' }))
@@ -446,6 +459,7 @@ describe('the draft in the account', () => {
     expect(screen.getByText('이 기기에만 저장됨', STATUS)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '임시 저장함' })).toHaveAttribute('href', '/requests#drafts')
     expect(getLocalDraft(USER, LOCAL)).toMatchObject({ limited: true })
+    expect(screen.getByRole('heading', { level: 1 })).toHaveAccessibleDescription(/임시 저장함이 가득 찼어요/)
   })
 
   it('stays as it is while typing goes on in a draft the account has no room for', async () => {
@@ -505,8 +519,25 @@ describe('the draft in the account', () => {
       await screen.findByText('이 기기에만 저장됨 · 연결되면 올려요', STATUS, SYNCED),
     ).toBeInTheDocument()
     // Told once, as it changes; not on every save.
-    expect(document.querySelector('[aria-live="polite"]')).toHaveTextContent('이 기기에만 저장됨')
+    const region = document.querySelector('[aria-live="polite"]')!
+    expect(region).toHaveTextContent('이 기기에만 저장됨')
     expect(getLocalDraft(USER, LOCAL)).toBeDefined()
+
+    // Every pause in typing tries again, and fails again: the region is not written again.
+    const changes: MutationRecord[] = []
+    const observer = new MutationObserver((records) => changes.push(...records))
+    observer.observe(region, { subtree: true, childList: true, characterData: true })
+    try {
+      await userEvent.type(screen.getByLabelText('요청 제목'), ' 더')
+      expect(await screen.findByText('저장 중…', STATUS)).toBeInTheDocument()
+      expect(
+        await screen.findByText('이 기기에만 저장됨 · 연결되면 올려요', STATUS, SYNCED),
+      ).toBeInTheDocument()
+    } finally {
+      observer.disconnect()
+    }
+    expect(changes).toEqual([])
+    expect(region).toHaveTextContent('이 기기에만 저장됨')
   })
 
   it('deletes the draft here and in the account, after asking', async () => {

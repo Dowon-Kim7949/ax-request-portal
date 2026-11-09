@@ -1,5 +1,5 @@
 import { Check, CircleAlert, FileText, ImagePlus, Paperclip, Plus, Sparkles, Trash2, X } from 'lucide-react'
-import { useRef, useState, type ReactNode } from 'react'
+import { useContext, useRef, useState, type ReactNode } from 'react'
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -17,13 +17,16 @@ import { cn } from '@/lib/cn'
 import { formatBytes, formatDate } from '@/lib/format'
 import { hqToday } from '@/lib/time-zone'
 import { EMPTY_ROW, parseChecklist, STEPS, stepOfField, type WizardValues } from './schema'
+import { StepNotice } from './step-notice'
 
 export function StepTitle({ children, hint }: { children: ReactNode; hint?: ReactNode }) {
+  const notice = useContext(StepNotice)
   return (
     <div className="mb-6 flex flex-col gap-2">
       <h1
         className="text-[24px] leading-snug font-bold tracking-tight outline-none sm:text-[28px]"
         tabIndex={-1}
+        aria-describedby={notice}
         data-step-title
       >
         {children}
