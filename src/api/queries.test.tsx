@@ -174,7 +174,7 @@ describe('saved drafts', () => {
     await call(api.deleteDraft, { params: { id: saved.id } })
   })
 
-  it('keeps a new draft as the open copy and reads the list again', async () => {
+  it('keeps a new draft as the open copy, lists it at once and reads the list again', async () => {
     const { qc, wrapper } = setup()
     await primeList(qc)
     const { result } = renderHook(() => useCreateDraft(), { wrapper })
@@ -183,6 +183,9 @@ describe('saved drafts', () => {
 
     const saved = result.current.data!
     expect(qc.getQueryData<SavedDraft>(keys.draft(saved.id))).toEqual(saved)
+    // In the list before it is read again (the sync deletes this device's copy in the same moment).
+    const { content: _content, attachments: _attachments, ...summary } = saved
+    expect(qc.getQueryData<SavedDraftSummary[]>(keys.drafts())?.[0]).toEqual(summary)
     expect(qc.getQueryState(keys.drafts())?.isInvalidated).toBe(true)
     await call(api.deleteDraft, { params: { id: saved.id } })
   })

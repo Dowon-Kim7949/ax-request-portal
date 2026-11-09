@@ -227,9 +227,22 @@ export const DRAFT_MUTATION_KEY = ['drafts'] as const
  */
 const draftScope = (id: string) => ({ id: `draft:${id}` })
 
-/** After a draft was saved (here or by the draft sync): the open copy is the answer, and the list is read again. */
+/**
+ * After a draft was saved (here or by the draft sync): the open copy is the
+ * answer, and so is its line in the list, at once (the device's own copy may
+ * be deleted in the same moment, and the list must not lose the draft until
+ * it is read again). Then the list is read again.
+ */
 export function storeSavedDraft(qc: QueryClient, draft: SavedDraft) {
   qc.setQueryData(keys.draft(draft.id), draft)
+  const { content: _content, attachments: _attachments, ...summary } = draft
+  qc.setQueryData<SavedDraftSummary[]>(keys.drafts(), (list) =>
+    list
+      ? [summary, ...list.filter((d) => d.id !== draft.id)].sort(
+          (a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt),
+        )
+      : list,
+  )
   void qc.invalidateQueries({ queryKey: keys.drafts() })
 }
 
