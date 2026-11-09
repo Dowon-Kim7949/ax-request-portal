@@ -135,6 +135,11 @@ export function describeDateTime(iso: string, view: TimeView = currentTimeView()
   }
 }
 
+/** YYYY-MM-DD → its weekday: "월" / "Mon" (short), "월요일" / "Monday" (long) */
+export function formatWeekday(date: string, width: 'short' | 'long' = 'short'): string {
+  return dateTimeFormat({ timeZone: 'UTC', weekday: width }).format(calendarInstant(date))
+}
+
 /** YYYY-MM → "2026년 10월" / "October 2026" */
 export function formatMonth(month: string): string {
   return dateTimeFormat({ timeZone: 'UTC', year: 'numeric', month: 'long' }).format(

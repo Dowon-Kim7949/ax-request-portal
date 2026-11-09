@@ -24,6 +24,46 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-09 - Docs: cite formatKrw by line range in AI Operations
+
+- status: needs_review
+- actor: claude-code
+- scope: docs
+- changed:
+  - docs/llm-wiki/domains/13_ops.md
+- summary:
+  - `13_ops.md` cited `src/lib/format.ts#symbol:formatKrw`, which `impact.source_changed` reads as the whole file, so any new formatter made it stale. It now cites `src/lib/format.ts#L162-L175`, compared region by region.
+- evidence:
+  - CI's wiki gate failed on PR #15 after a stamp-only re-approval left the document unchanged against main; `npx llm-wiki validate --strict --agent claude` and `impact --since main` pass after this change.
+- caveats:
+  - A line range moves when code above it changes; keep it on `formatKrw` when `format.ts` is edited above line 162.
+
+## 2026-11-09 - Feature: a month view for the release schedule
+
+- status: needs_review
+- actor: claude-code
+- scope: code, tests, docs
+- changed:
+  - src/features/schedule/schedule-page.tsx, src/features/schedule/month-view.tsx, src/features/schedule/month-grid.ts
+  - src/features/schedule/schedule-page.test.tsx, src/features/schedule/month-grid.test.ts
+  - src/lib/use-media-query.ts, src/lib/format.ts (`formatWeekday`), src/lib/format.test.ts
+  - src/i18n/ko.ts, src/i18n/en.ts (`schedule.view*`, month navigation, `emptyMonth`, `more`, `less`)
+  - e2e/schedule.spec.ts (new), e2e/axe.spec.ts and e2e/layout.spec.ts (`/schedule?view=month` visited)
+  - docs/llm-wiki/domains/09_schedule.md, WCAG.md, E2E_WORKFLOWS.md, DOMAIN_FEATURES.md, ARCHITECTURE_CONVENTIONS.md, GLOSSARY.md, domains/13_ops.md
+- summary:
+  - `/schedule` switches between the date list and a Sunday-first month table with `?view=month` (and `?month=YYYY-MM`), replacing the history entry. The month view loads exactly its grid's range from `GET /releases`; no contract change.
+  - The month view exists from the `md` breakpoint up (`useMediaQuery(TABLET_UP)`); phones keep the list, even from a month link.
+  - Days are head-office calendar days; a busy day folds after two releases behind an "N more" button.
+- evidence:
+  - Red: `schedule-page.test.tsx` could not load before `month-view.tsx` existed. Green: schedule unit tests 13/13; `npm run verify` passes (59 files / 625 tests, build, real-backend build check).
+  - Scoped E2E (as agreed: only the screens worked on): `schedule.spec.ts` on phone, tablet and desktop, `axe.spec.ts` "requester screens" light and dark on phone and desktop, `layout.spec.ts` requester routes at 320 px (Korean and English) and on a landscape tablet — 10 passed.
+- caveats:
+  - The full E2E suite was not run locally; CI runs it.
+  - `domains/13_ops.md` and `GLOSSARY.md` cite `src/lib/format.ts` as a whole file, so adding `formatWeekday` made them stale for `impact.source_changed`. 13_ops is moved back to `needs_review` with no content change; GLOSSARY gained one example. Both need a person's re-approval.
+  - `schedule.spec.ts` fixes the head-office zone to `Asia/Seoul`, the template's `organization.timeZone`.
+- review notes:
+  - Re-review the Views section of 09_schedule.md, the month-view bullets in WCAG.md and the new rows in E2E_WORKFLOWS.md against the code, then approve the seven documents with `npx llm-wiki review --approve <path>`.
+
 ## 2026-11-09 - Fix: Korean day periods on older locale data; a draft-sync test race
 
 - status: needs_review

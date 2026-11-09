@@ -90,7 +90,10 @@ evidence:
   - src/lib/time-zone.ts#symbol:sameOffset
   - src/lib/time-zone.ts#symbol:dateInTimeZone
   - src/lib/format.ts#symbol:formatDate
+  - src/lib/format.ts#symbol:formatWeekday
   - src/lib/format.ts#symbol:describeDateTime
+  - src/lib/use-media-query.ts#symbol:useMediaQuery
+  - src/lib/format.test.ts
   - src/components/ui/date-time.tsx#symbol:DateTimeText
   - src/mocks/engine.ts#symbol:businessDate
   - src/i18n/index.ts#symbol:initialLocale
@@ -133,7 +136,7 @@ A front-end-only SPA whose backend is a contract. One table of endpoints (`src/a
 | `src/api/` | `contract.ts` (endpoint table), `client.ts` (fetch), `query-client.ts` (retry and logging), `queries.ts` (TanStack Query hooks), `refresh.ts`, `error-text.ts`, `openapi.ts` | `domain` |
 | `src/mocks/` | MSW handlers, `MockEngine` (rules + state), persistence, seed, localized server texts, mock AI; `signals.ts` (window events for the app) | `domain`, `api/contract`, `lib/time-zone` |
 | `src/config/` | `app.config.ts` (validated template settings), `env.ts` (build-time variables), `env-check.ts` (build-setting rules), `nginx-csp.ts`, `zod-jitless.ts` | `domain`, `i18n/locales` |
-| `src/lib/` | Formatting (`format.ts`), time zones (`time-zone.ts`, no UI state, also used by the mock), small helpers (`abort.ts`, `debounce.ts`, `data-url.ts`) | `config`, `i18n`, `stores` (`format.ts` only) |
+| `src/lib/` | Formatting (`format.ts`), time zones (`time-zone.ts`, no UI state, also used by the mock), small helpers (`abort.ts`, `debounce.ts`, `data-url.ts`, `use-media-query.ts`: `useMediaQuery` and `TABLET_UP`, the `md` breakpoint for a view that needs a tablet's width) | `config`, `i18n`, `stores` (`format.ts` only) |
 | `src/app/` | Router, guards, session sync, shell and navigation, theme, page helpers, demo banner and demo-data signals, time-zone hooks | everything below |
 | `src/features/<domain>/` | Pages and page-specific components, one folder per domain; `drafts/` has no page: the draft sync engine (`sync-core.ts` rules, `sync-engine.ts` without React, `sync.ts` wiring, `hooks.ts`) and the saved-drafts section the home, requests and wizard screens render | `app`, `api`, `components`, `domain`, `stores` |
 | `src/components/` | Shared UI (`ui/`) and request widgets (`request/`) | `domain` types, `lib` |
@@ -186,7 +189,7 @@ A route that fails to load or render ends on `RouteErrorPage` (`RouteErrorView`)
 Two clocks matter ([Glossary](GLOSSARY.md)):
 
 - **Timestamps** (ISO instants: when something happened) show in the viewing time zone: the one chosen in Settings, otherwise the device's (`Intl`; never an IP lookup). `describeDateTime` and `DateTimeText` add the zone abbreviation and head-office time only when the viewer's clock differs from the head office's at that instant (`sameOffset`): a different zone name with the same offset adds nothing. `DateTimeText` renders `<time dateTime>` and keeps the translated sentence's word order. In Korean, `formatDateTime` always writes 오전 / 오후: some locale data (CLDR 47, used by Node 22 and 24 and by browsers built on it) writes Korean day periods as AM / PM, so tests and screens do not depend on the runtime's data.
-- **Date-only values** (`YYYY-MM-DD`: desired dates, scheduled release dates) are calendar dates. `formatDate` formats them as a UTC midnight in UTC, so they never move to another day in any time zone. Do not parse them with `new Date()` and format them in the local zone.
+- **Date-only values** (`YYYY-MM-DD`: desired dates, scheduled release dates) are calendar dates. `formatDate` and `formatWeekday` format them as a UTC midnight in UTC, so they never move to another day in any time zone; date arithmetic (`addDays`, the schedule's `monthWeeks`) works on the strings in UTC too. Do not parse them with `new Date()` and format them in the local zone.
 - **"Today" and day or month totals** follow the head office's business calendar, `appConfig.organization.timeZone`: `hqToday()` in the UI (date-input minimums, the schedule's today and this week, the current month of the dashboard, usage and budget), and `businessDate` / `engine.today(now)` / `engine.dateOf(at)` in the mock (`EngineOptions.timeZone`, default the head office), for monthly dashboard totals, release grouping, AI daily, monthly and budget totals, delay checks, the precheck and the seed. A release that happened is shown by its head-office day (`DateTimeText calendar="hq"`). Viewers on another clock get `HqCalendarNote` / `useHqCalendarNote` where it matters.
 - `src/lib/time-zone.ts` holds the rules without UI state, so the mock uses them too; `src/app/time-zone.ts` (`useTimeView`) re-renders when the Settings choice changes. The schema refuses an unknown IANA name in `organization.timeZone` at start-up.
 
@@ -246,7 +249,8 @@ Two clocks matter ([Glossary](GLOSSARY.md)):
 - `src/mocks/store.ts#symbol:REVISION_KEY`, `src/mocks/store.ts#symbol:stateProblem`, `src/mocks/store.ts#symbol:createMockStore`, `src/mocks/store.test.ts` — persistence, shape check and tabs.
 - `src/mocks/signals.ts#symbol:reportMockStorageFull`, `src/mocks/signals.ts#symbol:takeMockStorageFull`, `src/mocks/signals.ts#symbol:MOCK_DATA_CHANGED_EVENT`, `src/app/demo-data-sync.tsx#symbol:DemoDataSync`, `src/app/demo-storage-notice.tsx#symbol:DemoStorageNotice` — the mock's signals to the app.
 - `src/config/env.ts#symbol:env`, `src/config/env-check.ts#symbol:checkEnv`, `src/config/env-check.ts#symbol:isApiMock`, `src/config/env-check.test.ts`, `src/config/schema.ts#symbol:AppConfigSchema` — configuration and build settings.
-- `src/lib/time-zone.ts#symbol:hqToday`, `src/lib/time-zone.ts#symbol:sameOffset`, `src/lib/time-zone.ts#symbol:dateInTimeZone`, `src/lib/format.ts#symbol:formatDate`, `src/lib/format.ts#symbol:describeDateTime`, `src/components/ui/date-time.tsx#symbol:DateTimeText`, `src/mocks/engine.ts#symbol:businessDate` — time rules.
+- `src/lib/time-zone.ts#symbol:hqToday`, `src/lib/time-zone.ts#symbol:sameOffset`, `src/lib/time-zone.ts#symbol:dateInTimeZone`, `src/lib/format.ts#symbol:formatDate`, `src/lib/format.ts#symbol:formatWeekday`, `src/lib/format.ts#symbol:describeDateTime`, `src/components/ui/date-time.tsx#symbol:DateTimeText`, `src/mocks/engine.ts#symbol:businessDate` — time rules; `src/lib/format.test.ts` — date-only values read the same day in every viewing and machine time zone.
+- `src/lib/use-media-query.ts#symbol:useMediaQuery` — viewport gate for a view that needs width.
 - `src/i18n/index.ts#symbol:initialLocale`, `src/i18n/en.ts` — language selection and the typed English messages.
 - `src/app/nav.ts#symbol:NAV_ITEMS`, `src/app/router.tsx#symbol:RouteHandle` — navigation table and route handles.
 - `vite.config.ts`, `deploy/nginx.conf`, `src/config/zod-jitless.ts`, `src/config/nginx-csp.ts#symbol:pagePolicyOf`, `src/config/deploy-config.test.ts`, `deploy/csp-hashes.mjs`, `scripts/check-real-build.mjs` — chunks, serving rules, CSP and the real-backend build check.

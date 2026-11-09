@@ -27,6 +27,7 @@ const ROUTES = {
     '/requests/1029',
     '/schedule',
     '/notifications',
+    '/schedule?view=month', // after another screen, as openInApp needs
     '/settings',
   ],
   담당자: ['/work', '/work/regression', '/requests/1024', '/requests/1026'],

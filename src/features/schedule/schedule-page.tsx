@@ -1,7 +1,7 @@
-import { CalendarDays } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { useReleases } from '@/api/queries'
 import { refreshOf } from '@/api/refresh'
 import { useDirectory } from '@/app/hooks'
@@ -10,14 +10,20 @@ import { usePageTitle } from '@/app/title'
 import { ProjectIcon } from '@/components/request/project-icon'
 import { StatusBadge } from '@/components/request/status'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { HqCalendarNote } from '@/components/ui/date-time'
 import { EmptyState, ListSkeleton } from '@/components/ui/feedback'
 import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { Segmented } from '@/components/ui/segmented'
 import type { ReleaseScheduleItem } from '@/domain/model'
 import { cn } from '@/lib/cn'
-import { addDays, formatDate } from '@/lib/format'
+import { addDays, formatDate, formatMonth, shiftMonth } from '@/lib/format'
 import { hqToday } from '@/lib/time-zone'
+import { TABLET_UP, useMediaQuery } from '@/lib/use-media-query'
+import { isMonth, monthWeeks } from './month-grid'
+import { MonthCalendar } from './month-view'
+
+type View = 'list' | 'month'
 
 function DateGroup({ date, items, today }: { date: string; items: ReleaseScheduleItem[]; today: string }) {
   const { t } = useTranslation()
@@ -78,11 +84,29 @@ export default function SchedulePage() {
   const dir = useDirectory()
   // Release dates are head-office calendar days, so "today" is the head office's.
   const today = hqToday()
+  const thisMonth = today.slice(0, 7)
   const [projectId, setProjectId] = useState('all')
-  const releases = useReleases(addDays(today, -45), addDays(today, 90))
+  const [params, setParams] = useSearchParams()
+  // Seven columns need a tablet's width: phones keep the list, even from a link to the month.
+  const roomy = useMediaQuery(TABLET_UP)
+  const view: View = roomy && params.get('view') === 'month' ? 'month' : 'list'
+  const asked = params.get('month')
+  const month = isMonth(asked) ? asked : thisMonth
+  const weeks = monthWeeks(month)
+  const releases = useReleases(
+    view === 'month' ? weeks[0]![0] : addDays(today, -45),
+    view === 'month' ? weeks.at(-1)!.at(-1) : addDays(today, 90),
+  )
+  const items = useMemo(
+    () => (releases.data ?? []).filter((r) => projectId === 'all' || r.projectId === projectId),
+    [releases.data, projectId],
+  )
+  // Replaced, not pushed: Back leaves the schedule instead of stepping through every month looked at.
+  const showView = (next: View) => setParams(next === 'month' ? { view: 'month' } : {}, { replace: true })
+  const showMonth = (next: string) =>
+    setParams(next === thisMonth ? { view: 'month' } : { view: 'month', month: next }, { replace: true })
 
   const { thisWeek, upcoming, past } = useMemo(() => {
-    const items = (releases.data ?? []).filter((r) => projectId === 'all' || r.projectId === projectId)
     const byDate = new Map<string, ReleaseScheduleItem[]>()
     for (const item of items) byDate.set(item.date, [...(byDate.get(item.date) ?? []), item])
     const dates = [...byDate.keys()].sort()
@@ -95,7 +119,7 @@ export default function SchedulePage() {
         .reverse()
         .map((d) => [d, byDate.get(d)!] as const),
     }
-  }, [releases.data, projectId, today])
+  }, [items, today])
 
   const sections = [
     { key: 'thisWeek', label: t('schedule.thisWeek'), groups: thisWeek },
@@ -105,7 +129,23 @@ export default function SchedulePage() {
 
   return (
     <>
-      <PageHeader title={t('schedule.title')} description={t('schedule.subtitle')} />
+      <PageHeader
+        title={t('schedule.title')}
+        description={t('schedule.subtitle')}
+        actions={
+          roomy ? (
+            <Segmented
+              label={t('schedule.view')}
+              value={view}
+              onChange={showView}
+              options={[
+                { value: 'list', label: t('schedule.viewList') },
+                { value: 'month', label: t('schedule.viewMonth') },
+              ]}
+            />
+          ) : null
+        }
+      />
       <HqCalendarNote className="-mt-2 mb-4" />
       <Segmented
         className="mb-5"
@@ -117,6 +157,38 @@ export default function SchedulePage() {
           ...dir.projects.map((p) => ({ value: p.id, label: p.name })),
         ]}
       />
+      {view === 'month' ? (
+        <div className="mb-3 flex flex-wrap items-center gap-x-1 gap-y-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t('schedule.prevMonth')}
+            onClick={() => showMonth(shiftMonth(month, -1))}
+          >
+            <ChevronLeft aria-hidden />
+          </Button>
+          {/* Announced, so a screen reader hears where the arrows went. */}
+          <span aria-live="polite" className="min-w-32 text-center text-lg font-bold">
+            {formatMonth(month)}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label={t('schedule.nextMonth')}
+            onClick={() => showMonth(shiftMonth(month, 1))}
+          >
+            <ChevronRight aria-hidden />
+          </Button>
+          <Button
+            variant="outline"
+            className="ml-2"
+            disabled={month === thisMonth}
+            onClick={() => showMonth(thisMonth)}
+          >
+            {t('schedule.thisMonth')}
+          </Button>
+        </div>
+      ) : null}
       <RefreshFailed {...refreshOf(releases)} className="mb-3" />
       {releases.isPending ? (
         <ListSkeleton />
@@ -126,6 +198,21 @@ export default function SchedulePage() {
           onRetry={() => void releases.refetch()}
           retrying={releases.isFetching}
         />
+      ) : view === 'month' ? (
+        <>
+          {/* Not while another range's data stands in: that would claim an empty month too early. */}
+          {!releases.isPlaceholderData && !items.some((i) => i.date.startsWith(month)) ? (
+            <p className="mb-3 text-[15px] text-ink-500">{t('schedule.emptyMonth')}</p>
+          ) : null}
+          <MonthCalendar
+            key={month}
+            month={month}
+            weeks={weeks}
+            today={today}
+            items={items}
+            busy={releases.isPlaceholderData}
+          />
+        </>
       ) : sections.length ? (
         <div className="flex flex-col gap-8">
           {sections.map((s) => (

@@ -38,6 +38,7 @@ evidence:
   - e2e/axe.spec.ts
   - e2e/lifecycle.spec.ts
   - e2e/layout.spec.ts
+  - e2e/schedule.spec.ts
   - src/test/mock-api.ts#symbol:createTestApi
   - src/test/session.ts#symbol:signInAs
   - src/config/nginx-csp.ts#symbol:hasPagePolicy
@@ -81,10 +82,11 @@ Every user workflow is tested end to end against the production build with the i
 | `admin.spec.ts` | Executive reads the dashboard; admin changes a role and adds a project with a rule to keep, and cannot assign or change the operator role; notifications are read and their settings changed. |
 | `operator.spec.ts` | Operator replaces a provider key (only the last four characters come back), moves a task to another model, cannot disconnect a provider in use, edits the exchange rate, reads the usage dashboard and its table view, and sets the budget at `/admin/budget` → `/ops/budget`; a developer then sees the request's AI usage and the run button disabled with the reason. |
 | `smoke.spec.ts` | Login screen fits each viewport; per-device navigation (phone tab bar, tablet rail, desktop sidebar) reaches My requests and Schedule. |
-| `layout.spec.ts` | No horizontal scroll on any route for any role at 320 px and on a landscape tablet, in Korean and English. At 320 px, the notices and error states that only appear in some conditions (demo banner, time-zone settings and a detail screen with both clocks, session-expired notice, compact and full `LoadFailed`) lie inside the viewport and do not clip their text. |
+| `schedule.spec.ts` | On a tablet and a desktop the release schedule switches to the month view (`?view=month`), finds #1019 on the head office's tomorrow (stepping to the next month when tomorrow falls there), opens it and comes Back to the same month, steps months and returns with "This month", and switches back to the list. On a phone a `?view=month` link opens the list, with no switch. |
+| `layout.spec.ts` | No horizontal scroll on any route for any role at 320 px and on a landscape tablet, in Korean and English; the schedule's month view is one of the routes. At 320 px, the notices and error states that only appear in some conditions (demo banner, time-zone settings and a detail screen with both clocks, session-expired notice, compact and full `LoadFailed`) lie inside the viewport and do not clip their text. |
 | `demo-banner.spec.ts` | A demo build says so on the login screen and on signed-in screens, without a close button and without widening a phone screen. |
 | `csp.spec.ts` | The page carries the production policy, and walking the requester's, operator's and executive's screens (one test each) raises no CSP violation event and no console error. |
-| `axe.spec.ts` | axe-core finds nothing serious or critical on the login screen and every role's main screens, light and dark, and on the saved drafts (home, the expanded list with both badges, the delete sheet, the new-request notice) (see [Accessibility](WCAG.md)). |
+| `axe.spec.ts` | axe-core finds nothing serious or critical on the login screen and every role's main screens, light and dark, and on the saved drafts (home, the expanded list with both badges, the delete sheet, the new-request notice), and on the schedule's month view (see [Accessibility](WCAG.md)). |
 | `i18n.spec.ts` | With an English browser no Korean text appears on any role's screens (elements with an explicit `lang` excluded); a request can be filed in English; the saved drafts (list, badges, delete sheet, new-request notice) are in English; switching language at runtime works; edited demo data keeps its language. |
 | `theme.spec.ts` | System dark mode applies before first paint; no horizontal scroll in dark mode; an explicit light choice persists; the login-screen toggle works. |
 | `a11y.spec.ts` | The skip link is the first tab stop and focuses `main` (desktop only: WebKit does not tab to links by default); nothing animates under `prefers-reduced-motion: reduce`. |
@@ -100,6 +102,8 @@ Every user workflow is tested end to end against the production build with the i
 - `openLoginScreen` (used by `loginAs` / `loginAsEnglish`) clears the persisted session (`ax-request-portal:session`) while on `/favicon.svg`, a same-origin static file where the app is not running. Clearing it inside the app does not stick: an in-flight `/auth/me` response writes the session back through the auth guard. Retrying the clear made it worse.
 - Signing in moves on twice (the sign-in call's success, then the login screen's own redirect once it sees the session), and the URL changes before the screen does. `loginAs` therefore waits until the login form has gone (`expectSignedIn`) before the test moves on; a move made in between can be overtaken.
 - Move between screens after signing in with `openInApp(page, path)`: it pushes a history entry and a `popstate` the way the back and forward buttons do, then waits until the old screen's `h1` has gone. `page.goto` restarts the app and its mock (2–4 s in WebKit under a parallel run); use it only where the start itself is under test, and give a first screen after a full load `COLD_START_TIMEOUT` (10 s, above the app's own 8 s `MOCK_START_TIMEOUT_MS`).
+- `openInApp` to the same path with another query (`/schedule` → `/schedule?view=month`) keeps the screen mounted, so its `h1` never goes and the helper times out, by design. Visit such a URL after a different screen (as `axe.spec.ts` and `layout.spec.ts` do), or use the screen's own control.
+- `schedule.spec.ts` works out the head office's dates from `Asia/Seoul` (the template's `organization.timeZone`), because the seed schedules releases relative to the head office's today; a fork that changes the zone changes that constant too.
 - `signOut(page, viewport)` uses the phone's "more" sheet or the account menu; `switchRole` signs out (to `/login` without `next`) and starts again from a demo button, as a person handing the device over would.
 - `loginAs` picks a demo account by its Korean role label, so renaming those labels breaks the suite.
 - Reproducing conditions from a static page (`/favicon.svg`, the app not running): a load failure — store one request's title in `ax-request-portal:mock-db` as a number, which the client rejects as `contract_violation` and does not retry, so `LoadFailed` shows at once; a session expiry — replace the stored token with `mock-token.no-such-user`, so the next call is a `401`.
@@ -133,6 +137,7 @@ Every user workflow is tested end to end against the production build with the i
 - `e2e/update.spec.ts` — new-version notice.
 - `e2e/csp.spec.ts`, `src/config/nginx-csp.ts#symbol:hasPagePolicy`, `vite.config.ts` — the production policy under test; Vitest environment and include pattern.
 - `e2e/axe.spec.ts`, `e2e/lifecycle.spec.ts`, `e2e/layout.spec.ts` — accessibility scan, the whole lifecycle, conditional states at 320 px.
+- `e2e/schedule.spec.ts` — the schedule's month view per viewport.
 - `e2e/drafts.spec.ts`, `e2e/helpers.ts#symbol:seedSavedDrafts`, `e2e/helpers.ts#symbol:keepDraftOffline`, `e2e/helpers.ts#symbol:SEEDED_DRAFTS` — saved drafts and how their states are set up.
 - `src/components/ui/sheet.test.tsx` — a component-level test of `Sheet`'s focus return.
 - `src/test/mock-api.ts#symbol:createTestApi`, `src/test/session.ts#symbol:signInAs` — deterministic mock API and signed-in screens for unit tests.

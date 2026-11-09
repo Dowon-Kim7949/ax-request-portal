@@ -23,6 +23,7 @@ evidence:
   - e2e/demo-banner.spec.ts
   - e2e/axe.spec.ts
   - e2e/csp.spec.ts
+  - e2e/schedule.spec.ts
   - e2e/drafts.spec.ts
   - src/app/router.tsx#symbol:routes
   - src/app/nav.ts#symbol:NAV_ITEMS
@@ -57,7 +58,7 @@ User-facing features by role. Each row names the domain document that holds the 
 | See own requests, filter by "your turn", open or closed | [My Requests](domains/08_requests.md) | `requester.spec.ts`, `smoke.spec.ts` |
 | Answer a developer's questions; check each acceptance criterion; report an issue; cancel early | [Request Detail](domains/04_detail.md) | `requester.spec.ts` |
 | Follow the plain-language status of a request | [Request Detail](domains/04_detail.md) | `requester.spec.ts` |
-| See upcoming releases | [Release Schedule](domains/09_schedule.md) | `smoke.spec.ts` |
+| See upcoming releases as a list, or a month at a time on a tablet or a desktop | [Release Schedule](domains/09_schedule.md) | `smoke.spec.ts`, `schedule.spec.ts` |
 
 ## Developer
 
@@ -121,7 +122,7 @@ The 41 endpoints of `src/api/contract.ts` are listed per domain in the domain do
 - `src/domain/roles.ts#symbol:DEFAULT_ROLE_PERMISSIONS` — what each role may do.
 - `src/api/contract.ts#symbol:api` — the endpoint table.
 - `e2e/update.spec.ts` — new-version notice.
-- `e2e/time-zone.spec.ts`, `e2e/auth.spec.ts`, `e2e/lifecycle.spec.ts`, `e2e/attachments.spec.ts`, `e2e/demo-banner.spec.ts`, `e2e/axe.spec.ts`, `e2e/csp.spec.ts` — the features added to the tables above.
+- `e2e/time-zone.spec.ts`, `e2e/auth.spec.ts`, `e2e/lifecycle.spec.ts`, `e2e/attachments.spec.ts`, `e2e/demo-banner.spec.ts`, `e2e/axe.spec.ts`, `e2e/csp.spec.ts`, `e2e/schedule.spec.ts` — the features added to the tables above.
 - `e2e/drafts.spec.ts` — saved drafts: listed, continued, on another device, deleted, submitted, and signing out.
 
 ## Open Questions

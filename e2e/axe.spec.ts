@@ -83,6 +83,9 @@ for (const colorScheme of ['light', 'dark'] as const) {
         '/requests/1028',
         '/schedule',
         '/notifications',
+        // The month view on wider screens (phones keep the list). After another screen:
+        // openInApp waits for the heading to change, and a new query keeps the same screen.
+        '/schedule?view=month',
         '/settings',
       ]) {
         await visit(page, path)
