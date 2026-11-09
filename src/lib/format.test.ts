@@ -8,6 +8,7 @@ import {
   formatDateTime,
   formatMonth,
   formatRelative,
+  formatWeekday,
   shiftMonth,
 } from './format'
 
@@ -114,7 +115,15 @@ describe('date-only values', () => {
       expect(formatDate('2026-11-06'), timeZone).toBe('11월 6일 (금)')
       expect(formatDate('2026-03-08', { weekday: false }), timeZone).toBe('3월 8일')
       expect(formatMonth('2026-11'), timeZone).toBe('2026년 11월')
+      expect(formatWeekday('2026-11-01'), timeZone).toBe('일')
+      expect(formatWeekday('2026-11-01', 'long'), timeZone).toBe('일요일')
     }
+  })
+
+  it('name weekdays in the UI language', async () => {
+    await i18n.changeLanguage('en')
+    expect(formatWeekday('2026-11-01')).toBe('Sun')
+    expect(formatWeekday('2026-11-07', 'long')).toBe('Saturday')
   })
 
   it('do not depend on the time zone of the machine either', () => {
@@ -125,6 +134,7 @@ describe('date-only values', () => {
         process.env.TZ = tz
         expect(formatDate('2026-11-06'), tz).toBe('11월 6일 (금)')
         expect(formatMonth('2026-01'), tz).toBe('2026년 1월')
+        expect(formatWeekday('2026-11-06', 'long'), tz).toBe('금요일')
         expect(shiftMonth('2026-01', -1), tz).toBe('2025-12')
         expect(daysInMonth('2028-02'), tz).toBe(29)
       }

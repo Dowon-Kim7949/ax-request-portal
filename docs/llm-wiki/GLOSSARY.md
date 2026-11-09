@@ -2,8 +2,8 @@
 title: Glossary
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: glossary
 project: ax-request-portal
 last_updated: 2026-11-09
@@ -99,7 +99,7 @@ Terms as the code uses them. Identifiers are kept in English in both UI language
 | Business calendar | The head office's calendar. "Today" (`hqToday`) for date limits and grouping, and every day or month total (dashboard, AI usage, budget), follow it in the UI and the API, wherever the viewer is. | `src/lib/time-zone.ts` |
 | Viewing time zone | The time zone timestamps are shown in on this device: the one chosen in Settings, else the device's (`resolveViewTimeZone`). Never derived from the IP address. | `src/lib/time-zone.ts` |
 | Head-office time (shown beside local time) | On detail screens, "local time (zone) · Korea time", added only when the viewing time zone reads a different clock from the head office at that instant and the viewer keeps "show head-office time" on (`describeDateTime`). | `src/lib/format.ts` |
-| Date-only value | A `YYYY-MM-DD` calendar date (desired date, scheduled release date). Shown as written in every time zone; never converted. | `src/lib/format.ts` |
+| Date-only value | A `YYYY-MM-DD` calendar date (desired date, scheduled release date, a day of the schedule's month view). Shown as written in every time zone; never converted. | `src/lib/format.ts` |
 | Session end reason (`SessionEndReason`) | Why a session ended in this tab: `signedOut` (on purpose: the next sign-in starts at home, the drafts kept on this device are deleted) or `expired` (a 401: the login screen keeps `next` and says so). | `src/stores/session.ts` |
 | Load failure / refresh failure | Nothing could be loaded (`LoadFailed`) versus a refresh failed while earlier data stays on screen (`RefreshFailed`). | `src/components/ui/load-failed.tsx` |
 | Safe URL (`UrlKind`) | A URL the API may hand to the browser for its kind: `web`, `link`, `file` or `image` (`isSafeUrl`). | `src/domain/url.ts` |
