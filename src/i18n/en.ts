@@ -571,6 +571,7 @@ const en: Messages = {
   work: {
     title: 'Assigned',
     subtitle: 'Requests on your projects and requests assigned to you.',
+    listLabel: 'Assigned requests',
     filter: {
       myTurn: 'My turn',
       ai: 'AI working',
@@ -921,6 +922,7 @@ const en: Messages = {
   },
   notifications: {
     title: 'Notifications',
+    listLabel: 'Notification list',
     markAll: 'Mark all as read',
     empty: 'No new notifications.',
     unread: 'unread',

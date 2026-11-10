@@ -12,6 +12,12 @@ export interface RouteHandle {
   /** Hide the phone tab bar so a multi-step flow has the whole screen */
   focus?: boolean
   /**
+   * The page is built from `Page` parts (src/app/page.tsx): on a big screen it
+   * fills the window and only its lists scroll. The shell then leaves the
+   * page's width and padding to those parts.
+   */
+  fit?: boolean
+  /**
    * Needed to open the route. The single source for both the page guard
    * (`RequirePermission`) and the post-login redirect, which sends a person
    * home instead of to a page they cannot open.
@@ -38,7 +44,7 @@ function page(
       return {
         Component: permission
           ? () => (
-              <RequirePermission permission={permission}>
+              <RequirePermission permission={permission} fit={handle?.fit}>
                 <Page />
               </RequirePermission>
             )
@@ -95,7 +101,10 @@ export const routes: RouteObject[] = [
           },
           {
             path: 'work',
-            ...page(() => import('@/features/work/assigned-page'), { permission: 'request:review' }),
+            ...page(() => import('@/features/work/assigned-page'), {
+              permission: 'request:review',
+              fit: true,
+            }),
           },
           {
             path: 'work/regression',
@@ -131,7 +140,10 @@ export const routes: RouteObject[] = [
             path: 'ops/budget',
             ...page(() => import('@/features/ops/budget-page'), { permission: 'budget:manage' }),
           },
-          { path: 'notifications', ...page(() => import('@/features/notifications/notifications-page')) },
+          {
+            path: 'notifications',
+            ...page(() => import('@/features/notifications/notifications-page'), { fit: true }),
+          },
           { path: 'settings', ...page(() => import('@/features/settings/settings-page')) },
           { path: 'settings/notifications', ...moved('/settings') },
           { path: '*', Component: NotFoundPage },

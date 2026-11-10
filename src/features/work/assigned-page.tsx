@@ -4,7 +4,7 @@ import { useSearchParams } from 'react-router'
 import { useRequests } from '@/api/queries'
 import { refreshOf } from '@/api/refresh'
 import { useDirectory } from '@/app/hooks'
-import { PageHeader } from '@/app/page'
+import { Page, PageHeader, PageScroll, PageTop } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { RequestCard } from '@/components/request/request-card'
 import { Select } from '@/components/ui/controls'
@@ -50,54 +50,58 @@ export default function AssignedPage() {
   const shown = (list.data ?? []).filter(FILTERS[filter] ?? FILTERS.myTurn)
 
   return (
-    <>
-      <PageHeader title={t('work.title')} description={t('work.subtitle')} />
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <Segmented
-          label={t('work.title')}
-          value={filter}
-          onChange={(f) => set('filter', f)}
-          options={(Object.keys(FILTERS) as Filter[]).map((f) => ({
-            value: f,
-            label: t(`work.filter.${f}`),
-            count: list.data ? counts[f] : undefined,
-          }))}
-        />
-        <Select
-          className="lg:w-56"
-          aria-label={t('work.allProjects')}
-          value={projectId}
-          onChange={(e) => set('project', e.target.value)}
-        >
-          <option value="">{t('work.allProjects')}</option>
-          {dir.projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </Select>
-      </div>
-
-      <RefreshFailed {...refreshOf(list)} className="mb-3" />
-      {list.isPending ? (
-        <ListSkeleton />
-      ) : list.isLoadingError ? (
-        <LoadFailed error={list.error} onRetry={() => void list.refetch()} retrying={list.isFetching} />
-      ) : shown.length ? (
-        <div className={`grid grid-cols-1 gap-3 lg:grid-cols-2 ${list.isFetching ? 'opacity-90' : ''}`}>
-          {shown.map((r) => (
-            <RequestCard
-              key={r.id}
-              request={r}
-              myTurn={turnOf(r.status) === 'developer'}
-              showRequester
-              showDates
-            />
-          ))}
+    <Page>
+      <PageTop>
+        <PageHeader title={t('work.title')} description={t('work.subtitle')} />
+        <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <Segmented
+            label={t('work.title')}
+            value={filter}
+            onChange={(f) => set('filter', f)}
+            options={(Object.keys(FILTERS) as Filter[]).map((f) => ({
+              value: f,
+              label: t(`work.filter.${f}`),
+              count: list.data ? counts[f] : undefined,
+            }))}
+          />
+          <Select
+            className="lg:w-56"
+            aria-label={t('work.allProjects')}
+            value={projectId}
+            onChange={(e) => set('project', e.target.value)}
+          >
+            <option value="">{t('work.allProjects')}</option>
+            {dir.projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
         </div>
-      ) : (
-        <EmptyState title={t('work.empty')} />
-      )}
-    </>
+        <RefreshFailed {...refreshOf(list)} className="mb-3" />
+      </PageTop>
+
+      <PageScroll label={t('work.listLabel')}>
+        {list.isPending ? (
+          <ListSkeleton />
+        ) : list.isLoadingError ? (
+          <LoadFailed error={list.error} onRetry={() => void list.refetch()} retrying={list.isFetching} />
+        ) : shown.length ? (
+          <div className={`grid grid-cols-1 gap-3 lg:grid-cols-2 ${list.isFetching ? 'opacity-90' : ''}`}>
+            {shown.map((r) => (
+              <RequestCard
+                key={r.id}
+                request={r}
+                myTurn={turnOf(r.status) === 'developer'}
+                showRequester
+                showDates
+              />
+            ))}
+          </div>
+        ) : (
+          <EmptyState title={t('work.empty')} />
+        )}
+      </PageScroll>
+    </Page>
   )
 }

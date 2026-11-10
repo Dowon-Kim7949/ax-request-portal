@@ -2,8 +2,8 @@
 title: Architecture Conventions
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: architecture_conventions
 project: ax-request-portal
 last_updated: 2026-11-10
@@ -93,6 +93,9 @@ evidence:
   - src/lib/format.ts#symbol:formatWeekday
   - src/lib/format.ts#symbol:describeDateTime
   - src/lib/use-media-query.ts#symbol:useMediaQuery
+  - src/lib/use-media-query.ts#symbol:FIT_QUERY
+  - src/lib/use-media-query.test.ts
+  - src/lib/scrollbar-width.ts#symbol:trackScrollbarWidth
   - src/lib/format.test.ts
   - src/components/ui/date-time.tsx#symbol:DateTimeText
   - src/mocks/engine.ts#symbol:businessDate
@@ -138,7 +141,7 @@ A front-end-only SPA whose backend is a contract. One table of endpoints (`src/a
 | `src/api/` | `contract.ts` (endpoint table), `client.ts` (fetch), `query-client.ts` (retry and logging), `queries.ts` (TanStack Query hooks), `refresh.ts`, `error-text.ts`, `openapi.ts` | `domain` |
 | `src/mocks/` | MSW handlers, `MockEngine` (rules + state), persistence, seed, localized server texts, mock AI; `signals.ts` (window events for the app) | `domain`, `api/contract`, `lib/time-zone` |
 | `src/config/` | `app.config.ts` (validated template settings), `env.ts` (build-time variables), `env-check.ts` (build-setting rules), `nginx-csp.ts`, `zod-jitless.ts` | `domain`, `i18n/locales` |
-| `src/lib/` | Formatting (`format.ts`), time zones (`time-zone.ts`, no UI state, also used by the mock), small helpers (`abort.ts`, `debounce.ts`, `data-url.ts`, `use-media-query.ts`: `useMediaQuery` and `TABLET_UP`, the `md` breakpoint for a view that needs a tablet's width) | `config`, `i18n`, `stores` (`format.ts` only) |
+| `src/lib/` | Formatting (`format.ts`), time zones (`time-zone.ts`, no UI state, also used by the mock), small helpers (`abort.ts`, `debounce.ts`, `data-url.ts`, `use-media-query.ts`: `useMediaQuery`, `TABLET_UP`, the `md` breakpoint for a view that needs a tablet's width, and `FIT_QUERY`, the big-screen size the `fit:` CSS variant also names; `scrollbar-width.ts`: the measured scrollbar gutter as `--sbw`) | `config`, `i18n`, `stores` (`format.ts` only) |
 | `src/app/` | Router, guards, session sync, shell and navigation, theme, page helpers, demo banner and demo-data signals, time-zone hooks | everything below |
 | `src/features/<domain>/` | Pages and page-specific components, one folder per domain; `drafts/` has no page: the draft sync engine (`sync-core.ts` rules, `sync-engine.ts` without React, `sync.ts` wiring, `hooks.ts`) and the saved-drafts section the home, requests and wizard screens render | `app`, `api`, `components`, `domain`, `stores` |
 | `src/components/` | Shared UI (`ui/`) and request widgets (`request/`) | `domain` types, `lib` |
@@ -198,7 +201,7 @@ Two clocks matter ([Glossary](GLOSSARY.md)):
 ## Mock mode
 
 - `VITE_API_MOCK` (`true`, `false`, or unset/empty = mock) selects the in-browser mock; `VITE_API_BASE_URL` is the real backend; `VITE_BASE` is the public path (read only by `vite.config.ts`). `isApiMock` is the one reading of the value, used by both `vite.config.ts` and `src/config/env.ts`; the build rules are under Build and deploy. `.env.example` documents all four variables.
-- Boot (`main.tsx`): `zod-jitless` first, then i18n (the language decides the seed), theme sync, the query client, client configuration, then in mock mode the service worker races an 8 s timeout. On failure the page reloads once (a `sessionStorage` flag prevents loops) and then shows a retry screen. Reason: WebKit can refuse or hang the worker registration when the page is reloaded during the first load; creating a second worker on the same page risks handling requests twice.
+- Boot (`main.tsx`): `zod-jitless` first, then i18n (the language decides the seed), theme sync, the scrollbar-width measurement (`trackScrollbarWidth`, kept up to date on resize), the query client, client configuration, then in mock mode the service worker races an 8 s timeout. On failure the page reloads once (a `sessionStorage` flag prevents loops) and then shows a retry screen. Reason: WebKit can refuse or hang the worker registration when the page is reloaded during the first load; creating a second worker on the same page risks handling requests twice.
 - Worker restarts after boot: browsers stop an idle service worker (Chrome after about 30 s), and MSW's 5 s keep-alive timer is throttled in a background tab, so a tab left alone loses its worker. The restarted worker has an empty `activeClientIds` and passes every request to the network (GitHub Pages answers `404`), which used to leave an error on every screen until a reload. Every mock response carries `X-Mock-Api: 1` (`MOCK_RESPONSE_HEADER`); a response without it makes `reattachIfBypassed` post MSW's `MOCK_ACTIVATE` to the registered worker, wait up to 3 s (`REATTACH_TIMEOUT_MS`) for `MOCKING_ENABLED`, and let the client resend the request once. Concurrent bypassed requests share one re-attach. A bypassed request never reached the mock, so resending a mutation does not apply it twice. `MOCK_ACTIVATE` / `MOCKING_ENABLED` are MSW's worker protocol, not a public API: `e2e/mock-api.spec.ts` stops the worker through the Chrome DevTools Protocol and fails if an MSW upgrade changes them (Chromium only).
 - `createHandlers` derives one MSW handler per contract entry, validates params/query/body with the same schemas, adds 120–380 ms latency, reads the language and the mock token, advances simulated time (`engine.tick`) and runs the resolver. A handler reads the request body first and then takes up other tabs' saves, handles the request and saves with nothing awaited in between; an upload takes them up once more after reading the file.
 - State is `MockState` in `localStorage` (`ax-request-portal:mock-db`), `STATE_VERSION` 6. Bumping it discards every visitor's stored data and reseeds; so does a stored value that fails the shallow shape check (`stateProblem`, with a console warning). The seed is produced by running the real engine through the lifecycle, so seeded requests are always reachable states; steps a person would click (scope choices, assumption ticks) are filled in by `withDefaults` with the AI's suggestion. `dirty` marks data a person edited, uploads, read notifications and saved drafts included (their routes use `edit`, not `touch`, so a language change cannot reseed a person's drafts away): untouched demo data is regenerated when the language changes, edited data keeps its language.
@@ -219,7 +222,7 @@ Two clocks matter ([Glossary](GLOSSARY.md)):
 
 ## Navigation and routes
 
-- `NAV_ITEMS` is one permission-aware table that renders the desktop sidebar, the tablet icon rail and the phone tab bar (four tabs and a "more" sheet; whoever holds `request:create` finds "new request" as the middle tab, the same place on every account, and the other tabs follow `PHONE_PRIORITY`; `phoneTabs`). A route with `handle.focus` (the wizard) hides the phone tab bar.
+- `NAV_ITEMS` is one permission-aware table that renders the desktop sidebar, the tablet icon rail and the phone tab bar (four tabs and a "more" sheet; whoever holds `request:create` finds "new request" as the middle tab, the same place on every account, and the other tabs follow `PHONE_PRIORITY`; `phoneTabs`). A route with `handle.focus` (the wizard) hides the phone tab bar. A route with `handle.fit` is built from `Page` parts and, on a big screen, fills the window with only its list scrolling ([Frontend Profile](profiles/frontend.md)); `page()` also gives its forbidden state the page width.
 - Every route sits under a pathless root route that renders `SessionSync` and has `RouteErrorPage` as its `errorElement`, so the login screen gets the app's error page too; `HydrateFallback` is on `/login` and `/`. A route's permission is declared once, as `handle.permission` (`RouteHandle`): `page()` wraps the lazy page in `RequirePermission`, and the post-login redirect reads the same handles. Old addresses are `moved(to)` routes with `handle.redirectTo`. Navigation items keep their own `permission` for visibility, with the same `Permission` values.
 
 ## Build and deploy
@@ -252,7 +255,8 @@ Two clocks matter ([Glossary](GLOSSARY.md)):
 - `src/mocks/signals.ts#symbol:reportMockStorageFull`, `src/mocks/signals.ts#symbol:takeMockStorageFull`, `src/mocks/signals.ts#symbol:MOCK_DATA_CHANGED_EVENT`, `src/app/demo-data-sync.tsx#symbol:DemoDataSync`, `src/app/demo-storage-notice.tsx#symbol:DemoStorageNotice` — the mock's signals to the app.
 - `src/config/env.ts#symbol:env`, `src/config/env-check.ts#symbol:checkEnv`, `src/config/env-check.ts#symbol:isApiMock`, `src/config/env-check.test.ts`, `src/config/schema.ts#symbol:AppConfigSchema` — configuration and build settings.
 - `src/lib/time-zone.ts#symbol:hqToday`, `src/lib/time-zone.ts#symbol:sameOffset`, `src/lib/time-zone.ts#symbol:dateInTimeZone`, `src/lib/format.ts#symbol:formatDate`, `src/lib/format.ts#symbol:formatWeekday`, `src/lib/format.ts#symbol:describeDateTime`, `src/components/ui/date-time.tsx#symbol:DateTimeText`, `src/mocks/engine.ts#symbol:businessDate` — time rules; `src/lib/format.test.ts` — date-only values read the same day in every viewing and machine time zone.
-- `src/lib/use-media-query.ts#symbol:useMediaQuery` — viewport gate for a view that needs width.
+- `src/lib/use-media-query.ts#symbol:useMediaQuery`, `src/lib/use-media-query.ts#symbol:FIT_QUERY`, `src/lib/use-media-query.test.ts` — viewport gates; the test keeps `FIT_QUERY` equal to the `fit:` variant in `src/index.css`.
+- `src/lib/scrollbar-width.ts#symbol:trackScrollbarWidth` — the scrollbar gutter the page bands pad by.
 - `src/i18n/index.ts#symbol:initialLocale`, `src/i18n/en.ts` — language selection and the typed English messages.
 - `src/app/nav.ts#symbol:NAV_ITEMS`, `src/app/nav.ts#symbol:phoneTabs`, `src/app/nav.test.ts`, `src/app/router.tsx#symbol:RouteHandle` — navigation table, phone tabs per role and route handles.
 - `vite.config.ts`, `deploy/nginx.conf`, `src/config/zod-jitless.ts`, `src/config/nginx-csp.ts#symbol:pagePolicyOf`, `src/config/deploy-config.test.ts`, `deploy/csp-hashes.mjs`, `scripts/check-real-build.mjs` — chunks, serving rules, CSP and the real-backend build check.

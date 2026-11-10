@@ -12,6 +12,7 @@ import { BootError } from './app/boot'
 import { expireSession } from './app/session-sync'
 import { startThemeSync } from './app/theme'
 import './index.css'
+import { trackScrollbarWidth } from './lib/scrollbar-width'
 import { useSession } from './stores/session'
 
 const BOOT_RELOAD_KEY = 'ax-request-portal:boot-reloaded'
@@ -58,6 +59,7 @@ async function bootstrap() {
   if (!container) throw new Error('#root element is missing from index.html')
   const root = createRoot(container)
   startThemeSync()
+  trackScrollbarWidth()
   const queryClient = createQueryClient()
 
   const clientHooks: ClientHooks = {

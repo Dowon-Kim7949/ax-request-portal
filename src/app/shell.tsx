@@ -467,13 +467,16 @@ export function AppShell() {
   useDraftSync()
   const can = useCan()
   const items = visibleNav(can)
-  const focus = useMatches().some((m) => (m.handle as RouteHandle | undefined)?.focus)
+  const handles = useMatches().map((m) => m.handle as RouteHandle | undefined)
+  const focus = handles.some((h) => h?.focus)
+  // A page made of `Page` parts fills the window on a big screen; only its lists scroll (src/app/page.tsx).
+  const fit = handles.some((h) => h?.fit)
 
   return (
-    <div className="min-h-dvh">
+    <div data-fit={fit || undefined} className={cn('min-h-dvh', fit && 'fit:flex fit:h-dvh fit:flex-col')}>
       <SkipLink />
       <Sidebar items={items} />
-      <div className="md:pl-[76px] xl:pl-64">
+      <div className={cn('md:pl-[76px] xl:pl-64', fit && 'fit:flex fit:min-h-0 fit:flex-1 fit:flex-col')}>
         <DemoBanner />
         {/*
           The notch inset (an iOS home-screen app draws under the status bar) is padded once: by the
@@ -493,7 +496,7 @@ export function AppShell() {
             env.apiMock ? 'top-[env(safe-area-inset-top)]' : 'top-0 pt-safe',
           )}
         >
-          <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-2 px-4 sm:px-6 md:h-16">
+          <div className="page-band flex h-14 items-center justify-between gap-2 md:h-16">
             <div className="md:invisible">
               <BrandMark />
             </div>
@@ -508,7 +511,12 @@ export function AppShell() {
         <main
           id="main"
           tabIndex={-1}
-          className="mx-auto max-w-6xl px-4 pt-4 pb-[calc(6rem+env(safe-area-inset-bottom))] outline-none sm:px-6 md:pt-6 md:pb-12"
+          className={cn(
+            'outline-none',
+            fit
+              ? 'fit:flex fit:min-h-0 fit:flex-1 fit:flex-col'
+              : 'page-column pt-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pt-6 md:pb-12',
+          )}
         >
           <Outlet />
         </main>

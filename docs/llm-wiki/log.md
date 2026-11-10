@@ -24,6 +24,33 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-10 - UI: big screens fit the window, only the list scrolls (pilot: /work, /notifications)
+
+- status: needs_review
+- actor: claude-code
+- scope: code, tests, docs
+- changed:
+  - src/index.css (`fit:` variant, `--page-max` / `--page-pad` / `--page-gutter`, `page-band` / `page-column`, the line under a scrolled page top)
+  - src/app/page.tsx (`Page`, `PageTop`, `PageScroll`), src/app/scroll-memory.ts (new), src/lib/scrollbar-width.ts (new), src/lib/use-media-query.ts (`FIT_QUERY`) and its test (new), src/main.tsx
+  - src/app/shell.tsx (`data-fit`, header and `main` on the shared page width), src/app/router.tsx (`RouteHandle.fit`), src/app/guards.tsx (`RequirePermission` `fit`)
+  - src/features/work/assigned-page.tsx, src/features/notifications/notifications-page.tsx, src/i18n/ko.ts, src/i18n/en.ts (region names)
+  - e2e/fit.spec.ts (new), e2e/helpers.ts (`expectNoHorizontalScroll` also measures scroll regions), playwright.config.ts
+  - e2e/requester.spec.ts (waits for the step between two "next" clicks)
+  - docs/llm-wiki/profiles/frontend.md, ARCHITECTURE_CONVENTIONS.md, COMPONENT_INVENTORY.md, WCAG.md, E2E_WORKFLOWS.md, DOMAIN_FEATURES.md, domains/02_auth.md, 07_notifications.md, 12_work.md; domains/00_overview.md, 09_schedule.md and 11_wizard.md only back to needs_review (they cite changed files; nothing in them changed)
+- summary:
+  - From 1280 × 720 a route with `handle.fit` fills the window under the header: the page's top (title, filters, page-wide notices) stays in place and only its list scrolls, in a region as wide as the content column. Smaller windows, phones, tablets and a 200 % zoom keep the window scroll, and so do pages not yet converted.
+  - The content width grows from 72rem to 90rem at `2xl` on every page, through shared variables that the header uses too.
+  - The region reserves the scrollbar gutter on both edges; the header and the page top pad by the measured gutter (`--sbw`), so their edges match the list's with or without a scrollbar. The gutter is measured as `scrollbar-gutter` reserves it: headless Chromium hides `overflow: scroll` bars (0 px) but still reserves 15 px.
+  - The region is `relative`: an `sr-only` text inside it (the unread marker) otherwise sat below the window and gave the page a scrollbar at 1280 × 720.
+  - `useScrollMemory` restores the region per history entry on back and forward; any other navigation starts it at the top, as `<ScrollRestoration>` does for the window.
+- evidence:
+  - Green: `npm run verify` (unit 63 files / 637 passed). `e2e/fit.spec.ts` 7 passed. Full E2E on three projects without the axe groups for unrelated screens: 231 passed, 2 failed. The two failures were `requester.spec.ts` "audit findings" on WebKit; it clicked "next" twice without waiting, and a click during the step's async validation landed on the same step. That was 3 of 8 on the branch under load, and 0 of 8 and then 12 of 12 passing in later runs. With a wait for the step heading, phone, tablet and desktop pass 12 of 12.
+  - Edges measured equal for header, page top and list at 1920×1080, 1280×720 and 1366×650. Screenshots at 1920×1080 and 1280×720 checked by eye.
+- caveats:
+  - Pilot only: the rest of the pages, the multi-panel ones (detail, dashboard, home: one scrolling region per column), the wizard's step bar and `#drafts` anchor, and the demo banner's "scrolls away" wording follow in the next change.
+  - Card columns at `2xl` are unchanged (two on /work); whether the wider page wants three is left to review.
+- review notes:
+
 ## 2026-11-10 - UI: "new request" as the middle phone tab; the usage page's chip beside its title
 
 - status: needs_review

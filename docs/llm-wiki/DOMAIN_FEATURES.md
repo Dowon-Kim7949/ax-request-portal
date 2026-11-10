@@ -2,8 +2,8 @@
 title: Domain Features
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain_overview
 project: ax-request-portal
 last_updated: 2026-11-10
@@ -109,6 +109,7 @@ User-facing features by role. Each row names the domain document that holds the 
 | Language (Korean / English), theme (system / light / dark), notification preferences | [Settings](domains/10_settings.md) | `i18n.spec.ts`, `theme.spec.ts`, `admin.spec.ts` |
 | Notice when a newer version is deployed, with a reload button | [Architecture Conventions](ARCHITECTURE_CONVENTIONS.md) | `update.spec.ts` |
 | Same workflows on phone, tablet and desktop, down to 320 px | [Architecture Conventions](ARCHITECTURE_CONVENTIONS.md) | `layout.spec.ts`, `smoke.spec.ts` |
+| On a big screen (from 1280 × 720) a page fits the window and only its list scrolls; back returns the list to where it was (so far `/work` and `/notifications`) | [Frontend Profile](profiles/frontend.md) | `fit.spec.ts` |
 | Every main screen free of serious accessibility findings, light and dark; nothing blocked by the production security policy | [Accessibility](WCAG.md), [Architecture Conventions](ARCHITECTURE_CONVENTIONS.md) | `axe.spec.ts`, `csp.spec.ts` |
 
 ## API Services

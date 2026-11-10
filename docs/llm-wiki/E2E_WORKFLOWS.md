@@ -2,11 +2,11 @@
 title: E2E Workflows
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: e2e_workflows
 project: ax-request-portal
-last_updated: 2026-11-09
+last_updated: 2026-11-10
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -38,6 +38,8 @@ evidence:
   - e2e/axe.spec.ts
   - e2e/lifecycle.spec.ts
   - e2e/layout.spec.ts
+  - e2e/fit.spec.ts
+  - e2e/helpers.ts#symbol:expectNoHorizontalScroll
   - e2e/schedule.spec.ts
   - src/test/mock-api.ts#symbol:createTestApi
   - src/test/session.ts#symbol:signInAs
@@ -61,7 +63,7 @@ Every user workflow is tested end to end against the production build with the i
 
 ## Playwright setup
 
-- Projects in `playwright.config.ts`: `phone` (iPhone 14, WebKit), `tablet` (iPad gen 7, WebKit) and `desktop` (Desktop Chrome at 1440×900, Chromium). `layout.spec.ts` and `cursor.spec.ts` run on desktop only (they set their own viewports or need a fine pointer); `axe.spec.ts` skips the tablet (`NOT_ON_TABLET`).
+- Projects in `playwright.config.ts`: `phone` (iPhone 14, WebKit), `tablet` (iPad gen 7, WebKit) and `desktop` (Desktop Chrome at 1440×900, Chromium). `layout.spec.ts`, `fit.spec.ts` and `cursor.spec.ts` run on desktop only (they set their own viewports or need a fine pointer); the desktop project's 1440×900 is itself a big screen, so its runs see `fit` pages filling the window with only their list scrolling; `axe.spec.ts` skips the tablet (`NOT_ON_TABLET`).
 - `locale` is pinned to `ko-KR`, `colorScheme` to `light` and `timezoneId` to `Asia/Seoul` (the head office's): Playwright defaults to `en-US` and the machine's zone, and the Korean UI in head-office time is the default under test. English runs (`loginAsEnglish`, `i18n.spec.ts`), dark runs (`theme.spec.ts`) and other zones (`time-zone.spec.ts`) are explicit.
 - The web server is `npm run build && npm run preview -- --port 4173 --strictPort`; tests always hit a production build, never the dev server. Locally an already running preview on port 4173 is reused (`reuseExistingServer` outside CI): make sure it serves the current build and nothing else holds the port. Retries are 2 on CI and 0 locally; traces are kept on first retry.
 - `vite preview` sends the Content-Security-Policy of `deploy/nginx.conf` to every response except `mockServiceWorker.js` (`hasPagePolicy`, the `ax:preview-csp` plugin), so every spec runs under the production policy.
@@ -84,6 +86,7 @@ Every user workflow is tested end to end against the production build with the i
 | `smoke.spec.ts` | Login screen fits each viewport; per-device navigation (phone tab bar, tablet rail, desktop sidebar) reaches My requests and Schedule. |
 | `schedule.spec.ts` | On a tablet and a desktop the release schedule switches to the month view (`?view=month`), finds #1019 on the head office's tomorrow (stepping to the next month when tomorrow falls there), opens it and comes Back to the same month, steps months and returns with "This month", and switches back to the list. On a phone a `?view=month` link opens the list, with no switch. |
 | `layout.spec.ts` | No horizontal scroll on any route for any role at 320 px and on a landscape tablet, in Korean and English; the schedule's month view is one of the routes. At 320 px, the notices and error states that only appear in some conditions (demo banner, time-zone settings and a detail screen with both clocks, session-expired notice, compact and full `LoadFailed`) lie inside the viewport and do not clip their text. |
+| `fit.spec.ts` | Big screens: at 1920×1080 and 1280×720 every `fit` route (`FIT_ROUTES`) leaves the window unscrolled, its list is a focusable named region, and header, page top and list share their left and right edges; back restores the list's position, a new visit and a filter change start at the top, PageDown scrolls a focused list; at 1366×650 the window scrolls instead and there is no region. |
 | `demo-banner.spec.ts` | A demo build says so on the login screen and on signed-in screens, without a close button and without widening a phone screen. |
 | `csp.spec.ts` | The page carries the production policy, and walking the requester's, operator's and executive's screens (one test each) raises no CSP violation event and no console error. |
 | `axe.spec.ts` | axe-core finds nothing serious or critical on the login screen and every role's main screens, light and dark, and on the saved drafts (home, the expanded list with both badges, the delete sheet, the new-request notice), and on the schedule's month view (see [Accessibility](WCAG.md)). |
@@ -137,6 +140,7 @@ Every user workflow is tested end to end against the production build with the i
 - `e2e/update.spec.ts` — new-version notice.
 - `e2e/csp.spec.ts`, `src/config/nginx-csp.ts#symbol:hasPagePolicy`, `vite.config.ts` — the production policy under test; Vitest environment and include pattern.
 - `e2e/axe.spec.ts`, `e2e/lifecycle.spec.ts`, `e2e/layout.spec.ts` — accessibility scan, the whole lifecycle, conditional states at 320 px.
+- `e2e/fit.spec.ts`, `e2e/helpers.ts#symbol:expectNoHorizontalScroll` — the big-screen layout; the sideways-scroll check also measures each `[data-scroll-region]`, where a list on a big screen would hide its overflow from the page.
 - `e2e/schedule.spec.ts` — the schedule's month view per viewport.
 - `e2e/drafts.spec.ts`, `e2e/helpers.ts#symbol:seedSavedDrafts`, `e2e/helpers.ts#symbol:keepDraftOffline`, `e2e/helpers.ts#symbol:SEEDED_DRAFTS` — saved drafts and how their states are set up.
 - `src/components/ui/sheet.test.tsx` — a component-level test of `Sheet`'s focus return.

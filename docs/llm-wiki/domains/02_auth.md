@@ -2,11 +2,11 @@
 title: Auth
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-09
+last_updated: 2026-11-10
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -86,7 +86,7 @@ Who the user is and what they may do: the session, the auth and permission guard
 
 - Every route sits under a pathless root route whose `errorElement` is `RouteErrorPage`; `/` keeps its own `errorElement`, so an error below the shell leaves the root (and the tab sync) running.
 - `RequireAuth` wraps every route under `/`. Without a token or user it replaces the location with `/login?next=<path+query+hash>` (no `next` for `/`), except after a sign-out on purpose (`ended.reason === 'signedOut'`), which goes to plain `/login`: the next person to sign in starts at home.
-- A route's permission is declared once, as `handle.permission` (`RouteHandle` in `src/app/router.tsx`). `page()` wraps the lazy page in `RequirePermission`, and the post-login redirect (`resolvePostLoginPath`, see [Login](06_login.md)) reads the same handles. A missing permission renders an `ErrorState` ("forbidden") with a link home instead of redirecting, so a shared deep link explains itself.
+- A route's permission is declared once, as `handle.permission` (`RouteHandle` in `src/app/router.tsx`). `page()` wraps the lazy page in `RequirePermission`, and the post-login redirect (`resolvePostLoginPath`, see [Login](06_login.md)) reads the same handles. A missing permission renders an `ErrorState` ("forbidden") with a link home instead of redirecting, so a shared deep link explains itself; on a `handle.fit` route it is wrapped in the page width and padding the shell then leaves to the page ([Frontend Profile](../profiles/frontend.md)).
 - Old addresses (`/admin/budget`, `/settings/notifications`) are `moved(to)` routes: a `<Navigate>` plus `handle.redirectTo`, which the post-login redirect follows to check the destination's permission.
 
 ## Roles and permissions

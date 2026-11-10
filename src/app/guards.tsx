@@ -42,12 +42,23 @@ export function SessionSync() {
   return null
 }
 
-/** Renders a friendly "not allowed" page instead of the route when a permission is missing. */
-export function RequirePermission({ permission, children }: { permission: Permission; children: ReactNode }) {
+/**
+ * Renders a friendly "not allowed" page instead of the route when a permission is missing.
+ * `fit`: the route's page brings its own width and padding (`RouteHandle.fit`), so this one does too.
+ */
+export function RequirePermission({
+  permission,
+  fit,
+  children,
+}: {
+  permission: Permission
+  fit?: boolean
+  children: ReactNode
+}) {
   const can = useCan()
   const { t } = useTranslation()
   if (!can(permission)) {
-    return (
+    const denied = (
       <ErrorState
         title={t('errors.forbidden')}
         action={
@@ -57,6 +68,7 @@ export function RequirePermission({ permission, children }: { permission: Permis
         }
       />
     )
+    return fit ? <div className="page-column pt-4 pb-12 md:pt-6">{denied}</div> : denied
   }
   return <>{children}</>
 }

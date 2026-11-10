@@ -567,6 +567,7 @@ const ko = {
   work: {
     title: '배정된 요청',
     subtitle: '담당 프로젝트의 요청과 내가 맡은 요청이에요.',
+    listLabel: '배정된 요청 목록',
     filter: {
       myTurn: '내 차례',
       ai: 'AI 작업 중',
@@ -914,6 +915,7 @@ const ko = {
   },
   notifications: {
     title: '알림',
+    listLabel: '알림 목록',
     markAll: '모두 읽음',
     empty: '새 알림이 없어요.',
     unread: '읽지 않음',

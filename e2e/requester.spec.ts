@@ -178,6 +178,8 @@ test('requester files audit findings pasted from a table', async ({ page }) => {
   await expect(page.getByText('항목 2', { exact: true })).toBeVisible()
   await expectNoHorizontalScroll(page)
   await page.getByRole('button', { name: '다음' }).click()
+  // The step moves after an async validation: a second click before then lands on the same step.
+  await expect(page.getByRole('heading', { name: '마지막으로 알려 주실 것이 있나요?' })).toBeVisible()
   await page.getByRole('button', { name: '다음' }).click()
 
   await expect(page.getByRole('heading', { name: '이대로 제출할까요?' })).toBeVisible()

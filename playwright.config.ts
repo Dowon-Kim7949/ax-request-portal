@@ -4,14 +4,17 @@ const PORT = 4173
 
 /**
  * Every user flow must work on a phone, a tablet and a desktop,
- * so each spec runs once per viewport. Two specs run in the desktop project
+ * so each spec runs once per viewport. Three specs run in the desktop project
  * only: layout.spec.ts sets its own edge viewports (320 px phone, landscape
- * tablet), and cursor.spec.ts checks mouse cursors, which touch screens lack.
+ * tablet), fit.spec.ts its big-screen ones (FHD, 1280 × 720, a short laptop),
+ * and cursor.spec.ts checks mouse cursors, which touch screens lack. The
+ * desktop project's own 1440 × 900 is a big screen too: its runs see the pages
+ * that fit the window laid out that way.
  * The accessibility scan (axe.spec.ts) runs on the phone and the desktop: the
  * tablet has the phone's engine and the same components, so it adds time but
  * no findings of its own.
  */
-const DESKTOP_ONLY = /(layout|cursor)\.spec\.ts/
+const DESKTOP_ONLY = /(layout|fit|cursor)\.spec\.ts/
 const NOT_ON_TABLET = /axe\.spec\.ts/
 export default defineConfig({
   testDir: './e2e',
