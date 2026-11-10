@@ -3,6 +3,9 @@ import { useCallback, useSyncExternalStore } from 'react'
 /** Tablet width and up (Tailwind `md`): where the navigation becomes a rail or a sidebar. */
 export const TABLET_UP = '(min-width: 48rem)'
 
+/** Tailwind `xl`: the full sidebar replaces the tablet's icon rail. */
+export const SIDEBAR_UP = '(min-width: 80rem)'
+
 /**
  * A desktop window big enough for a page to fill it, with only its lists
  * scrolling (the `fit:` variant in src/index.css, which must say the same).

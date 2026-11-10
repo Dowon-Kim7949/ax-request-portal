@@ -49,6 +49,7 @@ evidence:
   - src/app/page.tsx#symbol:PagePlain
   - src/app/scroll-memory.ts#symbol:useScrollMemory
   - src/app/shell.tsx#symbol:BottomNav
+  - src/app/shell.tsx#symbol:Sidebar
   - src/features/wizard/steps.tsx#symbol:MissingAttachments
   - src/features/detail/attachment-link.tsx#symbol:AttachmentLink
   - src/components/ui/sheet.test.tsx
@@ -102,6 +103,7 @@ The primitives are written by hand in the shadcn style (Tailwind classes, `class
 | `Page`, `PageTop`, `PageScroll`, `PageColumns`, `PagePlain` (`page.tsx`) | The parts of a `fit` route, which every `page()` route is ([Frontend Profile](profiles/frontend.md)). `PageColumns` puts `PageScroll column`s side by side, each scrolling on its own; `PagePlain` gives a whole-page loading, failed, forbidden or not-found state the page width. `PageTop` holds what stays in place (header, filters, page-wide notices); `PageScroll` the list, which on a big screen is a named, focusable region that scrolls on its own, remembers its position per history entry (`useScrollMemory`) and marks `data-scrolled` for the line under the top. Below the big-screen size they are plain blocks with the page width and padding. |
 | `DemoStorageNotice`, `DemoDataSync` | Mock builds only, rendered once in `App.tsx`. The first shows one toast when the demo data can no longer be saved; the second invalidates every query when another tab changed the demo data ([Architecture Conventions](ARCHITECTURE_CONVENTIONS.md)). |
 | `Glyph` (local to `shell.tsx`) | Decorative text drawn by CSS (`content: attr(data-glyph)`, `aria-hidden`) inside a control whose name already says it: the brand initials, the unread count on the bell, the account initial. As DOM text it would become part of the visible label, which must be contained in the accessible name (WCAG 2.5.3). Reuse the pattern for any initial or counter inside a named control. |
+| `Sidebar` (local to `shell.tsx`) | The desktop sidebar (from `xl`) and the tablet's 76 px icon rail (`md` up to `xl`). The rail's full menu opens as a modal Radix Dialog named "주 메뉴" over the page; it closes on Escape, on a click outside and on following a link, and gives focus back to the expand button ([Accessibility](WCAG.md)). Its items are `visibleNav`'s: those whose page would open. |
 | `BottomNav` (local to `shell.tsx`) | The phone tab bar: the tabs `phoneTabs` picks, then "more", which opens a `Sheet` with the remaining items and the account actions. "New request" is drawn as a brand-coloured circle; every other icon sits in a box of the same 32 px, so all labels line up. |
 
 Page-local components worth knowing: `MissingAttachments` (wizard, an alert naming attachments the server could not find, see [Request Wizard](domains/11_wizard.md)) and `AttachmentLink` (request page, opens or downloads an attachment safely, see [Request Detail](domains/04_detail.md)).
@@ -162,6 +164,7 @@ Feature-local, listed here because three screens share them.
 - `src/app/shell.tsx#symbol:Glyph` — CSS-drawn decorative text.
 - `src/app/page.tsx#symbol:Page`, `src/app/page.tsx#symbol:PageTop`, `src/app/page.tsx#symbol:PageScroll`, `src/app/page.tsx#symbol:PageColumns`, `src/app/page.tsx#symbol:PagePlain`, `src/app/scroll-memory.ts#symbol:useScrollMemory` — the big-screen page parts.
 - `src/app/shell.tsx#symbol:BottomNav` — the phone tab bar.
+- `src/app/shell.tsx#symbol:Sidebar` — the sidebar, the rail and the rail's menu dialog.
 - `src/features/wizard/steps.tsx#symbol:MissingAttachments`, `src/features/detail/attachment-link.tsx#symbol:AttachmentLink` — page-local components named above.
 - `vite.config.ts` — `vendor-ui` chunk group.
 - `src/App.tsx` — the single `Toaster`; `src/app/update-notice.tsx#symbol:UpdateNotice` — a toast overriding sonner's action button size.

@@ -18,7 +18,7 @@ evidence:
   - src/features/schedule/month-view.tsx#symbol:MonthCalendar
   - src/features/schedule/month-grid.ts#symbol:monthWeeks
   - src/features/schedule/month-grid.ts#symbol:isMonth
-  - src/lib/use-media-query.ts#symbol:useMediaQuery
+  - src/lib/use-media-query.ts#L3-L4
   - src/lib/format.ts#symbol:formatWeekday
   - src/features/schedule/schedule-page.test.tsx
   - src/features/schedule/month-grid.test.ts
@@ -79,7 +79,7 @@ A read-only calendar of scheduled releases at `/schedule` (`schedule:view`, held
 
 - `src/features/schedule/schedule-page.tsx#symbol:SchedulePage`, `src/features/schedule/schedule-page.tsx#symbol:DateGroup` — view and month in the URL, ranges, grouping, filter, past and today styling.
 - `src/features/schedule/month-view.tsx#symbol:MonthCalendar`, `src/features/schedule/month-grid.ts#symbol:monthWeeks`, `src/features/schedule/month-grid.ts#symbol:isMonth`, `src/lib/format.ts#symbol:formatWeekday` — the month grid, its cells and chips, the URL month check, weekday names.
-- `src/lib/use-media-query.ts#symbol:useMediaQuery` — the tablet-and-up gate (`TABLET_UP`).
+- `src/lib/use-media-query.ts#L3-L4` — the tablet-and-up gate (`TABLET_UP`, read with `useMediaQuery`). Cited by line, so other queries added to that file do not touch this document.
 - `src/features/schedule/schedule-page.test.tsx`, `src/features/schedule/month-grid.test.ts`, `e2e/schedule.spec.ts` — month view on the head-office day, switching and stepping in the URL, the phone fallback, the folded busy day, the grid's weeks.
 - `src/api/queries.ts#symbol:useReleases` — query.
 - `src/lib/time-zone.ts#symbol:hqToday`, `src/components/ui/date-time.tsx#symbol:HqCalendarNote` — head-office today and the calendar note.

@@ -32,6 +32,7 @@ evidence:
   - src/app/session-sync.ts#symbol:expireSession
   - src/app/session-sync.ts#symbol:useSessionSync
   - src/app/router.tsx#symbol:RouteHandle
+  - src/app/router.tsx#symbol:permissionsFor
   - src/features/auth/post-login.ts#symbol:resolvePostLoginPath
   - src/app/hooks.ts#symbol:userCan
   - src/api/queries.ts#symbol:useLogin
@@ -86,7 +87,7 @@ Who the user is and what they may do: the session, the auth and permission guard
 
 - Every route sits under a pathless root route whose `errorElement` is `RouteErrorPage`; `/` keeps its own `errorElement`, so an error below the shell leaves the root (and the tab sync) running.
 - `RequireAuth` wraps every route under `/`. Without a token or user it replaces the location with `/login?next=<path+query+hash>` (no `next` for `/`), except after a sign-out on purpose (`ended.reason === 'signedOut'`), which goes to plain `/login`: the next person to sign in starts at home.
-- A route's permission is declared once, as `handle.permission` (`RouteHandle` in `src/app/router.tsx`). `page()` wraps the lazy page in `RequirePermission`, and the post-login redirect (`resolvePostLoginPath`, see [Login](06_login.md)) reads the same handles. A missing permission renders an `ErrorState` ("forbidden") with a link home instead of redirecting, so a shared deep link explains itself; it is wrapped in `PagePlain`, the page width and padding the shell leaves to `fit` pages, which every `page()` route is ([Frontend Profile](../profiles/frontend.md)).
+- A route's permission is declared once, as `handle.permission` (`RouteHandle` in `src/app/router.tsx`). `page()` wraps the lazy page in `RequirePermission`, the post-login redirect (`resolvePostLoginPath`, see [Login](06_login.md)) reads the same handles, and so do the menus (`permissionsFor`, `visibleNav`: an item shows only when its page would open). A missing permission renders an `ErrorState` ("forbidden") with a link home instead of redirecting, so a shared deep link explains itself; it is wrapped in `PagePlain`, the page width and padding the shell leaves to `fit` pages, which every `page()` route is ([Frontend Profile](../profiles/frontend.md)).
 - Old addresses (`/admin/budget`, `/settings/notifications`) are `moved(to)` routes: a `<Navigate>` plus `handle.redirectTo`, which the post-login redirect follows to check the destination's permission.
 
 ## Roles and permissions
@@ -128,7 +129,6 @@ The config schema refuses a configuration without `admin`, or without an enabled
 
 - Hiding pages and buttons is not enforcement. The mock engine re-checks every permission; a real backend must do the same for every endpoint in `src/api/contract.ts`.
 - `ended` lives only in memory: after a reload of the login screen, or in a newly opened tab, the "only the same person returns to `next`" rule no longer applies and only the permission check does (as for a deep link).
-- `NavItem.permission` in `src/app/nav.ts` (menu visibility) is still declared apart from the routes' `handle.permission`.
 
 ## Review Notes
 

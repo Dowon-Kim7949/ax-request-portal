@@ -110,7 +110,7 @@ All 41 endpoints are declared once in `src/api/contract.ts` and published as `do
 - `src/domain/lifecycle.ts#symbol:scopeRevisionsLeft`, `src/domain/lifecycle.ts#symbol:uncheckedAssumptions`, `src/domain/lifecycle.ts#symbol:releaseDateMissing` — the scope, assumption and release guards.
 - `src/domain/lifecycle.ts#symbol:turnOf`, `src/domain/lifecycle.ts#symbol:STAGES`, `src/domain/lifecycle.ts#symbol:TERMINAL_STATUSES` — turn, stage and terminal rules.
 - `src/domain/model.ts#symbol:RequestStatus` — the thirteen statuses.
-- `src/app/router.tsx#symbol:routes` — routes and their `handle.permission` (all under one pathless root route, see [Auth](02_auth.md)).
+- `src/app/router.tsx#symbol:routes` — routes and their `handle.permission` (all under one pathless root route, see [Auth](02_auth.md)); the menus read the same permissions (`permissionsFor`), so a menu offers only pages that would open.
 
 ## Review Notes
 

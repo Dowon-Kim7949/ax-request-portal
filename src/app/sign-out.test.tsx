@@ -19,6 +19,7 @@ import { useSession } from '@/stores/session'
 import { createTestApi } from '@/test/mock-api'
 import { signInAs, testQueryClient } from '@/test/session'
 import { RequireAuth } from './guards'
+import { permissionsFor } from './router'
 import { AppShell } from './shell'
 
 const t = createTestApi()
@@ -42,7 +43,7 @@ function renderShell() {
         path: '/',
         element: (
           <RequireAuth>
-            <AppShell />
+            <AppShell permissionsFor={permissionsFor} />
           </RequireAuth>
         ),
         children: [{ index: true, element: <h1>홈</h1> }],

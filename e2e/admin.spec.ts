@@ -66,3 +66,47 @@ test('notifications can be read and configured', async ({ page }) => {
   await expect(messenger).toHaveAttribute('aria-checked', 'true')
   await expect(page.getByText('알림 설정을 저장했어요.')).toBeVisible()
 })
+
+test("executive files a request and reads it among their own, besides reading everyone else's", async ({
+  page,
+}) => {
+  // An executive holds the requester's permissions as well (DEFAULT_ROLE_PERMISSIONS).
+  await loginAs(page, '경영진')
+  await expect(page.getByRole('link', { name: '새 요청' }).first()).toBeVisible()
+  // A developer's queue is not theirs: the menu leaves it out, and the address refuses.
+  await expect(page.getByRole('link', { name: '배정된 요청' })).toHaveCount(0)
+
+  await openInApp(page, '/requests/new?project=p-portal')
+  await page.getByRole('radio', { name: /기존 기능 변경/ }).click() // auto-advances
+  await expect(page.getByRole('heading', { name: '어느 화면이나 기능인가요?' })).toBeVisible()
+  await page.getByRole('button', { name: '공지사항' }).click()
+  await page.getByRole('button', { name: '다음' }).click()
+  await expect(page.getByRole('heading', { name: /지금은 어떻고/ })).toBeVisible()
+  await page.getByLabel('요청 제목').fill('공지 게시 승인 단계 추가')
+  await page.getByLabel('지금 동작').fill('공지가 작성 즉시 게시된다')
+  await page.getByLabel('원하는 동작').fill('팀장이 승인한 공지만 게시된다')
+  await page.getByRole('button', { name: '다음' }).click()
+  await expect(page.getByRole('heading', { name: '무엇이 되면 완료인가요?' })).toBeVisible()
+  await page.getByLabel('완료 기준 1').fill('승인 전 공지는 목록에 보이지 않는다')
+  await page.getByRole('button', { name: '다음' }).click()
+  await expect(page.getByRole('heading', { name: /마지막으로/ })).toBeVisible()
+  await page.getByRole('button', { name: '다음' }).click()
+  await expect(page.getByRole('heading', { name: '이대로 제출할까요?' })).toBeVisible()
+  await page.getByRole('button', { name: '요청 제출' }).click()
+
+  await expect(page).toHaveURL(/\/requests\/\d+$/)
+  await expect(page.getByRole('heading', { level: 1, name: '공지 게시 승인 단계 추가' })).toBeVisible()
+  await expect(page.getByText('요청자 박대표')).toBeVisible()
+
+  await openInApp(page, '/requests')
+  await expect(page.getByRole('link', { name: /공지 게시 승인 단계 추가/ })).toBeVisible()
+
+  // Everyone's requests are open to them (request:read:all): one another person filed.
+  await openInApp(page, '/requests/1021')
+  await expect(page.getByRole('heading', { level: 1, name: '마이페이지 안내 문구 수정' })).toBeVisible()
+  await expect(page.getByText('요청자 김기획')).toBeVisible()
+
+  await openInApp(page, '/work')
+  await expect(page.getByText('이 작업을 할 권한이 없어요.')).toBeVisible()
+  await expectNoHorizontalScroll(page)
+})

@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react'
-import { createBrowserRouter, Navigate, Outlet, type RouteObject } from 'react-router'
+import { createBrowserRouter, matchRoutes, Navigate, Outlet, type RouteObject } from 'react-router'
 import { env } from '@/config/env'
 import type { Permission } from '@/domain/roles'
 import { BootScreen } from './boot'
@@ -64,6 +64,19 @@ function moved(to: string): Pick<RouteObject, 'handle' | 'element'> {
   return { handle: { redirectTo: to } satisfies RouteHandle, element: <Navigate to={to} replace /> }
 }
 
+/**
+ * The permissions a page needs: the `handle.permission` of every route its path
+ * matches. The menus show an item only when its page would open (`visibleNav`),
+ * so a route's permission is declared once, here, for the guard, the
+ * post-login redirect and the navigation alike.
+ */
+export function permissionsFor(path: string): Permission[] {
+  return (matchRoutes(routes, path) ?? []).flatMap((m) => {
+    const permission = (m.route.handle as RouteHandle | undefined)?.permission
+    return permission ? [permission] : []
+  })
+}
+
 export const routes: RouteObject[] = [
   {
     // Pathless root: every route, the login screen included, gets a friendly error page and the tab sync.
@@ -81,7 +94,7 @@ export const routes: RouteObject[] = [
         HydrateFallback: BootScreen,
         element: (
           <RequireAuth>
-            <AppShell />
+            <AppShell permissionsFor={permissionsFor} />
           </RequireAuth>
         ),
         // Errors below the shell stay here, so the root (and the tab sync) keeps running.
