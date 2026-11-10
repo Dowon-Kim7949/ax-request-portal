@@ -53,6 +53,9 @@ test('operator connects a provider, picks models, edits prices and reads usage',
   await expect(page.getByRole('img', { name: /^Claude \d+%, GPT \d+%$/ })).toBeVisible()
   await page.getByText('표로 보기').click()
   await expect(page.getByRole('columnheader', { name: 'Claude' })).toBeVisible()
+  // Who spent it: each team as booked, each person by name beside their team.
+  await expect(page.getByRole('region', { name: '팀별' }).getByText('기획팀')).toBeVisible()
+  await expect(page.getByRole('region', { name: '사람별' }).getByText('김기획')).toBeVisible()
   await expectNoHorizontalScroll(page)
 
   // The budget moved from the admin screens; the old address still leads to it.

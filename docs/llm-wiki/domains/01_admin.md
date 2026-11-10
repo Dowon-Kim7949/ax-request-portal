@@ -2,8 +2,8 @@
 title: Admin
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
 last_updated: 2026-11-10
@@ -72,6 +72,7 @@ All calls carry the bearer token; mutation failures show `toast.error` with the 
 
 - Operator accounts are provisioned by the service (database, seed or an identity-provider group mapped to `operator`), never by an organization admin, so an admin cannot hand themselves the AI keys or the budget.
 - Permissions are enforced twice: the route guard hides the page and the mock engine rejects the call. A real backend must do the same; hiding UI is not security.
+- A user's `team` is free text, set in the invitation sheet; afterwards only `PATCH /users/{id}` changes it (a user's row shows the team but has no control for it). Each AI usage entry keeps the team its person had when it was booked, so changing the team does not move earlier AI spending to the new one ([AI Operations](13_ops.md)).
 
 ## Evidence
 

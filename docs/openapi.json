@@ -2815,6 +2815,14 @@
             "exclusiveMinimum": 0,
             "maximum": 9007199254740991
           },
+          "userId": {
+            "type": "string",
+            "description": "The person whose action started the call. The feasibility report made automatically on submission counts against the requester who submitted"
+          },
+          "team": {
+            "description": "The person's team when the call was booked, kept as it was; absent when they had none",
+            "type": "string"
+          },
           "tokens": {
             "$ref": "#/components/schemas/TokenUsage"
           },
@@ -2834,6 +2842,7 @@
           "provider",
           "model",
           "runtime",
+          "userId",
           "tokens",
           "costUsd",
           "costKrw"
@@ -3023,6 +3032,62 @@
               ]
             },
             "description": "Most expensive requests in `month`, at most ten"
+          },
+          "byTeam": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "team": {
+                  "description": "Absent for people without a team",
+                  "type": "string"
+                },
+                "calls": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "costKrw": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "calls",
+                "costKrw"
+              ]
+            },
+            "description": "Spending by the team each call was booked under, most expensive first; someone who moves keeps their earlier calls in the old team"
+          },
+          "byPerson": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "userId": {
+                  "type": "string"
+                },
+                "team": {
+                  "description": "The team of their latest call in `month`",
+                  "type": "string"
+                },
+                "calls": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "costKrw": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "userId",
+                "calls",
+                "costKrw"
+              ]
+            },
+            "description": "Spending by the person who started each call, everyone with a call in `month`, most expensive first"
           }
         },
         "required": [
@@ -3038,7 +3103,9 @@
           "byModel",
           "byTask",
           "daily",
-          "topRequests"
+          "topRequests",
+          "byTeam",
+          "byPerson"
         ]
       },
       "ApiError": {

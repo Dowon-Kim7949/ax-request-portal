@@ -96,10 +96,25 @@ describe('cost', () => {
       task: 'work',
       selection: { provider: 'anthropic', model: 'claude-opus-5-5' },
       requestId: 7,
+      caller: { userId: 'u-choi', team: 'Engineering' },
       tokens: { input: 10_000, cacheRead: 100_000, cacheWrite: 0, output: 2_000 },
     })
     // 0.04 + 0.02 + 0.04 = 0.10 USD
     expect(entry).toMatchObject({ runtime: 'claude_code', costUsd: 0.1, costKrw: 140, requestId: 7 })
+    expect(entry).toMatchObject({ userId: 'u-choi', team: 'Engineering' })
+  })
+
+  it('books a person without a team with no team', () => {
+    const entry = bookUsage(DEFAULT_AI_PRICING, {
+      id: 'ai-3',
+      at: '2026-11-03T00:00:00.000Z',
+      task: 'precheck',
+      selection: { provider: 'anthropic', model: 'claude-haiku-5-5' },
+      caller: { userId: 'u-new' },
+      tokens: { input: 1, cacheRead: 0, cacheWrite: 0, output: 1 },
+    })
+    expect(entry?.userId).toBe('u-new')
+    expect(entry).not.toHaveProperty('team')
   })
 
   it('books nothing for a model without a price', () => {
@@ -108,6 +123,7 @@ describe('cost', () => {
       at: '2026-11-03T00:00:00.000Z',
       task: 'report',
       selection: { provider: 'openai', model: 'not-a-model' },
+      caller: { userId: 'u-kim' },
       tokens: { input: 1, cacheRead: 0, cacheWrite: 0, output: 1 },
     })
     expect(entry).toBeUndefined()

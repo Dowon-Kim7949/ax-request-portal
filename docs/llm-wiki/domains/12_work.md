@@ -2,8 +2,8 @@
 title: Developer Work
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
 last_updated: 2026-11-10
@@ -81,7 +81,7 @@ Every change to one request (the hooks above plus the requester's) runs in the m
 
 ## The mock AI
 
-`src/mocks/ai.ts` stands in for the model calls: `generateReport` writes a deterministic report (assumptions for screens without a wiki doc and for unreviewed evidence docs; every project rule as kept — the simulated AI never finds a conflict, the seed shows one on #1026), `generateScope` writes the requester's scope in the same call (no extra cost: a screen question for "other" targets, an extent question for the first neighbour the change shares code with, suggested answer "only what I asked for"), `finishWork` produces the run result with a fictional preview (a `preview.example.com` URL and an SVG screenshot), and the timings come from `appConfig.mock` (`reportSeconds`, `workSeconds`). The file states that a real backend replaces these with model calls and keeps the returned shapes, which are the contract. Wiki trust is derived, not chosen: no evidence → low, all evidence documents human-verified → high, at least half → medium (`deriveWikiTrust`); a `feasible` verdict on low trust is flagged as not backed by evidence.
+`src/mocks/ai.ts` stands in for the model calls: `generateReport` writes a deterministic report (assumptions for screens without a wiki doc and for unreviewed evidence docs; every project rule as kept — the simulated AI never finds a conflict, the seed shows one on #1026), `generateScope` writes the requester's scope in the same call (no extra cost: a screen question for "other" targets, an extent question for the first neighbour the change shares code with, suggested answer "only what I asked for"), `finishWork` produces the run result with a fictional preview (a `preview.example.com` URL and an SVG screenshot), and the timings come from `appConfig.mock` (`reportSeconds`, `workSeconds`). A finished run is booked as AI usage against the developer who started it (`runWork` or `requestRevision`), with their team at that moment ([AI Operations](13_ops.md)). The file states that a real backend replaces these with model calls and keeps the returned shapes, which are the contract. Wiki trust is derived, not chosen: no evidence → low, all evidence documents human-verified → high, at least half → medium (`deriveWikiTrust`); a `feasible` verdict on low trust is flagged as not backed by evidence.
 
 ## Evidence
 

@@ -309,3 +309,84 @@ export function ModelBars({ rows }: { rows: AiUsageReport['byModel'] }) {
     </ul>
   )
 }
+
+/**
+ * One bar per team, largest first (the API's order), in one neutral color:
+ * teams are not providers. People without a team share one row.
+ */
+export function TeamBars({ rows }: { rows: AiUsageReport['byTeam'] }) {
+  const { t } = useTranslation()
+  const max = Math.max(1, ...rows.map((r) => r.costKrw))
+  return (
+    <ul className="flex flex-col gap-3">
+      {rows.map((r) => (
+        <li key={r.team ?? ''} className="flex flex-col gap-1.5">
+          <div className="flex items-baseline justify-between gap-3 text-sm">
+            <span className={cn('min-w-0 truncate font-semibold', r.team ? 'text-ink-900' : 'text-ink-500')}>
+              {r.team ?? t('usage.noTeam')}
+            </span>
+            <span className="shrink-0 text-ink-600 tabular-nums">
+              {formatKrw(r.costKrw)} · {t('usage.callsValue', { n: formatNumber(r.calls) })}
+            </span>
+          </div>
+          <span
+            aria-hidden
+            className="h-3 rounded-r-[4px] bg-brand-600"
+            style={{ width: `${Math.max(0.5, (r.costKrw / max) * 100)}%` }}
+          />
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/* Ranked list                                                         */
+/* ------------------------------------------------------------------ */
+
+/** People named one by one; the rest are summed in a single row. */
+export const TOP_PEOPLE = 10
+
+/** The people who spent most, largest first (the API's order), then everyone else in one row. */
+export function PeopleList({
+  rows,
+  userName,
+}: {
+  rows: AiUsageReport['byPerson']
+  userName: (id: string) => string
+}) {
+  const { t } = useTranslation()
+  const shown = rows.slice(0, TOP_PEOPLE)
+  const rest = rows.slice(TOP_PEOPLE)
+  const row = 'flex items-baseline justify-between gap-3 py-2 first:pt-0 last:pb-0'
+  const figures = (costKrw: number, calls: number) => (
+    <span className="shrink-0 text-right tabular-nums">
+      <span className="font-semibold">{formatKrw(costKrw)}</span>{' '}
+      <span className="text-xs text-ink-500">{t('usage.callsValue', { n: formatNumber(calls) })}</span>
+    </span>
+  )
+  return (
+    <ol className="flex flex-col divide-y divide-line text-sm">
+      {shown.map((r) => (
+        <li key={r.userId} className={row}>
+          <span className="min-w-0 truncate">
+            <span className="font-semibold text-ink-900">{userName(r.userId)}</span>
+            {r.team ? <span className="text-ink-600"> {r.team}</span> : null}
+          </span>
+          {figures(r.costKrw, r.calls)}
+        </li>
+      ))}
+      {rest.length ? (
+        <li className={row}>
+          <span className="min-w-0 truncate text-ink-600">
+            {t('usage.otherPeople', { count: rest.length })}
+          </span>
+          {figures(
+            rest.reduce((n, r) => n + r.costKrw, 0),
+            rest.reduce((n, r) => n + r.calls, 0),
+          )}
+        </li>
+      ) : null}
+    </ol>
+  )
+}

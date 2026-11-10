@@ -1,6 +1,7 @@
 /**
  * AI usage (operator): one month of AI spending by provider, model, task,
- * day and request. Every figure is an estimate booked from token counts.
+ * day, request, team and person. Every figure is an estimate booked from
+ * token counts.
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -28,7 +29,7 @@ import {
   formatUsd,
 } from '@/lib/format'
 import { hqToday } from '@/lib/time-zone'
-import { DailyChart, ModelBars, ProviderLegend, ProviderSplit } from './usage-charts'
+import { DailyChart, ModelBars, PeopleList, ProviderLegend, ProviderSplit, TeamBars } from './usage-charts'
 
 export default function UsagePage() {
   const { t } = useTranslation()
@@ -199,6 +200,24 @@ export default function UsagePage() {
                       </ol>
                     </Card>
                   </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  <Card aria-labelledby="by-team">
+                    <CardHeader>
+                      <CardTitle id="by-team">{t('usage.byTeam')}</CardTitle>
+                    </CardHeader>
+                    <TeamBars rows={u.byTeam} />
+                    <p className="mt-4 text-xs leading-relaxed text-ink-500">{t('usage.byTeamNote')}</p>
+                  </Card>
+
+                  <Card aria-labelledby="by-person">
+                    <CardHeader>
+                      <CardTitle id="by-person">{t('usage.byPerson')}</CardTitle>
+                    </CardHeader>
+                    <PeopleList rows={u.byPerson} userName={dir.userName} />
+                    <p className="mt-4 text-xs leading-relaxed text-ink-500">{t('usage.byPersonNote')}</p>
+                  </Card>
                 </div>
               </>
             )}
