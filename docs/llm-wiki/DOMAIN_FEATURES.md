@@ -2,11 +2,11 @@
 title: Domain Features
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain_overview
 project: ax-request-portal
-last_updated: 2026-11-09
+last_updated: 2026-11-10
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -118,7 +118,7 @@ The 41 endpoints of `src/api/contract.ts` are listed per domain in the domain do
 ## Evidence
 
 - `src/app/router.tsx#symbol:routes` — routes and their permissions.
-- `src/app/nav.ts#symbol:NAV_ITEMS` — navigation per permission.
+- `src/app/nav.ts#symbol:NAV_ITEMS` — navigation per permission; on a phone, "new request" is the middle tab for every role that can file one (`src/app/nav.test.ts`).
 - `src/domain/roles.ts#symbol:DEFAULT_ROLE_PERMISSIONS` — what each role may do.
 - `src/api/contract.ts#symbol:api` — the endpoint table.
 - `e2e/update.spec.ts` — new-version notice.

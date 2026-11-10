@@ -9,12 +9,23 @@ interface PageHeaderProps {
   description?: ReactNode
   /** Shows a back link (always on phones, where there is no sidebar) */
   back?: { to: string; label?: string }
+  /** A status chip about the whole page ("estimate"), shown beside the title */
+  badge?: ReactNode
+  /** Buttons for the page; they sit at the right, or wrap below on a phone */
   actions?: ReactNode
   eyebrow?: ReactNode
   className?: string
 }
 
-export function PageHeader({ title, description, back, actions, eyebrow, className }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  description,
+  back,
+  badge,
+  actions,
+  eyebrow,
+  className,
+}: PageHeaderProps) {
   const { t } = useTranslation()
   return (
     <header className={cn('mb-5 flex flex-col gap-3 sm:mb-6', className)}>
@@ -30,9 +41,18 @@ export function PageHeader({ title, description, back, actions, eyebrow, classNa
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1">
           {eyebrow ? <div className="text-sm font-semibold text-accent">{eyebrow}</div> : null}
-          <h1 className="text-2xl leading-tight font-bold tracking-tight text-ink-900 sm:text-[28px]">
-            {title}
-          </h1>
+          {badge ? (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h1 className="text-2xl leading-tight font-bold tracking-tight text-ink-900 sm:text-[28px]">
+                {title}
+              </h1>
+              {badge}
+            </div>
+          ) : (
+            <h1 className="text-2xl leading-tight font-bold tracking-tight text-ink-900 sm:text-[28px]">
+              {title}
+            </h1>
+          )}
           {description ? <p className="text-[15px] text-ink-500">{description}</p> : null}
         </div>
         {actions ? <div className="flex shrink-0 gap-2">{actions}</div> : null}

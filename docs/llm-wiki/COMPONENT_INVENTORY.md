@@ -2,8 +2,8 @@
 title: Component Inventory
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: component_inventory
 project: ax-request-portal
 last_updated: 2026-11-10
@@ -42,6 +42,7 @@ evidence:
   - src/app/demo-storage-notice.tsx#symbol:DemoStorageNotice
   - src/app/demo-data-sync.tsx#symbol:DemoDataSync
   - src/app/shell.tsx#symbol:Glyph
+  - src/app/shell.tsx#symbol:BottomNav
   - src/features/wizard/steps.tsx#symbol:MissingAttachments
   - src/features/detail/attachment-link.tsx#symbol:AttachmentLink
   - src/components/ui/sheet.test.tsx
@@ -94,6 +95,7 @@ The primitives are written by hand in the shadcn style (Tailwind classes, `class
 | `DemoBanner` | Mock builds only (`env.apiMock`); cannot be dismissed. `bar`: a slim warning-tone strip above the sticky header of the signed-in shell, an `aside` landmark named "Demo mode"; it scrolls away with the page and takes the top safe-area inset. `inline`: a small `<p>` under the login screen's tagline. |
 | `DemoStorageNotice`, `DemoDataSync` | Mock builds only, rendered once in `App.tsx`. The first shows one toast when the demo data can no longer be saved; the second invalidates every query when another tab changed the demo data ([Architecture Conventions](ARCHITECTURE_CONVENTIONS.md)). |
 | `Glyph` (local to `shell.tsx`) | Decorative text drawn by CSS (`content: attr(data-glyph)`, `aria-hidden`) inside a control whose name already says it: the brand initials, the unread count on the bell, the account initial. As DOM text it would become part of the visible label, which must be contained in the accessible name (WCAG 2.5.3). Reuse the pattern for any initial or counter inside a named control. |
+| `BottomNav` (local to `shell.tsx`) | The phone tab bar: the tabs `phoneTabs` picks, then "more", which opens a `Sheet` with the remaining items and the account actions. "New request" is drawn as a brand-coloured circle; every other icon sits in a box of the same 32 px, so all labels line up. |
 
 Page-local components worth knowing: `MissingAttachments` (wizard, an alert naming attachments the server could not find, see [Request Wizard](domains/11_wizard.md)) and `AttachmentLink` (request page, opens or downloads an attachment safely, see [Request Detail](domains/04_detail.md)).
 
@@ -151,6 +153,7 @@ Feature-local, listed here because three screens share them.
 - `src/components/ui/date-time.tsx#symbol:DateTimeText`, `src/components/ui/date-time.tsx#symbol:HqCalendarNote`, `src/components/ui/date-time.test.tsx`, `src/app/time-zone.ts#symbol:useTimeView`, `src/app/time-zone.ts#symbol:useHqCalendarNote`, `src/components/ui/month-stepper.tsx#symbol:MonthStepper` — times and the business calendar.
 - `src/app/demo-banner.tsx#symbol:DemoBanner`, `src/app/demo-storage-notice.tsx#symbol:DemoStorageNotice`, `src/app/demo-data-sync.tsx#symbol:DemoDataSync` — demo-mode pieces.
 - `src/app/shell.tsx#symbol:Glyph` — CSS-drawn decorative text.
+- `src/app/shell.tsx#symbol:BottomNav` — the phone tab bar.
 - `src/features/wizard/steps.tsx#symbol:MissingAttachments`, `src/features/detail/attachment-link.tsx#symbol:AttachmentLink` — page-local components named above.
 - `vite.config.ts` — `vendor-ui` chunk group.
 - `src/App.tsx` — the single `Toaster`; `src/app/update-notice.tsx#symbol:UpdateNotice` — a toast overriding sonner's action button size.

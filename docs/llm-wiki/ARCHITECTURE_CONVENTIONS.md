@@ -2,8 +2,8 @@
 title: Architecture Conventions
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: architecture_conventions
 project: ax-request-portal
 last_updated: 2026-11-10
@@ -99,6 +99,8 @@ evidence:
   - src/i18n/index.ts#symbol:initialLocale
   - src/i18n/en.ts
   - src/app/nav.ts#symbol:NAV_ITEMS
+  - src/app/nav.ts#symbol:phoneTabs
+  - src/app/nav.test.ts
   - src/app/router.tsx#symbol:RouteHandle
   - src/app/pages.tsx#symbol:RouteErrorView
   - vite.config.ts
@@ -217,7 +219,7 @@ Two clocks matter ([Glossary](GLOSSARY.md)):
 
 ## Navigation and routes
 
-- `NAV_ITEMS` is one permission-aware table that renders the desktop sidebar, the tablet icon rail and the phone tab bar (up to four tabs by priority, the rest in a "more" sheet). A route with `handle.focus` (the wizard) hides the phone tab bar.
+- `NAV_ITEMS` is one permission-aware table that renders the desktop sidebar, the tablet icon rail and the phone tab bar (four tabs and a "more" sheet; whoever holds `request:create` finds "new request" as the middle tab, the same place on every account, and the other tabs follow `PHONE_PRIORITY`; `phoneTabs`). A route with `handle.focus` (the wizard) hides the phone tab bar.
 - Every route sits under a pathless root route that renders `SessionSync` and has `RouteErrorPage` as its `errorElement`, so the login screen gets the app's error page too; `HydrateFallback` is on `/login` and `/`. A route's permission is declared once, as `handle.permission` (`RouteHandle`): `page()` wraps the lazy page in `RequirePermission`, and the post-login redirect reads the same handles. Old addresses are `moved(to)` routes with `handle.redirectTo`. Navigation items keep their own `permission` for visibility, with the same `Permission` values.
 
 ## Build and deploy
@@ -252,7 +254,7 @@ Two clocks matter ([Glossary](GLOSSARY.md)):
 - `src/lib/time-zone.ts#symbol:hqToday`, `src/lib/time-zone.ts#symbol:sameOffset`, `src/lib/time-zone.ts#symbol:dateInTimeZone`, `src/lib/format.ts#symbol:formatDate`, `src/lib/format.ts#symbol:formatWeekday`, `src/lib/format.ts#symbol:describeDateTime`, `src/components/ui/date-time.tsx#symbol:DateTimeText`, `src/mocks/engine.ts#symbol:businessDate` — time rules; `src/lib/format.test.ts` — date-only values read the same day in every viewing and machine time zone.
 - `src/lib/use-media-query.ts#symbol:useMediaQuery` — viewport gate for a view that needs width.
 - `src/i18n/index.ts#symbol:initialLocale`, `src/i18n/en.ts` — language selection and the typed English messages.
-- `src/app/nav.ts#symbol:NAV_ITEMS`, `src/app/router.tsx#symbol:RouteHandle` — navigation table and route handles.
+- `src/app/nav.ts#symbol:NAV_ITEMS`, `src/app/nav.ts#symbol:phoneTabs`, `src/app/nav.test.ts`, `src/app/router.tsx#symbol:RouteHandle` — navigation table, phone tabs per role and route handles.
 - `vite.config.ts`, `deploy/nginx.conf`, `src/config/zod-jitless.ts`, `src/config/nginx-csp.ts#symbol:pagePolicyOf`, `src/config/deploy-config.test.ts`, `deploy/csp-hashes.mjs`, `scripts/check-real-build.mjs` — chunks, serving rules, CSP and the real-backend build check.
 - `src/app/update-check.ts#symbol:watchForUpdates`, `src/app/update-notice.tsx#symbol:UpdateNotice`, `src/app/update-check.test.ts`, `e2e/update.spec.ts` — new-version notice; `src/vite-env.d.ts` — `__BUILD_ID__`, `__API_MOCK__` and `VITE_*` types; `deploy/check-nginx.sh` — serving checks.
 

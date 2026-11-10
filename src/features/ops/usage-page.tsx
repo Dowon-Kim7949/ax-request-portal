@@ -47,7 +47,7 @@ export default function UsagePage() {
       <PageHeader
         title={t('usage.title')}
         description={t('usage.subtitle', { month: formatMonth(month) })}
-        actions={<Badge>{t('ai.estimate')}</Badge>}
+        badge={<Badge>{t('ai.estimate')}</Badge>}
       />
 
       {/* Filters: one row, above everything they scope */}

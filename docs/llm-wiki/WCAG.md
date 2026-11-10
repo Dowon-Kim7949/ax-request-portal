@@ -2,8 +2,8 @@
 title: Accessibility (WCAG)
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: wcag
 project: ax-request-portal
 last_updated: 2026-11-10
@@ -92,7 +92,7 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 ## Semantics and focus management
 
 - Skip link: `SkipLink` is the first tab stop on every signed-in screen; it is visually hidden until focused and moves focus to `<main id="main" tabIndex={-1}>` in code, so the URL hash and the router are not touched. The login screen has no navigation to skip. `e2e/a11y.spec.ts` checks it on the desktop project only: WebKit (phone and tablet projects) does not tab to links by default.
-- Landmarks come from the shell: `header`, `main`, a labelled `nav` for the sidebar/rail and a separately labelled `nav` for the phone tab bar. In a mock build the demo banner above the header is a labelled `aside` ("Demo mode"), because it sits outside `header` and `main`; it has nothing focusable, so the skip link stays the first tab stop. On the login screen the demo note is a plain paragraph inside `main`. Icon-only links carry `aria-label` (the notifications link includes the unread count, "알림 (N)").
+- Landmarks come from the shell: `header`, `main`, a labelled `nav` for the sidebar/rail and a separately labelled `nav` for the phone tab bar, where "new request" keeps the middle place on every account that has it (consistent navigation, SC 3.2.3; `phoneTabs`). In a mock build the demo banner above the header is a labelled `aside` ("Demo mode"), because it sits outside `header` and `main`; it has nothing focusable, so the skip link stays the first tab stop. On the login screen the demo note is a plain paragraph inside `main`. Icon-only links carry `aria-label` (the notifications link includes the unread count, "알림 (N)").
 - Label in Name (2.5.3): the visible text of a control must be part of its accessible name. Decorative text inside a control whose name already says it — the brand initials, the unread counter on the bell, the account initial — is drawn by CSS with the shell's `Glyph` (`content: attr(data-glyph)`, `aria-hidden`), not as DOM text. The account button is named by a visually hidden "My account" plus the user's name, visible from `lg`.
 - A `<dl>` group holds only `<dt>` and `<dd>`: the wizard's review rows keep their edit button inside the `<dd>`, and a project card's target and rule counts sit outside its `<dl>`.
 - The schedule's month view is a `<table>` (caption: the month), not an ARIA `grid`: screen readers move by week and day with their table commands, and no arrow-key handling is owed. Column headers show short weekday names and give screen readers the full ones; each cell starts with its full date, hidden visually, beside the visible day number (hidden from the accessibility tree). Release chips are links named "#id title, service, status"; a day's overflow is a button with `aria-expanded` and `aria-controls`; the table is `aria-busy` while another range's data stands in; the month name beside the arrows is a polite live region.

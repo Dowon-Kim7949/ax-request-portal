@@ -24,6 +24,27 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-10 - UI: "new request" as the middle phone tab; the usage page's chip beside its title
+
+- status: needs_review
+- actor: claude-code
+- scope: code, tests, docs
+- changed:
+  - src/app/nav.ts (`phoneTabs`, `PHONE_PRIORITY`), src/app/nav.test.ts (new)
+  - src/app/page.tsx (`PageHeader` `badge`), src/app/page.test.tsx (new), src/features/ops/usage-page.tsx
+  - src/app/shell.tsx (`BottomNav`: every tab icon in a 32 px box)
+  - docs/llm-wiki/ARCHITECTURE_CONVENTIONS.md, DOMAIN_FEATURES.md, profiles/frontend.md, domains/13_ops.md, COMPONENT_INVENTORY.md, WCAG.md
+- summary:
+  - The phone tab bar took the first four permitted items of one priority list, so "new request" moved between the second and fourth tab by role. It is now always the middle tab (third of five) for anyone with `request:create`; the other tabs keep the priority order. Requester and admin tabs change; the operator, who cannot file requests, keeps four priority tabs.
+  - The usage page's "estimate" chip sat in `actions`, bottom-aligned after the wrapped description on a phone (440 px). `PageHeader` gains `badge`, shown on the title's row and centred on it; `actions` stays for buttons.
+  - The "new request" circle (32 px) is larger than the other tab icons (24 px), which pushed its label lower; every tab icon now sits in a 32 px box.
+- evidence:
+  - Red: `nav.test.ts` "keeps new request in the middle" failed against the old order. `page.test.tsx` was written with the change (no red run). Green: unit 62 files / 636 passed; lint and typecheck pass. Scoped E2E (smoke; layout at 320 px for every role; axe requester, executive, admin and operator screens) 36 passed. Screenshots at 440 px (requester and admin tabs, the usage header) checked by eye.
+- caveats:
+  - Other pages' `actions` (buttons) keep their bottom alignment; only page-level status chips move to `badge`.
+- review notes:
+  - Re-review the navigation bullet in ARCHITECTURE_CONVENTIONS.md, the evidence line in DOMAIN_FEATURES.md, the layout and `PageHeader` bullets in profiles/frontend.md and the estimate bullet in 13_ops.md, the `BottomNav` row in COMPONENT_INVENTORY.md and the landmarks bullet in WCAG.md, then approve the six documents.
+
 ## 2026-11-10 - Feature: dates on the developer's work cards
 
 - status: needs_review

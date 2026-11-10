@@ -2,11 +2,11 @@
 title: AI Operations
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-09
+last_updated: 2026-11-10
 author: claude-code
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -91,7 +91,7 @@ The sidebar shows these under an "AI operations" heading (`NavGroup` `ops`); the
   - Claude (API and Claude Code): `input_tokens` already excludes cache reads and writes.
   - OpenAI Responses and Codex: `input_tokens` includes cached and cache-write tokens, so both are subtracted; `output_tokens` includes reasoning. For Codex this is an assumption (its docs do not say), clamped so a malformed report cannot go negative.
 - Cost = Σ tokens × the operator's price ÷ 1M, in USD, then × `usdKrw`. `bookUsage` books it once, when the call finishes, rounded to 1/100; editing prices later never re-prices past entries. A model without a price books nothing.
-- All costs are estimates. Provider SDK cost fields (the Claude Agent SDK's `total_cost_usd`) are client-side estimates too; the bill is in each provider's console.
+- All costs are estimates, and the usage page says so with an "estimate" chip beside its title (`PageHeader` `badge`). Provider SDK cost fields (the Claude Agent SDK's `total_cost_usd`) are client-side estimates too; the bill is in each provider's console.
 - Daily and monthly totals, the budget's month and "today" on the daily chart follow the head-office business calendar ([Glossary](../GLOSSARY.md)): an entry booked between 00:00 and 09:00 in Korea counts in that Korean day and month. A viewer on another clock sees `HqCalendarNote` next to the month stepper. Key registration times are `DateTimeText` (compact, full form in the tooltip).
 - Korean amounts group by 만 and 억 (`formatKrw`: "1.5억 원", "18.4만 원"); English uses compact `₩` notation.
 
