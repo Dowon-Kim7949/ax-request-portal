@@ -82,14 +82,19 @@ export const NAV_ITEMS: NavItem[] = [
 ]
 
 /**
- * Phone tab bar: the four most useful items for this user, in this order.
- * Everything else lives in the "more" sheet.
+ * Phone tab bar: four tabs plus "more". Whoever can file a request finds "new
+ * request" in the middle (third of five), the same place on every account; the
+ * other tabs are this user's most useful items, in this order. Everything else
+ * lives in the "more" sheet.
  */
+const PHONE_PRIMARY: NavKey = 'newRequest'
+const PHONE_PRIMARY_SLOT = 2
+const PHONE_TAB_COUNT = 4
+
 const PHONE_PRIORITY: NavKey[] = [
   'home',
   'assigned',
   'dashboard',
-  'newRequest',
   'myRequests',
   'schedule',
   'aiUsage',
@@ -103,9 +108,11 @@ export function visibleNav(can: (p: Permission) => boolean): NavItem[] {
 
 export function phoneTabs(items: NavItem[]): { tabs: NavItem[]; rest: NavItem[] } {
   const byKey = new Map(items.map((i) => [i.key, i]))
+  const primary = byKey.get(PHONE_PRIMARY)
   const tabs = PHONE_PRIORITY.map((k) => byKey.get(k))
     .filter((i): i is NavItem => Boolean(i))
-    .slice(0, 4)
+    .slice(0, primary ? PHONE_TAB_COUNT - 1 : PHONE_TAB_COUNT)
+  if (primary) tabs.splice(Math.min(PHONE_PRIMARY_SLOT, tabs.length), 0, primary)
   const tabKeys = new Set(tabs.map((t) => t.key))
   return { tabs, rest: items.filter((i) => !tabKeys.has(i.key)) }
 }

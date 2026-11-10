@@ -349,7 +349,10 @@ function BottomNav({ items }: { items: NavItem[] }) {
                   <i.icon className="size-4.5" aria-hidden />
                 </span>
               ) : (
-                <i.icon className="size-6" aria-hidden />
+                // The same 32 px box as the "new request" circle, so every label lines up.
+                <span className="grid size-8 place-items-center">
+                  <i.icon className="size-6" aria-hidden />
+                </span>
               )}
               {t(`nav.${i.key}`)}
             </NavLink>
@@ -360,7 +363,9 @@ function BottomNav({ items }: { items: NavItem[] }) {
             onClick={() => setMoreOpen(true)}
             aria-haspopup="dialog"
           >
-            <Ellipsis className="size-6" aria-hidden />
+            <span className="grid size-8 place-items-center">
+              <Ellipsis className="size-6" aria-hidden />
+            </span>
             {t('common.more')}
           </button>
         </div>
