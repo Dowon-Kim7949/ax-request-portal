@@ -37,3 +37,6 @@ playwright/.cache
 *.njsproj
 *.sln
 *.sw?
+
+# llm-wiki run manifests: local evidence for `llm-wiki check-run`; CI does not read them
+.llm-wiki/runs/

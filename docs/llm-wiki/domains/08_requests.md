@@ -6,7 +6,7 @@ tags:
 status: verified
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-09
+last_updated: 2026-11-10
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -42,7 +42,7 @@ related:
 visibility: public
 contains_sensitive_info: false
 reviewed_by: Kim Dowon
-reviewed_at: 2026-11-09
+reviewed_at: 2026-11-10
 ---
 
 # My Requests
@@ -57,6 +57,7 @@ The requester's own list at `/requests` (`request:read:own`), with their saved d
 - Search is local state: a title substring or an exact `#id` (a leading `#` is stripped). The server's `q` parameter is not used.
 - Empty states differ: no requests at all shows a "new request" call-to-action, an empty filter result says so.
 - The new-request button is hidden below `sm`; phones reach the wizard from the navigation.
+- Cards here do not show the wanted-by or release date (`RequestCard` without `showDates`); the requester sees both on the request page and the release date on the schedule.
 
 ## Saved drafts
 

@@ -6,7 +6,7 @@ tags:
 status: verified
 doc_type: component_inventory
 project: ax-request-portal
-last_updated: 2026-11-09
+last_updated: 2026-11-10
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -58,7 +58,7 @@ related:
 visibility: public
 contains_sensitive_info: false
 reviewed_by: Kim Dowon
-reviewed_at: 2026-11-09
+reviewed_at: 2026-11-10
 ---
 
 # Component Inventory
@@ -112,7 +112,7 @@ Feature-local, listed here because three screens share them.
 
 | Component | Purpose |
 | --- | --- |
-| `RequestCard` | Whole card is one link to `/requests/:id`; props `request`, `myTurn` (shows the "your turn" badge), `showRequester`. |
+| `RequestCard` | Whole card is one link to `/requests/:id`; props `request`, `myTurn` (shows the "your turn" badge), `showRequester`, `showDates` (adds the wanted-by and release dates, flagged past due while the request is open; only the developer queue passes it). |
 | `StatusBadge` | Status label and tone for one lifecycle status. |
 | `Stepper` | Phase progress for a request; the current phase carries `aria-current="step"`. |
 | `Timeline` | Renders a request's timeline entries; each time is a `DateTimeText variant="full"`. |
