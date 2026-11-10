@@ -2,8 +2,8 @@
 title: Architecture Conventions
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: architecture_conventions
 project: ax-request-portal
 last_updated: 2026-11-10
@@ -104,6 +104,7 @@ evidence:
   - src/app/nav.ts#symbol:NAV_ITEMS
   - src/app/nav.ts#symbol:phoneTabs
   - src/app/nav.test.ts
+  - src/app/router.tsx#symbol:permissionsFor
   - src/app/router.tsx#symbol:RouteHandle
   - src/app/pages.tsx#symbol:RouteErrorView
   - vite.config.ts
@@ -223,7 +224,7 @@ Two clocks matter ([Glossary](GLOSSARY.md)):
 ## Navigation and routes
 
 - `NAV_ITEMS` is one permission-aware table that renders the desktop sidebar, the tablet icon rail and the phone tab bar (four tabs and a "more" sheet; whoever holds `request:create` finds "new request" as the middle tab, the same place on every account, and the other tabs follow `PHONE_PRIORITY`; `phoneTabs`). A route with `handle.focus` (the wizard) hides the phone tab bar. Every `page()` route has `handle.fit`: its page is built from `Page` parts and, on a big screen, fills the window with only its lists scrolling ([Frontend Profile](profiles/frontend.md)); the not-found route is the exception and scrolls the window.
-- Every route sits under a pathless root route that renders `SessionSync` and has `RouteErrorPage` as its `errorElement`, so the login screen gets the app's error page too; `HydrateFallback` is on `/login` and `/`. A route's permission is declared once, as `handle.permission` (`RouteHandle`): `page()` wraps the lazy page in `RequirePermission`, and the post-login redirect reads the same handles. Old addresses are `moved(to)` routes with `handle.redirectTo`. Navigation items keep their own `permission` for visibility, with the same `Permission` values.
+- Every route sits under a pathless root route that renders `SessionSync` and has `RouteErrorPage` as its `errorElement`, so the login screen gets the app's error page too; `HydrateFallback` is on `/login` and `/`. A route's permission is declared once, as `handle.permission` (`RouteHandle`): `page()` wraps the lazy page in `RequirePermission`, and the post-login redirect reads the same handles. Old addresses are `moved(to)` routes with `handle.redirectTo`. Navigation items declare no permission of their own: `visibleNav` shows an item when every permission `permissionsFor(item.to)` returns (the `handle.permission` of each route the path matches) is held, so a menu never offers a page that would refuse. The router passes `permissionsFor` to `AppShell` as a prop; importing it would close a module cycle (the router renders the shell). `src/app/nav.test.ts` checks that every item links to a page of its own and is shown exactly when that page would open.
 
 ## Build and deploy
 
@@ -258,7 +259,7 @@ Two clocks matter ([Glossary](GLOSSARY.md)):
 - `src/lib/use-media-query.ts#symbol:useMediaQuery`, `src/lib/use-media-query.ts#symbol:FIT_QUERY`, `src/lib/use-media-query.test.ts` — viewport gates; the test keeps `FIT_QUERY` equal to the `fit:` variant in `src/index.css`.
 - `src/lib/scrollbar-width.ts#symbol:trackScrollbarWidth` — the scrollbar gutter the page bands pad by.
 - `src/i18n/index.ts#symbol:initialLocale`, `src/i18n/en.ts` — language selection and the typed English messages.
-- `src/app/nav.ts#symbol:NAV_ITEMS`, `src/app/nav.ts#symbol:phoneTabs`, `src/app/nav.test.ts`, `src/app/router.tsx#symbol:RouteHandle` — navigation table, phone tabs per role and route handles.
+- `src/app/nav.ts#symbol:NAV_ITEMS`, `src/app/nav.ts#symbol:phoneTabs`, `src/app/nav.test.ts`, `src/app/router.tsx#symbol:RouteHandle`, `src/app/router.tsx#symbol:permissionsFor` — navigation table, phone tabs per role, route handles and the permissions the menus read from them.
 - `vite.config.ts`, `deploy/nginx.conf`, `src/config/zod-jitless.ts`, `src/config/nginx-csp.ts#symbol:pagePolicyOf`, `src/config/deploy-config.test.ts`, `deploy/csp-hashes.mjs`, `scripts/check-real-build.mjs` — chunks, serving rules, CSP and the real-backend build check.
 - `src/app/update-check.ts#symbol:watchForUpdates`, `src/app/update-notice.tsx#symbol:UpdateNotice`, `src/app/update-check.test.ts`, `e2e/update.spec.ts` — new-version notice; `src/vite-env.d.ts` — `__BUILD_ID__`, `__API_MOCK__` and `VITE_*` types; `deploy/check-nginx.sh` — serving checks.
 

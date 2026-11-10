@@ -10,6 +10,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import '@/i18n'
 import { createTestApi } from '@/test/mock-api'
 import { signInAs, testQueryClient } from '@/test/session'
+import { permissionsFor } from './router'
 import { AppShell } from './shell'
 
 const build = vi.hoisted(() => ({ apiMock: true }))
@@ -38,7 +39,13 @@ afterAll(() => t.server.close())
 
 function renderShell() {
   const router = createMemoryRouter(
-    [{ path: '/', element: <AppShell />, children: [{ index: true, element: <h1>홈</h1> }] }],
+    [
+      {
+        path: '/',
+        element: <AppShell permissionsFor={permissionsFor} />,
+        children: [{ index: true, element: <h1>홈</h1> }],
+      },
+    ],
     { initialEntries: ['/'] },
   )
   const view = render(

@@ -2,8 +2,8 @@
 title: Component Inventory
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: component_inventory
 project: ax-request-portal
 last_updated: 2026-11-10

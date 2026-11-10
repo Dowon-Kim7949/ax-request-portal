@@ -2,8 +2,8 @@
 title: Domain Features
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain_overview
 project: ax-request-portal
 last_updated: 2026-11-10
@@ -78,7 +78,7 @@ User-facing features by role. Each row names the domain document that holds the 
 | Feature | Domain | E2E |
 | --- | --- | --- |
 | Monthly dashboard: received (like-for-like comparison), in progress, done, AI cost, per-project bars, attention list | [Executive Dashboard](domains/03_dashboard.md) | `admin.spec.ts` |
-| Everything a requester can do, plus reading all requests | [Auth](domains/02_auth.md) | — |
+| Everything a requester can do, plus reading all requests | [Auth](domains/02_auth.md) | `admin.spec.ts` |
 
 ## Admin
 
@@ -128,7 +128,7 @@ The 41 endpoints of `src/api/contract.ts` are listed per domain in the domain do
 
 ## Open Questions
 
-- Executives have no E2E test of their requester abilities; they are covered only through the permission table.
+- None at the moment.
 
 ## Review Notes
 

@@ -24,6 +24,30 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-10 - The rail's menu as a dialog; menus read the routes' permissions; executives' requester E2E
+
+- status: needs_review
+- actor: claude-code
+- scope: code, tests, docs
+- changed:
+  - src/app/shell.tsx (`Sidebar`: the tablet rail's menu is a Radix Dialog; `AppShell` takes `permissionsFor`), src/lib/use-media-query.ts (`SIDEBAR_UP`)
+  - src/app/router.tsx (`permissionsFor`), src/app/nav.ts (`NavItem.permission` removed; `visibleNav(can, permissionsFor)`), src/app/nav.test.ts, src/app/shell.test.tsx, src/app/sign-out.test.tsx
+  - e2e/a11y.spec.ts (the rail's menu), e2e/admin.spec.ts (an executive files a request)
+  - docs/llm-wiki: WCAG.md, domains/02_auth.md, ARCHITECTURE_CONVENTIONS.md, DOMAIN_FEATURES.md, E2E_WORKFLOWS.md, profiles/frontend.md; COMPONENT_INVENTORY.md, domains/00_overview.md and 09_schedule.md only back to needs_review
+- summary:
+  - Three open questions are closed: WCAG (the rail's overlay and focus), Auth (`NavItem.permission` declared apart from the routes) and Domain Features (no E2E of an executive's requester abilities).
+  - The tablet rail's expanded menu was a plain overlay. Focus stayed on the button behind it, Tab went on to the dimmed page, and Escape did nothing. It is now a modal Radix Dialog ("주 메뉴"), with the same look. It is closed when the window leaves the rail's widths.
+  - The menus no longer declare permissions. An item shows when the page it links to would open, read from the routes' `handle.permission` (`permissionsFor`). The router passes the function to `AppShell` because importing it would close a module cycle.
+  - An executive files a request, finds it in My requests, reads another person's request, and finds no developer queue in the menu or at its address.
+- evidence:
+  - Red, then green: `a11y.spec.ts` "the tablet rail" found no dialog before the change, then passed 3 of 3. The first green run failed on the outside click. Radix starts listening for outside clicks a tick after opening, so the test retries that click (a probe after 500 ms closed it).
+  - `nav.test.ts`: every item links to a page of its own and shows exactly when its page would open, for every role.
+  - The executive test passes on three projects. The same "no link" locator does find the queue for a developer on all three, so the check can fail.
+  - `npm run verify` passed (unit 640). Full E2E on three projects: 244 passed, 0 failed.
+- caveats:
+  - The menu's dialog opens only at the rail's widths (`TABLET_UP` and below `SIDEBAR_UP`), and jsdom has no `matchMedia`, so only E2E exercises it.
+- review notes:
+
 ## 2026-11-10 - UI: every page fits a big screen; the demo notice moves into the header
 
 - status: needs_review

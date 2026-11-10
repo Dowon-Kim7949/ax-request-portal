@@ -2,8 +2,8 @@
 title: Accessibility (WCAG)
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: wcag
 project: ax-request-portal
 last_updated: 2026-11-10
@@ -34,6 +34,7 @@ evidence:
   - src/index.css#L200-L234
   - src/index.css#L236-L249
   - src/app/shell.tsx#symbol:SkipLink
+  - src/app/shell.tsx#symbol:Sidebar
   - src/i18n/en.ts#symbol:skipToContent
   - src/i18n/ko.ts#symbol:skipToContent
   - index.html#L13-L31
@@ -104,6 +105,7 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 - A screen reader ignores a live region that arrives with its text already in it. The login screen's session-expiry notice is therefore injected 100 ms after mounting into an empty `sr-only` `role="status"`; the visible copy is `aria-hidden` and is the e-mail field's description, so it is heard once.
 - The time-zone preview in Settings is not a live region (each arrow key on the select would be read out); the select points to it with `aria-describedby`.
 - Wizard steps move focus to the step heading (`StepTitle`, `tabIndex=-1`) in a layout effect, before paint. A passive effect stole focus after the user had started typing and dropped the input.
+- The tablet rail's full menu (md up to xl) is a modal Radix Dialog named "주 메뉴": opening moves focus into it, Tab stays inside, Escape or a click on the dimmed page closes it, focus goes back to the expand button (`aria-expanded`, `aria-haspopup="dialog"`), and the page behind is hidden from assistive technology meanwhile. A window resized past the rail's widths closes it rather than leaving focus in a hidden dialog. `e2e/a11y.spec.ts` checks it on a landscape tablet. Before, it was a plain overlay: Tab went on to the dimmed page behind, and Escape did nothing.
 - `Sheet` (Radix Dialog) traps focus and closes on Escape. On closing it gives focus back to what had it when it opened; when that is gone the caller moves focus (after deleting a saved draft: the section heading, or `main` when the section went with it). A sheet that must not close mid-operation keeps Escape from closing it (deleting a saved draft).
 - Saved drafts: the wizard's save line tells screen readers only when the draft stops reaching the account, once; a conflict or full-account notice describes the step heading, so it is heard when the heading takes focus. A count shown as `N/20` is read as a sentence (visually hidden text). See [Request Wizard](domains/11_wizard.md) and [My Requests](domains/08_requests.md).
 
@@ -126,6 +128,7 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 - `src/index.css#L200-L234` — focus outline and cursor contract; `src/index.css#L236-L249` — reduced-motion rule.
 - `src/components/request/request-card.tsx#symbol:RequestDates` — a past-due date in words as well as colour.
 - `src/app/page.tsx#symbol:PageScroll`, `e2e/fit.spec.ts` — the big-screen list region: when it applies, its name and keyboard access.
+- `src/app/shell.tsx#symbol:Sidebar`, `e2e/a11y.spec.ts` — the tablet rail's menu as a modal dialog.
 - `src/app/shell.tsx#symbol:SkipLink` — skip link and the focusable `main`; `src/i18n/en.ts#symbol:skipToContent` — its label, with `src/i18n/ko.ts#symbol:skipToContent` for Korean.
 - `index.html#L13-L31` — pre-paint theme script.
 - `src/app/theme.ts#symbol:applyTheme` — runtime theme sync.
@@ -142,7 +145,7 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 
 ## Open Questions
 
-- Whether the desktop sidebar's expanded overlay traps focus has not been checked.
+- None at the moment.
 
 ## Review Notes
 

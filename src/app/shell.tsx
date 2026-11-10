@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { Fragment, useEffect, useId, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Dialog } from 'radix-ui'
 import { Link, NavLink, Outlet, ScrollRestoration, useMatches } from 'react-router'
 import { toast } from 'sonner'
 import { useNotifications } from '@/api/queries'
@@ -19,12 +20,14 @@ import { env } from '@/config/env'
 import { useDraftSync } from '@/features/drafts/hooks'
 import { currentLocale } from '@/i18n'
 import { cn } from '@/lib/cn'
+import { SIDEBAR_UP, TABLET_UP, useMediaQuery } from '@/lib/use-media-query'
 import { useBrand } from './brand'
 import { resetDemoData } from './demo'
 import { DemoBanner } from './demo-banner'
 import { useCan, useCurrentUser } from './hooks'
 import { phoneTabs, visibleNav, type NavItem } from './nav'
 import type { RouteHandle } from './router'
+import type { Permission } from '@/domain/roles'
 import { useSignOut } from './sign-out'
 
 /* ------------------------------------------------------------------ */
@@ -239,8 +242,14 @@ function SideLink({
 
 function Sidebar({ items }: { items: NavItem[] }) {
   const { t } = useTranslation()
-  // Below xl the sidebar is an icon rail; it can be opened as an overlay.
+  // Below xl the sidebar is an icon rail; its full menu opens over the page as a modal dialog.
   const [open, setOpen] = useState(false)
+  const expandRef = useRef<HTMLButtonElement>(null)
+  // Only while the rail shows: a window resized to the full sidebar or to a phone's tab bar
+  // closes the menu, instead of leaving focus held by a dialog nobody can see.
+  const tabletUp = useMediaQuery(TABLET_UP)
+  const sidebarUp = useMediaQuery(SIDEBAR_UP)
+  if (open && !(tabletUp && !sidebarUp)) setOpen(false)
 
   const main = items.filter((i) => i.group === 'main')
   const sections = (['admin', 'ops'] as const)
@@ -281,24 +290,34 @@ function Sidebar({ items }: { items: NavItem[] }) {
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[76px] flex-col border-r border-line bg-surface md:flex xl:hidden">
         {body(false)}
         <button
+          ref={expandRef}
           type="button"
           onClick={() => setOpen(true)}
           className="m-3 grid h-11 place-items-center rounded-xl text-ink-500 hover:bg-muted"
           aria-label={t('nav.expand')}
           aria-expanded={open}
+          aria-haspopup="dialog"
         >
           <ChevronsRight className="size-5" aria-hidden />
         </button>
       </aside>
-      {open ? (
-        <div className="fixed inset-0 z-40 hidden md:block xl:hidden">
-          <button
-            type="button"
-            className="absolute inset-0 animate-fade-in bg-black/40"
-            aria-label={t('nav.collapse')}
-            onClick={() => setOpen(false)}
-          />
-          <aside className="relative flex h-full w-64 animate-slide-left flex-col bg-surface shadow-2xl">
+      {/*
+        Modal (Radix): focus moves in and stays until it closes, Escape or a click on the dimmed page
+        closes it, and the page behind is hidden from assistive technology meanwhile.
+      */}
+      <Dialog.Root open={open} onOpenChange={setOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 animate-fade-in bg-black/40" />
+          <Dialog.Content
+            aria-describedby={undefined}
+            // Back to the button that opened it (there is no Radix trigger to return to).
+            onCloseAutoFocus={(e) => {
+              e.preventDefault()
+              expandRef.current?.focus()
+            }}
+            className="fixed inset-y-0 left-0 z-40 flex w-64 animate-slide-left flex-col bg-surface shadow-2xl focus:outline-none"
+          >
+            <Dialog.Title className="sr-only">{t('nav.mainLabel')}</Dialog.Title>
             {body(true, () => setOpen(false))}
             <button
               type="button"
@@ -308,9 +327,9 @@ function Sidebar({ items }: { items: NavItem[] }) {
               <ChevronsLeft className="size-5" aria-hidden />
               {t('nav.collapse')}
             </button>
-          </aside>
-        </div>
-      ) : null}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </>
   )
 }
@@ -462,11 +481,12 @@ function SkipLink() {
   )
 }
 
-export function AppShell() {
+/** The signed-in layout. `permissionsFor` is the router's (passed in: the router renders this shell). */
+export function AppShell({ permissionsFor }: { permissionsFor: (path: string) => Permission[] }) {
   // Drafts reach the account from any screen, not only the wizard's.
   useDraftSync()
   const can = useCan()
-  const items = visibleNav(can)
+  const items = visibleNav(can, permissionsFor)
   const handles = useMatches().map((m) => m.handle as RouteHandle | undefined)
   const focus = handles.some((h) => h?.focus)
   // A page made of `Page` parts fills the window on a big screen; only its lists scroll (src/app/page.tsx).

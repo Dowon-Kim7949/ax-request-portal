@@ -2,8 +2,8 @@
 title: Frontend Profile
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: profile
 project: ax-request-portal
 last_updated: 2026-11-10
@@ -58,7 +58,7 @@ Front-end rules that apply to every screen. The deeper references are [Architect
 
 ## Responsive shell
 
-- Three layouts from one navigation table: phone (bottom tab bar, four tabs plus a "more" sheet, with "new request" always the middle tab when the user may file one), tablet from `md` (76 px icon rail that expands as an overlay), desktop from `xl` (256 px sidebar).
+- Three layouts from one navigation table: phone (bottom tab bar, four tabs plus a "more" sheet, with "new request" always the middle tab when the user may file one), tablet from `md` (76 px icon rail whose full menu opens as a modal dialog over the page), desktop from `xl` (256 px sidebar).
 - Every workflow must be completable at every size; the E2E projects (phone, tablet, desktop) enforce it. When a route needs the full phone height for its own action bar, it sets `handle.focus` to hide the tab bar.
 - Single-column grids need `grid-cols-1`; without it a `nowrap` child widens the page beyond the phone viewport.
 - Content width: the header and every page share `--page-max` (72rem, 90rem from `2xl`) and `--page-pad` through the `page-band` (bands that do not scroll) and `page-column` (inside a scroll region, or a whole page) utilities in `src/index.css`.
