@@ -2,8 +2,8 @@
 title: Domain Features
 tags:
   - llm-wiki
-  - needs-review
-status: needs_review
+  - verified
+status: verified
 doc_type: domain_overview
 project: ax-request-portal
 last_updated: 2026-11-10

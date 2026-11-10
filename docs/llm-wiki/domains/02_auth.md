@@ -2,8 +2,8 @@
 title: Auth
 tags:
   - llm-wiki
-  - needs-review
-status: needs_review
+  - verified
+status: verified
 doc_type: domain
 project: ax-request-portal
 last_updated: 2026-11-10
@@ -51,7 +51,7 @@ related:
 visibility: public
 contains_sensitive_info: false
 reviewed_by: Kim Dowon
-reviewed_at: 2026-11-09
+reviewed_at: 2026-11-10
 ---
 
 # Auth
