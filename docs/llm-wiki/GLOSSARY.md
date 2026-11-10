@@ -2,11 +2,11 @@
 title: Glossary
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: glossary
 project: ax-request-portal
-last_updated: 2026-11-09
+last_updated: 2026-11-10
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -91,7 +91,7 @@ Terms as the code uses them. Identifiers are kept in English in both UI language
 | Merge request / MR | The AI's change for review; called PR when the project's provider is GitHub. | `src/features/detail/developer-panels.tsx` |
 | Criterion check (`CriterionCheck`) | The requester's pass/fail per acceptance criterion during verification. | `src/domain/model.ts` |
 | Regression check (`RegressionCheck`) | An existing feature to re-check after a change, from the report's impact. | `src/domain/model.ts` |
-| Mock mode / demo mode | A build whose `VITE_API_MOCK` is not `false` (`isApiMock`): the in-browser MSW server answers every call and the data stays in each browser's `localStorage`. Every screen says so with the demo banner (`DemoBanner`). | `src/config/env-check.ts` |
+| Mock mode / demo mode | A build whose `VITE_API_MOCK` is not `false` (`isApiMock`): the in-browser MSW server answers every call and the data stays in each browser's `localStorage`. Every screen says so with the demo notice (`DemoBanner`: a strip above the header on a phone, a box in the header from a tablet up). | `src/config/env-check.ts` |
 | Mock state (`MockState`) | The mock server's persisted data, versioned by `STATE_VERSION`. | `src/mocks/engine.ts` |
 | Dirty | Mock data a person has edited (uploads and read notifications included); it no longer follows language changes. | `src/mocks/engine.ts` |
 | Contract | The endpoint table in `src/api/contract.ts` and the generated `docs/openapi.json`. | `src/api/contract.ts` |

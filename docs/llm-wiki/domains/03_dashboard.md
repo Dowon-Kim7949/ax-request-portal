@@ -2,11 +2,11 @@
 title: Executive Dashboard
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-10
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -55,6 +55,10 @@ Every date in the totals is a day on the head-office business calendar ([Glossar
 ## Charts
 
 Bars are plain CSS, no chart library: done uses `brand-600`, in progress `ai-500` (both contrast-checked as non-text marks in `src/theme.test.ts`), bars are 12 px high with a 2 px gap, lengths are relative to the largest project, and zero segments are not drawn. Each segment is focusable (`tabIndex=0`, `role="img"`, an `aria-label` with project, series and value) and its tooltip opens on hover and on focus, so the numbers are reachable by keyboard and screen reader. Reuse the same two tokens for these series elsewhere, and add any new series colour to the contrast table first.
+
+## Layout
+
+- A `fit` route ([Frontend Profile](../profiles/frontend.md)): on a big screen the title, the month stepper and the four tiles stay in place; the per-project panel and the side panels (upcoming releases, what needs attention) each scroll on their own (`PageColumns`). While another month loads, the tiles and the panels both dim and are `aria-busy`.
 
 ## API Services
 

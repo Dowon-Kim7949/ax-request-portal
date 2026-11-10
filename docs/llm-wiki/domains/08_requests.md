@@ -2,8 +2,8 @@
 title: My Requests
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
 last_updated: 2026-11-10
@@ -70,6 +70,11 @@ The requester's own list at `/requests` (`request:read:own`), with their saved d
 - While the account's list is read, this device's rows show at once; with none, the section holds room for as many rows as it showed last time (`lastDraftCount`, up to 3, remembered per person in `ax-request-portal:drafts-seen:<userId>` and deleted on sign-out), so nothing below jumps. A failed first load shows a compact `LoadFailed` with retry next to this device's rows; a failed refresh shows `RefreshFailed`.
 - Opened at `#drafts`, the section scrolls itself into view once it renders (the router's scroll restoration runs before the data arrives), with a scroll margin for the sticky header. Focus does not move.
 - `DraftsNotice` (same file): on a new, empty request the wizard's save line shows "Saved drafts: N · Continue", linking to `/requests#drafts`; the open draft is not counted.
+
+## Layout
+
+- A `fit` route ([Frontend Profile](../profiles/frontend.md)): on a big screen the title and the new-request button stay in place; the saved drafts, the filter and search, and the cards scroll in one region ("내 요청 목록"), where the filter and search stay at the region's top once the drafts have gone by (`sticky`). Cards go to three columns on a 1344 px list.
+- `#drafts` still lands on the drafts: they are the first thing in the region, and a #hash address is not reset to the top (`useScrollMemory`).
 
 ## API Services
 

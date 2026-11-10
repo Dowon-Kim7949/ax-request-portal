@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router'
 import { useRequests } from '@/api/queries'
 import { refreshOf } from '@/api/refresh'
-import { PageHeader } from '@/app/page'
+import { Page, PageHeader, PageScroll, PageTop } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { RequestCard } from '@/components/request/request-card'
 import { Button } from '@/components/ui/button'
@@ -48,70 +48,75 @@ export default function MyRequestsPage() {
   }, [list.data, filter, q])
 
   return (
-    <>
-      <PageHeader
-        title={t('requests.title')}
-        actions={
-          <Button asChild className="hidden sm:inline-flex">
-            <Link to="/requests/new">
-              <SquarePen aria-hidden />
-              {t('nav.newRequest')}
-            </Link>
-          </Button>
-        }
-      />
-      {/* Above the requests, apart from their filter and search. */}
-      <DraftsSection variant="page" className="mb-6" />
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Segmented
-          label={t('requests.title')}
-          value={filter}
-          onChange={(f) => setParams({ filter: f }, { replace: true })}
-          options={(['open', 'myTurn', 'closed', 'all'] as const).map((f) => ({
-            value: f,
-            label: t(`requests.filter.${f}`),
-            count: list.data ? counts[f] : undefined,
-          }))}
-        />
-        <label className="relative sm:w-64">
-          <span className="sr-only">{t('requests.search')}</span>
-          <Search
-            className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink-400"
-            aria-hidden
-          />
-          <Input
-            type="search"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={t('requests.search')}
-            className="h-11 pl-10"
-          />
-        </label>
-      </div>
-
-      <RefreshFailed {...refreshOf(list)} className="mb-3" />
-      {list.isPending ? (
-        <ListSkeleton />
-      ) : list.isLoadingError ? (
-        <LoadFailed error={list.error} onRetry={() => void list.refetch()} retrying={list.isFetching} />
-      ) : shown.length ? (
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {shown.map((r) => (
-            <RequestCard key={r.id} request={r} myTurn={turnOf(r.status) === 'requester'} />
-          ))}
-        </div>
-      ) : (
-        <EmptyState
-          title={list.data?.length ? t('requests.emptyFiltered') : t('requests.empty')}
-          action={
-            list.data?.length ? null : (
-              <Button asChild>
-                <Link to="/requests/new">{t('home.newRequestCta')}</Link>
-              </Button>
-            )
+    <Page>
+      <PageTop>
+        <PageHeader
+          title={t('requests.title')}
+          actions={
+            <Button asChild className="hidden sm:inline-flex">
+              <Link to="/requests/new">
+                <SquarePen aria-hidden />
+                {t('nav.newRequest')}
+              </Link>
+            </Button>
           }
         />
-      )}
-    </>
+      </PageTop>
+      <PageScroll label={t('common.listOf', { title: t('requests.title') })} className="@container">
+        {/* Above the requests, apart from their filter and search. */}
+        <DraftsSection variant="page" className="mb-6" />
+        {/* On a big screen the filter stays at the top of the list once the drafts have scrolled away. */}
+        <div className="flex flex-col gap-3 bg-canvas pb-4 sm:flex-row sm:items-center sm:justify-between fit:sticky fit:top-0 fit:z-10">
+          <Segmented
+            label={t('requests.title')}
+            value={filter}
+            onChange={(f) => setParams({ filter: f }, { replace: true })}
+            options={(['open', 'myTurn', 'closed', 'all'] as const).map((f) => ({
+              value: f,
+              label: t(`requests.filter.${f}`),
+              count: list.data ? counts[f] : undefined,
+            }))}
+          />
+          <label className="relative sm:w-64">
+            <span className="sr-only">{t('requests.search')}</span>
+            <Search
+              className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-ink-400"
+              aria-hidden
+            />
+            <Input
+              type="search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={t('requests.search')}
+              className="h-11 pl-10"
+            />
+          </label>
+        </div>
+
+        <RefreshFailed {...refreshOf(list)} className="mb-3" />
+        {list.isPending ? (
+          <ListSkeleton />
+        ) : list.isLoadingError ? (
+          <LoadFailed error={list.error} onRetry={() => void list.refetch()} retrying={list.isFetching} />
+        ) : shown.length ? (
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 @min-[84rem]:grid-cols-3">
+            {shown.map((r) => (
+              <RequestCard key={r.id} request={r} myTurn={turnOf(r.status) === 'requester'} />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            title={list.data?.length ? t('requests.emptyFiltered') : t('requests.empty')}
+            action={
+              list.data?.length ? null : (
+                <Button asChild>
+                  <Link to="/requests/new">{t('home.newRequestCta')}</Link>
+                </Button>
+              )
+            }
+          />
+        )}
+      </PageScroll>
+    </Page>
   )
 }

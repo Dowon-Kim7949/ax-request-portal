@@ -477,28 +477,33 @@ export function AppShell() {
       <SkipLink />
       <Sidebar items={items} />
       <div className={cn('md:pl-[76px] xl:pl-64', fit && 'fit:flex fit:min-h-0 fit:flex-1 fit:flex-col')}>
-        <DemoBanner />
+        {/* On a phone the demo notice is a strip above the header; from a tablet up, a box in the header. */}
+        <DemoBanner className="md:hidden" />
         {/*
           The notch inset (an iOS home-screen app draws under the status bar) is padded once: by the
-          demo banner when there is one, otherwise by the header. With the banner, the header sticks
-          just below the inset once the banner has scrolled away, and this strip keeps the page from
-          showing through under the status bar.
+          demo strip on a phone when there is one, otherwise by the header. With the strip, the header
+          sticks just below the inset once the strip has scrolled away, and this strip keeps the page
+          from showing through under the status bar.
         */}
         {env.apiMock ? (
           <div
             aria-hidden
-            className="pointer-events-none fixed inset-x-0 top-0 z-30 h-[env(safe-area-inset-top)] bg-canvas/90 backdrop-blur md:left-[76px] xl:left-64"
+            className="pointer-events-none fixed inset-x-0 top-0 z-30 h-[env(safe-area-inset-top)] bg-canvas/90 backdrop-blur md:hidden"
           />
         ) : null}
         <header
           className={cn(
             'sticky z-20 border-b border-line/70 bg-canvas/90 backdrop-blur',
-            env.apiMock ? 'top-[env(safe-area-inset-top)]' : 'top-0 pt-safe',
+            env.apiMock ? 'top-[env(safe-area-inset-top)] md:top-0 md:pt-safe' : 'top-0 pt-safe',
           )}
         >
           <div className="page-band flex h-14 items-center justify-between gap-2 md:h-16">
-            <div className="md:invisible">
-              <BrandMark />
+            {/* The brand moves to the sidebar from a tablet up; the demo notice takes its place. */}
+            <div className="flex min-w-0 items-center">
+              <div className="md:hidden">
+                <BrandMark />
+              </div>
+              <DemoBanner variant="inline" className="hidden self-auto md:flex" />
             </div>
             <div className="flex items-center gap-1">
               <NotificationBell />

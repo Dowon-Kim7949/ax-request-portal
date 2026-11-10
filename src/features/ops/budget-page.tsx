@@ -7,7 +7,7 @@ import * as z from 'zod'
 import { ApiError } from '@/api/client'
 import { useBudget, useUpdateBudget } from '@/api/queries'
 import { refreshOf } from '@/api/refresh'
-import { PageHeader } from '@/app/page'
+import { Page, PageHeader, PagePlain, PageScroll, PageTop } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { ModelName } from '@/components/ai/ai'
 import { Button } from '@/components/ui/button'
@@ -137,58 +137,71 @@ export default function BudgetPage() {
   const query = useBudget()
   const b = query.data
 
-  if (query.isPending) return <Skeleton className="h-64" />
+  if (query.isPending)
+    return (
+      <PagePlain>
+        <Skeleton className="h-64" />
+      </PagePlain>
+    )
   if (query.isLoadingError || !b) {
-    return <LoadFailed error={query.error} onRetry={() => void query.refetch()} retrying={query.isFetching} />
+    return (
+      <PagePlain>
+        <LoadFailed error={query.error} onRetry={() => void query.refetch()} retrying={query.isFetching} />
+      </PagePlain>
+    )
   }
 
   const pct = b.monthlyLimitKrw ? (b.spentKrw / b.monthlyLimitKrw) * 100 : 0
   const over = pct >= b.alertThresholdPct
 
   return (
-    <>
-      <PageHeader title={t('budget.title')} description={t('budget.subtitle')} />
-      <RefreshFailed {...refreshOf(query)} className="mb-3" />
-      <div className="flex flex-col gap-4">
-        <Card>
-          <CardHeader className="items-start">
-            <div>
-              <CardTitle>{t('budget.thisMonth', { month: formatMonth(b.month) })}</CardTitle>
-              <p className="mt-1 text-[32px] leading-tight font-bold tracking-tight">
-                {formatKrw(b.spentKrw)}
-              </p>
-              <p className="text-sm text-ink-500">
-                {t('budget.of', { limit: formatKrw(b.monthlyLimitKrw) })} · {Math.round(pct)}%
-              </p>
-            </div>
-            {over ? (
-              <span className="flex items-center gap-1 rounded-full bg-warning-50 px-2.5 py-1 text-xs font-bold text-warning-fg">
-                <AlertTriangle className="size-3.5" aria-hidden />
-                {t('budget.over')}
-              </span>
-            ) : null}
-          </CardHeader>
-          <Meter
-            value={pct}
-            warnAt={b.alertThresholdPct}
-            label={t('budget.thisMonth', { month: formatMonth(b.month) })}
-          />
-          <dl className="mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-            {b.byModel.map((m) => (
-              <div
-                key={`${m.provider}/${m.model}`}
-                className="flex items-center justify-between gap-3 rounded-xl bg-muted px-3.5 py-2.5"
-              >
-                <dt className="min-w-0 text-ink-600">
-                  <ModelName selection={m} />
-                </dt>
-                <dd className="font-semibold tabular-nums">{formatKrw(m.spentKrw)}</dd>
+    <Page>
+      <PageTop>
+        <PageHeader title={t('budget.title')} description={t('budget.subtitle')} />
+        <RefreshFailed {...refreshOf(query)} className="mb-3" />
+      </PageTop>
+      <PageScroll label={t('common.contentOf', { title: t('budget.title') })}>
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardHeader className="items-start">
+              <div>
+                <CardTitle>{t('budget.thisMonth', { month: formatMonth(b.month) })}</CardTitle>
+                <p className="mt-1 text-[32px] leading-tight font-bold tracking-tight">
+                  {formatKrw(b.spentKrw)}
+                </p>
+                <p className="text-sm text-ink-500">
+                  {t('budget.of', { limit: formatKrw(b.monthlyLimitKrw) })} · {Math.round(pct)}%
+                </p>
               </div>
-            ))}
-          </dl>
-        </Card>
-        <Limits budget={b} />
-      </div>
-    </>
+              {over ? (
+                <span className="flex items-center gap-1 rounded-full bg-warning-50 px-2.5 py-1 text-xs font-bold text-warning-fg">
+                  <AlertTriangle className="size-3.5" aria-hidden />
+                  {t('budget.over')}
+                </span>
+              ) : null}
+            </CardHeader>
+            <Meter
+              value={pct}
+              warnAt={b.alertThresholdPct}
+              label={t('budget.thisMonth', { month: formatMonth(b.month) })}
+            />
+            <dl className="mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+              {b.byModel.map((m) => (
+                <div
+                  key={`${m.provider}/${m.model}`}
+                  className="flex items-center justify-between gap-3 rounded-xl bg-muted px-3.5 py-2.5"
+                >
+                  <dt className="min-w-0 text-ink-600">
+                    <ModelName selection={m} />
+                  </dt>
+                  <dd className="font-semibold tabular-nums">{formatKrw(m.spentKrw)}</dd>
+                </div>
+              ))}
+            </dl>
+          </Card>
+          <Limits budget={b} />
+        </div>
+      </PageScroll>
+    </Page>
   )
 }

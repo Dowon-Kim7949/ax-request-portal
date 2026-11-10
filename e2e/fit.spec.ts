@@ -6,10 +6,23 @@
 import { expect, test, type Page } from './fixtures.ts'
 import { expectNoHorizontalScroll, loginAs, openInApp } from './helpers.ts'
 
-/** Routes laid out to fit, per demo account (`fit: true` in src/app/router.tsx). */
+/** Every screen of the signed-in app, per demo account (each `page()` route is `fit`, src/app/router.tsx). */
 const FIT_ROUTES = {
-  담당자: ['/work?filter=open', '/notifications'],
-  요청자: ['/notifications'],
+  요청자: [
+    '/',
+    '/requests/new?project=p-portal&step=1',
+    '/requests',
+    '/requests/1021',
+    '/requests/1028',
+    '/schedule',
+    '/notifications',
+    '/schedule?view=month', // after another screen, as openInApp needs
+    '/settings',
+  ],
+  담당자: ['/', '/work?filter=open', '/work/regression', '/requests/1024', '/notifications'],
+  경영진: ['/dashboard'],
+  관리자: ['/admin/projects', '/admin/users'],
+  운영자: ['/ops/usage', '/ops/agents', '/ops/pricing', '/ops/budget'],
 } as const
 
 const FIT_SIZES = [
@@ -23,22 +36,27 @@ async function settle(page: Page) {
 }
 
 function region(page: Page) {
-  return page.locator('[data-scroll-region]')
+  return page.locator('[data-scroll-region]').first()
 }
 
-/** Left and right content edges of the header, the page's fixed top and its list. */
+/**
+ * Left and right content edges of the header, the page's fixed top and its
+ * scrolling part. With several columns, the part spans from the first one's
+ * left edge to the last one's right edge.
+ */
 async function contentEdges(page: Page) {
   return page.evaluate(() => {
-    const edges = (el: Element | null) => {
-      if (!el) return null
+    const edges = (el: Element) => {
       const box = el.getBoundingClientRect()
       const style = getComputedStyle(el)
       return [box.left + parseFloat(style.paddingLeft), box.right - parseFloat(style.paddingRight)]
     }
+    const top = document.querySelector('[data-page-top] > div')
+    const parts = [...document.querySelectorAll('[data-scroll-region] > div')].map(edges)
     return {
-      header: edges(document.querySelector('header > div')),
-      top: edges(document.querySelector('[data-page-top] > div')),
-      list: edges(document.querySelector('[data-scroll-region] > div')),
+      header: edges(document.querySelector('header > div')!),
+      top: top ? edges(top) : null,
+      list: parts.length ? [Math.min(...parts.map((p) => p[0])), Math.max(...parts.map((p) => p[1]))] : null,
     }
   })
 }
@@ -48,7 +66,8 @@ for (const size of FIT_SIZES) {
     test.use({ viewport: size })
 
     for (const [role, routes] of Object.entries(FIT_ROUTES)) {
-      test(`${role}: the page fits the window and its list scrolls on its own`, async ({ page }) => {
+      test(`${role}: every screen fits the window and scrolls inside its regions`, async ({ page }) => {
+        test.setTimeout(60_000)
         await loginAs(page, role as keyof typeof FIT_ROUTES)
         for (const route of routes) {
           await openInApp(page, route)
@@ -58,14 +77,22 @@ for (const size of FIT_SIZES) {
             client: document.documentElement.clientHeight,
           }))
           expect(doc.scroll, `${route}: the window does not scroll`).toBeLessThanOrEqual(doc.client)
-          await expect(page.getByRole('region', { name: /목록/ })).toHaveAttribute('tabindex', '0')
+          // Each scrolling part is a named region a keyboard can reach.
+          const regions = page.locator('[data-scroll-region]')
+          expect(await regions.count(), `${route}: scroll regions`).toBeGreaterThan(0)
+          for (const r of await regions.all()) {
+            await expect(r, route).toHaveAttribute('role', 'region')
+            await expect(r, route).toHaveAttribute('tabindex', '0')
+            await expect(r, route).toHaveAttribute('aria-label', /\S/)
+          }
           await expectNoHorizontalScroll(page)
 
-          // The header, the fixed top and the list share their edges, scrollbar or not.
+          // The header, the fixed top and the scrolling part share their edges, scrollbar or not.
           const { header, top, list } = await contentEdges(page)
           for (const [part, value] of Object.entries({ top, list })) {
-            expect(value?.[0], `${route}: ${part} left edge`).toBeCloseTo(header![0], 0)
-            expect(value?.[1], `${route}: ${part} right edge`).toBeCloseTo(header![1], 0)
+            if (!value) continue
+            expect(value[0], `${route}: ${part} left edge`).toBeCloseTo(header[0], 0)
+            expect(value[1], `${route}: ${part} right edge`).toBeCloseTo(header[1], 0)
           }
         }
       })
@@ -115,6 +142,32 @@ test.describe('scroll positions', () => {
     await region(page).focus()
     await page.keyboard.press('PageDown')
     await expect.poll(() => region(page).evaluate((el) => el.scrollTop)).toBeGreaterThan(0)
+  })
+
+  test('the wizard keeps its place when typing saves the draft and moves ?draft=', async ({ page }) => {
+    await loginAs(page, '요청자')
+    await openInApp(page, '/requests/new?project=p-portal')
+    await page.getByRole('radio', { name: /버그/ }).click() // auto-advances
+    await expect(page.getByRole('heading', { name: '어느 화면이나 기능인가요?' })).toBeVisible()
+    await page.getByRole('button', { name: '다음' }).click()
+    const title = page.getByLabel('요청 제목')
+    await expect(title).toBeVisible()
+    await expect(page).not.toHaveURL(/draft=/)
+
+    const step = region(page)
+    expect(
+      await step.evaluate((el) => el.scrollHeight - el.clientHeight),
+      'the step scrolls',
+    ).toBeGreaterThan(20)
+    await step.evaluate((el) => el.scrollTo(0, 20))
+    // Type without scrolling the field into view: only the save may move the region, and must not.
+    await title.evaluate((el) => (el as HTMLInputElement).focus({ preventScroll: true }))
+    await page.keyboard.type('스크롤 위치')
+    // The first save gives the form a draft id: a replace with preventScrollReset.
+    await expect(page).toHaveURL(/draft=/)
+    // Once the save has rendered, the step is still where it was (give or take its notices), not at the top.
+    await expect(page.getByText('계정에 저장됨')).toBeVisible()
+    expect(await step.evaluate((el) => el.scrollTop)).toBeGreaterThanOrEqual(20)
   })
 })
 

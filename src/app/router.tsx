@@ -14,7 +14,8 @@ export interface RouteHandle {
   /**
    * The page is built from `Page` parts (src/app/page.tsx): on a big screen it
    * fills the window and only its lists scroll. The shell then leaves the
-   * page's width and padding to those parts.
+   * page's width and padding to those parts. Every `page()` route is; only
+   * the not-found page (a route of its own) is not.
    */
   fit?: boolean
   /**
@@ -27,12 +28,16 @@ export interface RouteHandle {
   redirectTo?: string
 }
 
-/** Lazy route: the page module loads on first visit, behind `handle.permission` when set. */
+/**
+ * Lazy route: the page module loads on first visit, behind `handle.permission` when set.
+ * Its page is built from `Page` parts (`handle.fit`).
+ */
 function page(
   load: () => Promise<{ default: ComponentType }>,
-  handle?: RouteHandle,
+  options?: Omit<RouteHandle, 'fit'>,
 ): Pick<RouteObject, 'handle' | 'lazy'> {
-  const permission = handle?.permission
+  const handle: RouteHandle = { ...options, fit: true }
+  const permission = handle.permission
   return {
     handle,
     lazy: async () => {
@@ -44,7 +49,7 @@ function page(
       return {
         Component: permission
           ? () => (
-              <RequirePermission permission={permission} fit={handle?.fit}>
+              <RequirePermission permission={permission}>
                 <Page />
               </RequirePermission>
             )
@@ -101,10 +106,7 @@ export const routes: RouteObject[] = [
           },
           {
             path: 'work',
-            ...page(() => import('@/features/work/assigned-page'), {
-              permission: 'request:review',
-              fit: true,
-            }),
+            ...page(() => import('@/features/work/assigned-page'), { permission: 'request:review' }),
           },
           {
             path: 'work/regression',
@@ -142,7 +144,7 @@ export const routes: RouteObject[] = [
           },
           {
             path: 'notifications',
-            ...page(() => import('@/features/notifications/notifications-page'), { fit: true }),
+            ...page(() => import('@/features/notifications/notifications-page')),
           },
           { path: 'settings', ...page(() => import('@/features/settings/settings-page')) },
           { path: 'settings/notifications', ...moved('/settings') },

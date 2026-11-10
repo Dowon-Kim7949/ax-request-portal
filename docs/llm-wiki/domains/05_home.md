@@ -2,11 +2,11 @@
 title: Home
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-09
+last_updated: 2026-11-10
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -55,6 +55,10 @@ Developers and admins therefore never see the requester section.
 ## Saved drafts
 
 `DraftsSection variant="home"` shows for everyone with `request:create`: in the requester section's left column under "your turn", and for reviewers (developers, admins) right after the developer queue. It is the same section as on [My Requests](08_requests.md) (rows from the account and this device, badges, `N/20`, delete with confirmation, the room held while the account's list is read) with the newest three rows only, and a "See all saved drafts" link to `/requests#drafts` beside the heading (44 px tall, shown even with three drafts or fewer). It is absent when there are no drafts, so a reviewer's home looks as before until they save one.
+
+## Layout
+
+- A `fit` route ([Frontend Profile](../profiles/frontend.md)): on a big screen the greeting stays in place and the sections below scroll in one region ("홈 내용").
 
 ## API Services
 

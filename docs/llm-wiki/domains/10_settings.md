@@ -2,11 +2,11 @@
 title: Settings
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-10
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -83,6 +83,10 @@ Four switches — in-app, e-mail, messenger, only when action is required. Each 
 | `useUpdateNotificationSettings` | `PUT /me/notification-settings` | `NotificationSettings` → `NotificationSettings` | Writes the response into the cache (no refetch) and shows a toast; switches are disabled while saving. |
 
 The settings apply when a notification is created, not retroactively (see [Notifications](07_notifications.md)).
+
+## Layout
+
+- A `fit` route ([Frontend Profile](../profiles/frontend.md)): the title stays in place and the sections scroll ("설정 내용"), kept to `max-w-2xl` at the left.
 
 ## Evidence
 

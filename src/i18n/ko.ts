@@ -8,6 +8,9 @@
  */
 const ko = {
   common: {
+    /** Names of the parts of a page that scroll on their own on a big screen (PageScroll) */
+    listOf: '{{title}} 목록',
+    contentOf: '{{title}} 내용',
     next: '다음',
     back: '이전',
     cancel: '취소',
@@ -451,6 +454,7 @@ const ko = {
     pastDue: '지남',
   },
   detail: {
+    sideLabel: '배포와 진행 기록',
     requestedBy: '요청자 {{name}}',
     filedOn: '{{date}} 접수',
     whatIAsked: '요청 내용',

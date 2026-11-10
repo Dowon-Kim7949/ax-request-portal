@@ -4,7 +4,7 @@
  * resolve env(), so this checks the classes that place them.
  */
 import { QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import '@/i18n'
@@ -59,6 +59,18 @@ describe('the top of the signed-in shell', () => {
     expect(header).toHaveClass('top-[env(safe-area-inset-top)]')
     // What scrolls under the status bar once the banner is gone is covered.
     expect(container.querySelector('[aria-hidden].fixed.top-0')).not.toBeNull()
+  })
+
+  it('shows the demo notice as a strip on a phone and as a box in the header from a tablet up', async () => {
+    const { header, container } = renderShell()
+    await screen.findByRole('heading', { name: '홈' })
+    expect(screen.getByRole('complementary', { name: '데모 모드' })).toHaveClass('md:hidden')
+    const box = within(header).getByText('데모 모드').closest('p')
+    expect(box).toHaveTextContent('데모 모드 · 데이터는 이 브라우저에만 저장돼요')
+    expect(box).toHaveClass('hidden', 'md:flex')
+    // From a tablet up there is no strip above the header, so the header takes the notch inset.
+    expect(header).toHaveClass('md:top-0', 'md:pt-safe')
+    expect(container.querySelector('[aria-hidden].fixed.top-0')).toHaveClass('md:hidden')
   })
 
   it('lets the header take the inset without a banner', async () => {

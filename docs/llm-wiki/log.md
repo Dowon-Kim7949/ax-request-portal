@@ -24,6 +24,32 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-10 - UI: every page fits a big screen; the demo notice moves into the header
+
+- status: needs_review
+- actor: claude-code
+- scope: code, tests, docs
+- changed:
+  - src/app/page.tsx (`PageColumns`, `PageScroll column`, `PagePlain`), src/index.css (`page-columns`; the line under a scrolled top for any region of the page), src/app/scroll-memory.ts (`preventScrollReset` and #hash moves keep the position)
+  - src/app/router.tsx (`page()` sets `fit` on every route), src/app/guards.tsx (`RequirePermission` always in `PagePlain`)
+  - every page under src/features: home, requests, wizard, detail, schedule, work (both queues), dashboard, admin (both), ops (all four), notifications, settings; src/i18n/ko.ts, en.ts (`common.listOf`, `common.contentOf`, `detail.sideLabel`)
+  - src/app/demo-banner.tsx, src/app/shell.tsx (the demo notice: a strip on a phone, a box in the header from `md`), src/app/shell.test.tsx
+  - e2e/fit.spec.ts (every screen of every role; the wizard's draft-id move), e2e/demo-banner.spec.ts (strip or box per viewport), e2e/drafts.spec.ts, e2e/requester.spec.ts and e2e/screens.spec.ts (wait for the step a picked type moves to)
+  - docs/llm-wiki: profiles/frontend.md, COMPONENT_INVENTORY.md, WCAG.md, E2E_WORKFLOWS.md, DOMAIN_FEATURES.md, ARCHITECTURE_CONVENTIONS.md, GLOSSARY.md, and domains 01-13 except 00
+- summary:
+  - Review of the pilot: `/work` cards go to three columns on a list of 1344 px or wider (a container query, so FHD and not a 1536 px window, where the details wrapped). The notifications column keeps a reading width at the left (`max-w-3xl`). The demo notice becomes a box at the left of the header from a tablet up, where the brand had moved to the sidebar; phones keep the strip.
+  - Every `page()` route is now `fit`. Multi-panel pages scroll per column: the request page's body and its release-and-history side, and the dashboard's panels under its tiles. Usage keeps its tiles and dashboard its tiles and month stepper in place. Home keeps its greeting in place. My requests keeps its filter `sticky` at the top of its region once the drafts have scrolled by.
+  - The wizard's step bar stays a direct child of `Page` so it is still pinned under the header on a phone. Its actions moved outside the form (linked with `form=`), so a big screen keeps them along the bottom of the window.
+  - The region honours `preventScrollReset`, read from `UNSAFE_DataRouterStateContext` as the router's own restoration does. Without it, the wizard's `?draft=` move on the first save sent the step back to its top while the person was typing; the new fit test fails that way (scrollTop 0) when the check is removed.
+- evidence:
+  - Green: `npm run verify` (unit 638). `e2e/fit.spec.ts`: every screen of every role at 1920×1080 and 1280×720 shows no window scroll, named focusable regions, and equal edges for header, top and the outer edges of the columns.
+  - Full E2E on three projects: 237 passed, 2 failed. Both were `drafts.spec.ts` on the tablet: a radio that moves to the next step, then "next" clicked while the router still showed the type step. The tests now wait for the step heading. drafts, fit, demo-banner and requester then passed 60 of 60 on three projects. The final full run gave 239 passed and 1 failed: the same race in `requester.spec.ts` "survives a reload", where the radio has no "auto-advances" comment. With the wait it passed 12 of 12. `screens.spec.ts` (README screenshots) got the same wait.
+  - Screenshots checked by eye: detail, dashboard, usage, wizard at 1920 and 1280; the wizard on a phone (step bar pinned while scrolling) and a tablet.
+- caveats:
+  - A second `UNSAFE_` React Router context (`UNSAFE_DataRouterStateContext` in `scroll-memory.ts`) joins the one in `useLiveSearch`; check both when upgrading React Router's major version.
+  - The not-found route stays outside `fit` and scrolls the window.
+- review notes:
+
 ## 2026-11-10 - UI: big screens fit the window, only the list scrolls (pilot: /work, /notifications)
 
 - status: needs_review

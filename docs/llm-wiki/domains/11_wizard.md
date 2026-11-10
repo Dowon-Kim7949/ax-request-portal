@@ -179,7 +179,14 @@ Filing a new work request at `/requests/new` (`request:create`): seven steps, a 
 
 ## Focus
 
-A layout effect on step change scrolls to the top and focuses the step heading (`StepTitle`, `tabIndex=-1`) before paint. A passive effect ran after the user had started typing in the first field and stole focus mid-input.
+A layout effect on step change scrolls the window and, on a big screen, the step's region to the top and focuses the step heading (`StepTitle`, `tabIndex=-1`) before paint. A passive effect ran after the user had started typing in the first field and stole focus mid-input.
+
+## Layout
+
+- A `fit` route laid out apart from the others ([Frontend Profile](../profiles/frontend.md)). The step bar is a direct child of `Page`, so while the window scrolls (phone, tablet) it stays pinned under the header; on a big screen it stays on top, the step (save state, notices, form) scrolls in one region, and the actions run along the bottom of the window.
+- The actions sit outside the form, linked to it with `form=`, so they can stay in view; Enter in a field still submits, because a form's default button may sit outside it.
+- The form's own `?draft=` moves use `preventScrollReset`, which the region honours as the window does, so a save while someone types does not jump the step to its top.
+- The waiting, loading, failed and not-found states are `PagePlain`.
 
 ## API Services
 

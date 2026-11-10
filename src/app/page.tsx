@@ -30,6 +30,15 @@ export function Page({ children }: { children: ReactNode }) {
   )
 }
 
+/**
+ * A `fit` route's screen that has no list to split off: its loading or
+ * failed state, a "not allowed" or "not found" page. It brings the page width
+ * and padding the shell leaves to `fit` pages, and scrolls with the window.
+ */
+export function PagePlain({ children }: { children: ReactNode }) {
+  return <div className="page-column pt-4 pb-12 md:pt-6">{children}</div>
+}
+
 /** What stays in place above the list: the page header, filters, notices about the whole page. */
 export function PageTop({ children }: { children: ReactNode }) {
   return (
@@ -40,14 +49,54 @@ export function PageTop({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Parts side by side under the page's top, each a `PageScroll column` that
+ * scrolls on its own on a big screen (the request page's body and summary,
+ * the dashboard's panels). `className` gives the grid its columns, e.g.
+ * `lg:grid-cols-[1fr_340px]`; below `lg` they stack and the window scrolls.
+ *
+ * Its right padding leaves out the scrollbar gutter that the bands above pad
+ * by (`page-columns`): the last column's scrollbar sits there, so its content
+ * ends where the top's does.
+ */
+export function PageColumns({
+  className,
+  busy,
+  children,
+}: {
+  className?: string
+  /** The data inside is being replaced (aria-busy) */
+  busy?: boolean
+  children: ReactNode
+}) {
+  return (
+    <div
+      aria-busy={busy || undefined}
+      className={cn(
+        'page-columns grid grid-cols-1 items-start gap-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-12',
+        'fit:min-h-0 fit:flex-1 fit:grid-rows-[minmax(0,1fr)] fit:items-stretch fit:pb-0',
+        className,
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
+/**
  * The part that scrolls on a big screen. There it is a named region a
  * keyboard can focus and scroll, since not every browser lets a keyboard
  * reach a scroll area that has no link or button of its own. Back and forward
  * bring it back to where it was (`useScrollMemory`).
+ *
+ * `column`: one of several `PageColumns`, as wide as its column (the default
+ * spans the whole content column). It reserves its scrollbar's gutter at its
+ * end only, and reaches 4 px past its column on each side so the focus rings
+ * of the cards inside are not clipped.
  */
 export function PageScroll({
   label,
   id = 'main',
+  column = false,
   className,
   children,
 }: {
@@ -55,6 +104,7 @@ export function PageScroll({
   label: string
   /** Tells two scrolling parts of one page apart, for their remembered positions */
   id?: string
+  column?: boolean
   className?: string
   children: ReactNode
 }) {
@@ -81,11 +131,21 @@ export function PageScroll({
       tabIndex={fit ? 0 : undefined}
       // relative: visually hidden text (sr-only, absolutely placed) is laid out inside the region;
       // otherwise it sits below the window and gives the page a scrollbar after all.
-      className="relative fit:min-h-0 fit:flex-1 fit:[scrollbar-gutter:stable_both-edges] fit:overflow-y-auto fit:focus-visible:-outline-offset-2"
+      className={cn(
+        'relative fit:min-h-0 fit:overflow-y-auto fit:focus-visible:-outline-offset-2',
+        column
+          ? '-mx-1 min-w-0 px-1 fit:[scrollbar-gutter:stable]'
+          : 'fit:flex-1 fit:[scrollbar-gutter:stable_both-edges]',
+      )}
     >
       {/* pt-1 in a region: room for a focus ring on the first row, which the region would clip. */}
       <div
-        className={cn('page-column pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-12 fit:pt-1', className)}
+        className={cn(
+          column
+            ? 'fit:pt-1 fit:pb-12'
+            : 'page-column pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-12 fit:pt-1',
+          className,
+        )}
       >
         {children}
       </div>

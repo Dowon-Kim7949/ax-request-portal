@@ -2,11 +2,11 @@
 title: Request Detail
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-10
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -98,6 +98,10 @@ The page computes two things and lets them decide everything:
 ## Attachments
 
 `AttachmentLink` checks every URL again before rendering (`isSafeUrl(url, 'file')`): an unsafe one is plain text with "Cannot be opened". Images and PDFs (`opensInline`) open in a new tab; anything else (SVG and HTML included) downloads, so an upload never runs as a page of the portal. A `data:` URL (the demo's small uploads) is opened through a `blob:` URL made on click, because browsers refuse to open `data:` URLs in a tab; a blocked pop-up falls back to a download. Preview screenshots, the preview link and the merge-request link are hidden when their URL is not safe.
+
+## Layout
+
+- A `fit` route ([Frontend Profile](../profiles/frontend.md)): on a big screen the back link, the title, the refresh notice and the stepper stay in place; the body column ("#1024 내용") and the side column (release, AI usage, timeline: "배포와 진행 기록") each scroll on their own. The loading, not-found and failed states are `PagePlain`.
 
 ## API Services
 

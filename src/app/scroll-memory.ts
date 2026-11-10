@@ -1,5 +1,5 @@
-import { useLayoutEffect, type RefObject } from 'react'
-import { useLocation } from 'react-router'
+import { useContext, useLayoutEffect, type RefObject } from 'react'
+import { UNSAFE_DataRouterStateContext, useLocation } from 'react-router'
 
 const STORAGE_KEY = 'ax-request-portal:scroll-regions'
 const MAX_ENTRIES = 100
@@ -39,7 +39,8 @@ function remember(map: Map<string, number>, slot: string, top: number) {
 /**
  * What React Router's <ScrollRestoration> does for the window, for a scroll
  * region inside a page: back and forward put the region where it was, any
- * other navigation (a link, a changed filter) starts it at the top. Positions
+ * other navigation (a link, a changed filter) starts it at the top, unless it
+ * was made with `preventScrollReset` or goes to a #hash. Positions
  * are kept per history entry (`location.key`) and per region `id`, so a page
  * with two scrolling columns keeps both.
  *
@@ -48,18 +49,28 @@ function remember(map: Map<string, number>, slot: string, top: number) {
  * a few seconds pass.
  */
 export function useScrollMemory(ref: RefObject<HTMLElement | null>, id: string) {
-  const { key } = useLocation()
+  const { key, hash } = useLocation()
+  // A move made with `preventScrollReset` (the wizard's own ?draft= updates while someone types)
+  // keeps the position, as it does for the window. The router exposes it only through this context.
+  // It changes with the location; a run for it alone puts back the position just remembered.
+  const preventReset = useContext(UNSAFE_DataRouterStateContext)?.preventScrollReset ?? false
 
   useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
     const map = store()
     const slot = `${key}:${id}`
-    const target = map.get(slot) ?? 0
-    el.scrollTop = target
+    const saved = map.get(slot)
+    // Nothing remembered for this entry, and the move asked to stay, or the address has a #hash
+    // whose target the page has scrolled into view (a child's layout effect, already run):
+    // starting at the top would undo either.
+    const stay = saved === undefined && (preventReset || hash !== '')
+    const target = stay ? el.scrollTop : (saved ?? 0)
+    if (stay) remember(map, slot, target)
+    else el.scrollTop = target
 
     let stopWaiting = () => {}
-    if (el.scrollTop < target - 1 && typeof ResizeObserver !== 'undefined') {
+    if (!stay && el.scrollTop < target - 1 && typeof ResizeObserver !== 'undefined') {
       const observer = new ResizeObserver(() => {
         el.scrollTop = target
         if (el.scrollTop >= target - 1) stopWaiting()
@@ -80,5 +91,5 @@ export function useScrollMemory(ref: RefObject<HTMLElement | null>, id: string) 
       stopWaiting()
       el.removeEventListener('scroll', onScroll)
     }
-  }, [ref, key, id])
+  }, [ref, key, hash, preventReset, id])
 }

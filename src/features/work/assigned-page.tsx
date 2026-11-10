@@ -81,13 +81,16 @@ export default function AssignedPage() {
         <RefreshFailed {...refreshOf(list)} className="mb-3" />
       </PageTop>
 
-      <PageScroll label={t('work.listLabel')}>
+      {/* Three columns once a card can keep its details on one line (a 1344 px list, as on FHD). */}
+      <PageScroll label={t('work.listLabel')} className="@container">
         {list.isPending ? (
           <ListSkeleton />
         ) : list.isLoadingError ? (
           <LoadFailed error={list.error} onRetry={() => void list.refetch()} retrying={list.isFetching} />
         ) : shown.length ? (
-          <div className={`grid grid-cols-1 gap-3 lg:grid-cols-2 ${list.isFetching ? 'opacity-90' : ''}`}>
+          <div
+            className={`grid grid-cols-1 gap-3 lg:grid-cols-2 @min-[84rem]:grid-cols-3 ${list.isFetching ? 'opacity-90' : ''}`}
+          >
             {shown.map((r) => (
               <RequestCard
                 key={r.id}

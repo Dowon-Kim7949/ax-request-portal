@@ -4,7 +4,7 @@ import { Link } from 'react-router'
 import { useRegressionQueue } from '@/api/queries'
 import { refreshOf } from '@/api/refresh'
 import { useDirectory } from '@/app/hooks'
-import { PageHeader } from '@/app/page'
+import { Page, PageHeader, PageScroll, PageTop } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { StatusBadge } from '@/components/request/status'
 import { Card } from '@/components/ui/card'
@@ -25,34 +25,38 @@ export default function RegressionPage() {
   )
 
   return (
-    <>
-      <PageHeader title={t('regression.title')} description={t('regression.subtitle')} />
-      <RefreshFailed {...refreshOf(queue)} className="mb-3" />
-      {queue.isPending ? (
-        <ListSkeleton />
-      ) : queue.isLoadingError ? (
-        <LoadFailed error={queue.error} onRetry={() => void queue.refetch()} retrying={queue.isFetching} />
-      ) : items.length ? (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          {items.map((item) => (
-            <Card key={item.requestId} aria-labelledby={`rg-${item.requestId}`}>
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <StatusBadge status={item.status} />
-                <span className="text-xs text-ink-400">#{item.requestId}</span>
-                <span className="text-xs text-ink-400">· {dir.projectName(item.projectId)}</span>
-              </div>
-              <h2 id={`rg-${item.requestId}`} className="mb-3 text-[15px] font-bold">
-                <Link to={`/requests/${item.requestId}`} className="hover:underline">
-                  {item.title}
-                </Link>
-              </h2>
-              <RegressionChecks requestId={item.requestId} checks={item.checks} editable />
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <EmptyState icon={<ShieldCheck className="size-6" aria-hidden />} title={t('regression.empty')} />
-      )}
-    </>
+    <Page>
+      <PageTop>
+        <PageHeader title={t('regression.title')} description={t('regression.subtitle')} />
+        <RefreshFailed {...refreshOf(queue)} className="mb-3" />
+      </PageTop>
+      <PageScroll label={t('common.listOf', { title: t('regression.title') })}>
+        {queue.isPending ? (
+          <ListSkeleton />
+        ) : queue.isLoadingError ? (
+          <LoadFailed error={queue.error} onRetry={() => void queue.refetch()} retrying={queue.isFetching} />
+        ) : items.length ? (
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+            {items.map((item) => (
+              <Card key={item.requestId} aria-labelledby={`rg-${item.requestId}`}>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <StatusBadge status={item.status} />
+                  <span className="text-xs text-ink-400">#{item.requestId}</span>
+                  <span className="text-xs text-ink-400">· {dir.projectName(item.projectId)}</span>
+                </div>
+                <h2 id={`rg-${item.requestId}`} className="mb-3 text-[15px] font-bold">
+                  <Link to={`/requests/${item.requestId}`} className="hover:underline">
+                    {item.title}
+                  </Link>
+                </h2>
+                <RegressionChecks requestId={item.requestId} checks={item.checks} editable />
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <EmptyState icon={<ShieldCheck className="size-6" aria-hidden />} title={t('regression.empty')} />
+        )}
+      </PageScroll>
+    </Page>
   )
 }

@@ -7,6 +7,7 @@ import { ErrorState } from '@/components/ui/feedback'
 import type { Permission } from '@/domain/roles'
 import { useSession } from '@/stores/session'
 import { useCan } from './hooks'
+import { PagePlain } from './page'
 import { useSessionSync } from './session-sync'
 
 export const LOGIN_PATH = '/login'
@@ -44,17 +45,9 @@ export function SessionSync() {
 
 /**
  * Renders a friendly "not allowed" page instead of the route when a permission is missing.
- * `fit`: the route's page brings its own width and padding (`RouteHandle.fit`), so this one does too.
+ * It brings the page width and padding, which the shell leaves to `fit` pages (`RouteHandle.fit`).
  */
-export function RequirePermission({
-  permission,
-  fit,
-  children,
-}: {
-  permission: Permission
-  fit?: boolean
-  children: ReactNode
-}) {
+export function RequirePermission({ permission, children }: { permission: Permission; children: ReactNode }) {
   const can = useCan()
   const { t } = useTranslation()
   if (!can(permission)) {
@@ -68,7 +61,7 @@ export function RequirePermission({
         }
       />
     )
-    return fit ? <div className="page-column pt-4 pb-12 md:pt-6">{denied}</div> : denied
+    return <PagePlain>{denied}</PagePlain>
   }
   return <>{children}</>
 }

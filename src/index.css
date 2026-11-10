@@ -132,7 +132,7 @@
       --page-gutter: var(--sbw, 0px);
     }
     /* A line under a page's fixed top once its list has scrolled beneath it. */
-    [data-page]:has(> [data-scrolled]) > [data-page-top] {
+    [data-page]:has([data-scrolled]) > [data-page-top] {
       box-shadow: inset 0 -1px var(--color-line);
     }
   }
@@ -272,6 +272,18 @@
   width: 100%;
   max-width: calc(var(--page-max) + 2 * var(--page-gutter));
   padding-inline: calc(var(--page-pad) + var(--page-gutter));
+}
+
+/*
+ * Columns that each scroll (PageColumns): the band's width, but the right padding leaves out the
+ * gutter, where the last column's own scrollbar sits.
+ */
+@utility page-columns {
+  margin-inline: auto;
+  width: 100%;
+  max-width: calc(var(--page-max) + 2 * var(--page-gutter));
+  padding-left: calc(var(--page-pad) + var(--page-gutter));
+  padding-right: var(--page-pad);
 }
 
 /* The page width inside a scroll region (whose gutter is already reserved), or the whole page. */

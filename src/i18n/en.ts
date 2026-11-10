@@ -7,6 +7,8 @@ import type { Messages } from './ko'
 
 const en: Messages = {
   common: {
+    listOf: '{{title}} list',
+    contentOf: '{{title}} content',
     next: 'Next',
     back: 'Back',
     cancel: 'Cancel',
@@ -455,6 +457,7 @@ const en: Messages = {
     pastDue: 'past due',
   },
   detail: {
+    sideLabel: 'Release and history',
     requestedBy: 'Requested by {{name}}',
     filedOn: 'Filed {{date}}',
     whatIAsked: 'The request',

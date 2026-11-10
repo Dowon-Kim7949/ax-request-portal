@@ -57,6 +57,8 @@ test('wizard draft survives a reload', async ({ page }) => {
   await loginAs(page, '요청자')
   await openInApp(page, '/requests/new?project=p-field')
   await page.getByRole('radio', { name: /버그/ }).click()
+  // The type moves on by itself; "다음" before the next step shows would act on the type step again.
+  await expect(page.getByRole('heading', { name: '어느 화면이나 기능인가요?' })).toBeVisible()
   await page.getByRole('button', { name: '다음' }).click()
   await page.getByLabel('요청 제목').fill('사진이 가끔 안 올라감')
   await expect(page.getByLabel('요청 제목')).toHaveValue('사진이 가끔 안 올라감')

@@ -2,11 +2,11 @@
 title: Login
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-10
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -60,7 +60,7 @@ When the previous session ended as `expired` (a `401`, here or in another tab), 
 ## Demo data and language
 
 - `loadDemoAccounts` imports the mock modules dynamically behind the `__API_MOCK__` build constant, so a real-backend build drops the import and never ships the seed. It reloads when the UI language changes, because demo names are generated per language.
-- In mock mode a small demo-mode note (`DemoBanner variant="inline"`, "Demo mode · Data stays in this browser only") sits under the tagline, inside the brand block, so it never overlaps the corner toggles at 320 px.
+- In mock mode a small demo-mode note (`DemoBanner variant="inline"`, "Demo mode · Data stays in this browser only") sits under the tagline, inside the brand block, so it never overlaps the corner toggles at 320 px. The same boxed note sits at the left of the signed-in header from a tablet up; a phone shows the strip above the header instead.
 - `QuickDisplayToggles` in the corner switches language and light/dark before signing in.
 
 ## API Services
