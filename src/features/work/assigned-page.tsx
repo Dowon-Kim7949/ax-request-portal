@@ -86,7 +86,13 @@ export default function AssignedPage() {
       ) : shown.length ? (
         <div className={`grid grid-cols-1 gap-3 lg:grid-cols-2 ${list.isFetching ? 'opacity-90' : ''}`}>
           {shown.map((r) => (
-            <RequestCard key={r.id} request={r} myTurn={turnOf(r.status) === 'developer'} showRequester />
+            <RequestCard
+              key={r.id}
+              request={r}
+              myTurn={turnOf(r.status) === 'developer'}
+              showRequester
+              showDates
+            />
           ))}
         </div>
       ) : (

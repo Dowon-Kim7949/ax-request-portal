@@ -2,11 +2,11 @@
 title: Developer Work
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-10
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -17,6 +17,8 @@ source_files:
 evidence:
   - src/features/work/assigned-page.tsx#symbol:AssignedPage
   - src/features/work/regression-page.tsx#symbol:RegressionPage
+  - src/components/request/request-card.tsx#symbol:RequestDates
+  - src/components/request/request-card.test.tsx
   - src/features/detail/developer-panels.tsx#symbol:DecisionCard
   - src/features/detail/developer-panels.tsx#symbol:WorkPanel
   - src/features/detail/developer-panels.tsx#symbol:ReportPanel
@@ -52,7 +54,7 @@ Everything a developer does: the assigned queue (`/work`, `request:review`), the
 
 ## Queues
 
-- **Assigned** (`AssignedPage`): filters `myTurn` (default), `ai`, `waiting`, `open`, `closed`, applied on the client with `turnOf` and `isTerminal`; filter and project are kept in `?filter=&project=`. The server returns only requests the user is responsible for unless the user is an admin.
+- **Assigned** (`AssignedPage`): filters `myTurn` (default), `ai`, `waiting`, `open`, `closed`, applied on the client with `turnOf` and `isTerminal`; filter and project are kept in `?filter=&project=`. The server returns only requests the user is responsible for unless the user is an admin. Each card adds the requester's wanted-by date (`desiredDate`) and the release date (`scheduledDate`) when they are set (`RequestCard` with `showDates`); while the request is open (not `isTerminal`), a date before the head office's today (`hqToday`) is marked past due in words as well as colour. The dates come from the list response; no extra request.
 - **Regression** (`RegressionPage`): open requests that have regression checks, cards with pending checks first, each card editable in place. Project names come from `useDirectory().projectName` (the id when the list is missing).
 - Both queues show `LoadFailed` with a retry when nothing could be loaded, and keep the list with a `RefreshFailed` line when a poll fails.
 
@@ -83,6 +85,7 @@ Every change to one request (the hooks above plus the requester's) runs in the m
 ## Evidence
 
 - `src/features/work/assigned-page.tsx#symbol:AssignedPage`, `src/features/work/regression-page.tsx#symbol:RegressionPage` — queues.
+- `src/components/request/request-card.tsx#symbol:RequestDates`, `src/components/request/request-card.test.tsx` — the dates on an assigned card and when they count as past due.
 - `src/features/detail/developer-panels.tsx#symbol:DecisionCard`, `src/features/detail/developer-panels.tsx#symbol:WorkPanel`, `src/features/detail/developer-panels.tsx#symbol:ReportPanel`, `src/features/detail/developer-panels.tsx#symbol:RegressionChecks`, `src/features/detail/developer-panels.tsx#symbol:ReleasePanel` — panels.
 - `src/mocks/engine.ts#symbol:listRequests`, `src/mocks/engine.ts#symbol:regressionQueue` — server-side scoping.
 - `src/mocks/ai.ts#symbol:generateReport`, `src/mocks/ai.ts#symbol:generateScope`, `src/domain/report.ts#symbol:deriveWikiTrust` — mock AI, the requester's scope and the trust rule.

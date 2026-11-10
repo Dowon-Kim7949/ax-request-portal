@@ -2,11 +2,11 @@
 title: Accessibility (WCAG)
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: wcag
 project: ax-request-portal
-last_updated: 2026-11-09
+last_updated: 2026-11-10
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -23,6 +23,7 @@ source_files:
   - e2e/axe.spec.ts
 evidence:
   - src/app/update-notice.tsx#symbol:UpdateNotice
+  - src/components/request/request-card.tsx#symbol:RequestDates
   - src/components/ui/sheet.tsx#symbol:Sheet
   - src/components/ui/sheet.test.tsx
   - src/features/wizard/draft-status.tsx#symbol:DraftStatusBar
@@ -71,6 +72,7 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 - `src/theme.test.ts` checks 43 foreground/background pairs in both themes: text pairs at 4.5:1 (`TEXT`) and non-text marks (control borders, chart marks, focus colours) at 3:1 (`UI`, SC 1.4.11). It also asserts that every token it checks is defined in each theme.
 - The test reads `src/index.css` with regular expressions: it expects `#rrggbb` values and the `.dark { … }` block closed by a two-space-indented brace. Writing tokens as `oklch()`, short hex, or reformatting that block makes the test report missing tokens rather than check contrast.
 - Adding a token that carries text or a control boundary means adding its pair to `PAIRS`.
+- Colour is never the only signal (SC 1.4.1): a past-due date on a developer's work card is `danger-fg` text and also says "지남" / "past due" (`RequestDates`).
 - Never dim text with `opacity` to mark something as past or secondary: the blended colour is no longer a checked pair and usually fails 4.5:1. Use a role tint and a checked text colour instead (past dates on the schedule sit on `bg-muted` with an `ink-400` date, in the list and in the month view).
 
 ## Dark mode
@@ -118,6 +120,7 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 
 - `src/theme.test.ts#symbol:PAIRS` — the 43 checked pairs; `src/theme.test.ts#L37-L39` — the 4.5:1 and 3:1 thresholds.
 - `src/index.css#L154-L188` — focus outline and cursor contract; `src/index.css#L190-L203` — reduced-motion rule.
+- `src/components/request/request-card.tsx#symbol:RequestDates` — a past-due date in words as well as colour.
 - `src/app/shell.tsx#symbol:SkipLink` — skip link and the focusable `main`; `src/i18n/en.ts#symbol:skipToContent` — its label, with `src/i18n/ko.ts#symbol:skipToContent` for Korean.
 - `index.html#L13-L31` — pre-paint theme script.
 - `src/app/theme.ts#symbol:applyTheme` — runtime theme sync.

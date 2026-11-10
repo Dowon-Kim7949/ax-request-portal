@@ -2,11 +2,11 @@
 title: Architecture Conventions
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: architecture_conventions
 project: ax-request-portal
-last_updated: 2026-11-09
+last_updated: 2026-11-10
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -211,7 +211,7 @@ Two clocks matter ([Glossary](GLOSSARY.md)):
 
 ## i18n
 
-- Korean is the default and the source of truth: `ko.ts` exports `Messages`, and `en.ts` is typed as `Messages`, so a missing or extra key is a compile error. `t()` keys are type-checked. With this many keys, passing `t` as a prop typed `ReturnType<typeof useTranslation>['t']` hits TS2589 (type instantiation too deep): call `useTranslation()` in the component instead.
+- Korean is the default and the source of truth: `ko.ts` exports `Messages`, and `en.ts` is typed as `Messages`, so a missing or extra key is a compile error. `t()` keys are type-checked, so a key picked at run time must keep its literal type (`'requests.wantedBy' as const`, or a union of keys); a plain `string` is a compile error (TS2345). With this many keys, passing `t` as a prop typed `ReturnType<typeof useTranslation>['t']` hits TS2589 (type instantiation too deep): call `useTranslation()` in the component instead.
 - Initial language: stored preference (if enabled) → browser languages → `appConfig.defaultLocale`. `<html lang>` follows every change.
 - Server-side texts (errors, notifications, AI report) follow `Accept-Language`; notifications are stored as key + parameters and rendered on read. Dates inside them are written per language with `readableDate` (`src/mocks/copy.ts`).
 

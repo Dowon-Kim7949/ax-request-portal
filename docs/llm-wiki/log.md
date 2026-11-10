@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: change_log
 project: ax-request-portal
-last_updated: 2026-11-09
+last_updated: 2026-11-10
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -23,6 +23,28 @@ contains_sensitive_info: false
 # LLM-WIKI Change Log
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
+
+## 2026-11-10 - Feature: dates on the developer's work cards
+
+- status: needs_review
+- actor: claude-code
+- scope: code, tests, docs
+- changed:
+  - src/components/request/request-card.tsx (`showDates`, `RequestDates`), src/components/request/request-card.test.tsx (new)
+  - src/features/work/assigned-page.tsx
+  - src/i18n/ko.ts, src/i18n/en.ts (`requests.wantedBy`, `requests.releaseOn`, `requests.pastDue`)
+  - docs/llm-wiki/domains/12_work.md, domains/08_requests.md, COMPONENT_INVENTORY.md, WCAG.md, ARCHITECTURE_CONVENTIONS.md
+- summary:
+  - `/work` cards show the requester's wanted-by date and the release date when set. While the request is open, a date before the head office's today is marked past due, in words and in `danger-fg`. The fields were already in `WorkRequestSummary`; no contract change.
+  - `showDates` is opt-in: the requester's list and home keep their cards unchanged.
+  - A month view for `/work` was considered and dropped: the queue is ordered by whose turn it is, `desiredDate` is optional (3 of 19 seed scenarios), and release dates are already on the schedule's month view.
+- evidence:
+  - Red: `request-card.test.tsx` 4 of 6 failed before the dates row existed. Green: 6/6; all unit tests 60 files / 632 passed; lint, typecheck and format pass.
+- caveats:
+  - The past-due check uses the head office's today on the viewer's device clock (`hqToday`), the same rule as the schedule.
+  - `ARCHITECTURE_CONVENTIONS.md` and `WCAG.md` cite the message files as a whole, so any new message key makes them stale for `impact.source_changed`; each gained one source-backed line.
+- review notes:
+  - Re-review the Assigned bullet in 12_work.md, the `RequestCard` row in COMPONENT_INVENTORY.md, the new bullets in 08_requests.md, WCAG.md and ARCHITECTURE_CONVENTIONS.md, then approve the five documents with `npx llm-wiki review --approve <path>` (one `--approve` per path).
 
 ## 2026-11-09 - Docs: cite formatKrw by line range in AI Operations
 

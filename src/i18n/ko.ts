@@ -446,6 +446,9 @@ const ko = {
     emptyFiltered: '조건에 맞는 요청이 없어요.',
     updated: '{{time}} 업데이트',
     myTurnBadge: '내 차례',
+    wantedBy: '희망 일정 {{date}}',
+    releaseOn: '배포 예정 {{date}}',
+    pastDue: '지남',
   },
   detail: {
     requestedBy: '요청자 {{name}}',

@@ -450,6 +450,9 @@ const en: Messages = {
     emptyFiltered: 'No requests match.',
     updated: 'Updated {{time}}',
     myTurnBadge: 'Your turn',
+    wantedBy: 'Wanted by {{date}}',
+    releaseOn: 'Release {{date}}',
+    pastDue: 'past due',
   },
   detail: {
     requestedBy: 'Requested by {{name}}',
