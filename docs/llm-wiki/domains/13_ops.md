@@ -95,6 +95,10 @@ The sidebar shows these under an "AI operations" heading (`NavGroup` `ops`); the
 - Daily and monthly totals, the budget's month and "today" on the daily chart follow the head-office business calendar ([Glossary](../GLOSSARY.md)): an entry booked between 00:00 and 09:00 in Korea counts in that Korean day and month. A viewer on another clock sees `HqCalendarNote` next to the month stepper. Key registration times are `DateTimeText` (compact, full form in the tooltip).
 - Korean amounts group by 만 and 억 (`formatKrw`: "1.5억 원", "18.4만 원"); English uses compact `₩` notation.
 
+## Layout
+
+- All four screens are `fit` routes ([Frontend Profile](../profiles/frontend.md)). On a big screen the usage page keeps its title, month stepper and four tiles in place and scrolls the charts below; agents, pricing and budget keep the title and refresh notice in place and scroll the rest. A budget that has not loaded is `PagePlain`.
+
 ## API Services
 
 | Hook | Endpoint | Payload → response | Errors and cache |

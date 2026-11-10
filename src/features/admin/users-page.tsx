@@ -8,7 +8,7 @@ import { ApiError } from '@/api/client'
 import { UserCreate } from '@/api/contract'
 import { useCreateUser, useUpdateUser } from '@/api/queries'
 import { useCurrentUser, useDirectory } from '@/app/hooks'
-import { PageHeader } from '@/app/page'
+import { Page, PageHeader, PageScroll, PageTop } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -151,29 +151,33 @@ export default function UsersPage() {
   const [inviting, setInviting] = useState(false)
 
   return (
-    <>
-      <PageHeader
-        title={t('users.title')}
-        description={t('users.subtitle')}
-        actions={
-          <Button onClick={() => setInviting(true)}>
-            <UserPlus aria-hidden />
-            {t('users.invite')}
-          </Button>
-        }
-      />
-      <RefreshFailed failed={dir.usersStale} onRetry={dir.retry} retrying={dir.retrying} className="mb-3" />
-      {dir.loading ? (
-        <ListSkeleton />
-      ) : dir.usersError ? (
-        <LoadFailed error={dir.usersError} onRetry={dir.retry} retrying={dir.retrying} />
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {dir.users.map((u) => (
-            <UserRow key={u.id} user={u} isMe={u.id === me.id} />
-          ))}
-        </ul>
-      )}
+    <Page>
+      <PageTop>
+        <PageHeader
+          title={t('users.title')}
+          description={t('users.subtitle')}
+          actions={
+            <Button onClick={() => setInviting(true)}>
+              <UserPlus aria-hidden />
+              {t('users.invite')}
+            </Button>
+          }
+        />
+        <RefreshFailed failed={dir.usersStale} onRetry={dir.retry} retrying={dir.retrying} className="mb-3" />
+      </PageTop>
+      <PageScroll label={t('common.listOf', { title: t('users.title') })}>
+        {dir.loading ? (
+          <ListSkeleton />
+        ) : dir.usersError ? (
+          <LoadFailed error={dir.usersError} onRetry={dir.retry} retrying={dir.retrying} />
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {dir.users.map((u) => (
+              <UserRow key={u.id} user={u} isMe={u.id === me.id} />
+            ))}
+          </ul>
+        )}
+      </PageScroll>
       <Sheet
         open={inviting}
         onOpenChange={setInviting}
@@ -182,6 +186,6 @@ export default function UsersPage() {
       >
         {inviting ? <InviteForm onDone={() => setInviting(false)} /> : null}
       </Sheet>
-    </>
+    </Page>
   )
 }

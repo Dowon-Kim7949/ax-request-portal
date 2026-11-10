@@ -120,10 +120,17 @@ export function addDaysIso(days: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
-/** Fails when the page scrolls sideways — the most common phone layout bug. */
+/**
+ * Fails when the page scrolls sideways — the most common phone layout bug —
+ * or when a page's own scroll region does (on a big screen a list scrolls
+ * inside one, where the page's width would not show it).
+ */
 export async function expectNoHorizontalScroll(page: Page) {
-  const overflow = await page.evaluate(
-    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  const overflow = await page.evaluate(() =>
+    Math.max(
+      document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      ...[...document.querySelectorAll('[data-scroll-region]')].map((el) => el.scrollWidth - el.clientWidth),
+    ),
   )
   expect(overflow, 'horizontal overflow in px').toBeLessThanOrEqual(0)
 }

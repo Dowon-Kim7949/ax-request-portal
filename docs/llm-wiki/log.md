@@ -24,6 +24,59 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-10 - UI: every page fits a big screen; the demo notice moves into the header
+
+- status: needs_review
+- actor: claude-code
+- scope: code, tests, docs
+- changed:
+  - src/app/page.tsx (`PageColumns`, `PageScroll column`, `PagePlain`), src/index.css (`page-columns`; the line under a scrolled top for any region of the page), src/app/scroll-memory.ts (`preventScrollReset` and #hash moves keep the position)
+  - src/app/router.tsx (`page()` sets `fit` on every route), src/app/guards.tsx (`RequirePermission` always in `PagePlain`)
+  - every page under src/features: home, requests, wizard, detail, schedule, work (both queues), dashboard, admin (both), ops (all four), notifications, settings; src/i18n/ko.ts, en.ts (`common.listOf`, `common.contentOf`, `detail.sideLabel`)
+  - src/app/demo-banner.tsx, src/app/shell.tsx (the demo notice: a strip on a phone, a box in the header from `md`), src/app/shell.test.tsx
+  - e2e/fit.spec.ts (every screen of every role; the wizard's draft-id move), e2e/demo-banner.spec.ts (strip or box per viewport), e2e/drafts.spec.ts, e2e/requester.spec.ts and e2e/screens.spec.ts (wait for the step a picked type moves to)
+  - docs/llm-wiki: profiles/frontend.md, COMPONENT_INVENTORY.md, WCAG.md, E2E_WORKFLOWS.md, DOMAIN_FEATURES.md, ARCHITECTURE_CONVENTIONS.md, GLOSSARY.md, and domains 01-13 except 00
+- summary:
+  - Review of the pilot: `/work` cards go to three columns on a list of 1344 px or wider (a container query, so FHD and not a 1536 px window, where the details wrapped). The notifications column keeps a reading width at the left (`max-w-3xl`). The demo notice becomes a box at the left of the header from a tablet up, where the brand had moved to the sidebar; phones keep the strip.
+  - Every `page()` route is now `fit`. Multi-panel pages scroll per column: the request page's body and its release-and-history side, and the dashboard's panels under its tiles. Usage keeps its tiles and dashboard its tiles and month stepper in place. Home keeps its greeting in place. My requests keeps its filter `sticky` at the top of its region once the drafts have scrolled by.
+  - The wizard's step bar stays a direct child of `Page` so it is still pinned under the header on a phone. Its actions moved outside the form (linked with `form=`), so a big screen keeps them along the bottom of the window.
+  - The region honours `preventScrollReset`, read from `UNSAFE_DataRouterStateContext` as the router's own restoration does. Without it, the wizard's `?draft=` move on the first save sent the step back to its top while the person was typing; the new fit test fails that way (scrollTop 0) when the check is removed.
+- evidence:
+  - Green: `npm run verify` (unit 638). `e2e/fit.spec.ts`: every screen of every role at 1920×1080 and 1280×720 shows no window scroll, named focusable regions, and equal edges for header, top and the outer edges of the columns.
+  - Full E2E on three projects: 237 passed, 2 failed. Both were `drafts.spec.ts` on the tablet: a radio that moves to the next step, then "next" clicked while the router still showed the type step. The tests now wait for the step heading. drafts, fit, demo-banner and requester then passed 60 of 60 on three projects. The final full run gave 239 passed and 1 failed: the same race in `requester.spec.ts` "survives a reload", where the radio has no "auto-advances" comment. With the wait it passed 12 of 12. `screens.spec.ts` (README screenshots) got the same wait.
+  - Screenshots checked by eye: detail, dashboard, usage, wizard at 1920 and 1280; the wizard on a phone (step bar pinned while scrolling) and a tablet.
+- caveats:
+  - A second `UNSAFE_` React Router context (`UNSAFE_DataRouterStateContext` in `scroll-memory.ts`) joins the one in `useLiveSearch`; check both when upgrading React Router's major version.
+  - The not-found route stays outside `fit` and scrolls the window.
+- review notes:
+
+## 2026-11-10 - UI: big screens fit the window, only the list scrolls (pilot: /work, /notifications)
+
+- status: needs_review
+- actor: claude-code
+- scope: code, tests, docs
+- changed:
+  - src/index.css (`fit:` variant, `--page-max` / `--page-pad` / `--page-gutter`, `page-band` / `page-column`, the line under a scrolled page top)
+  - src/app/page.tsx (`Page`, `PageTop`, `PageScroll`), src/app/scroll-memory.ts (new), src/lib/scrollbar-width.ts (new), src/lib/use-media-query.ts (`FIT_QUERY`) and its test (new), src/main.tsx
+  - src/app/shell.tsx (`data-fit`, header and `main` on the shared page width), src/app/router.tsx (`RouteHandle.fit`), src/app/guards.tsx (`RequirePermission` `fit`)
+  - src/features/work/assigned-page.tsx, src/features/notifications/notifications-page.tsx, src/i18n/ko.ts, src/i18n/en.ts (region names)
+  - e2e/fit.spec.ts (new), e2e/helpers.ts (`expectNoHorizontalScroll` also measures scroll regions), playwright.config.ts
+  - e2e/requester.spec.ts (waits for the step between two "next" clicks)
+  - docs/llm-wiki/profiles/frontend.md, ARCHITECTURE_CONVENTIONS.md, COMPONENT_INVENTORY.md, WCAG.md, E2E_WORKFLOWS.md, DOMAIN_FEATURES.md, domains/02_auth.md, 07_notifications.md, 12_work.md; domains/00_overview.md, 09_schedule.md and 11_wizard.md only back to needs_review (they cite changed files; nothing in them changed)
+- summary:
+  - From 1280 × 720 a route with `handle.fit` fills the window under the header: the page's top (title, filters, page-wide notices) stays in place and only its list scrolls, in a region as wide as the content column. Smaller windows, phones, tablets and a 200 % zoom keep the window scroll, and so do pages not yet converted.
+  - The content width grows from 72rem to 90rem at `2xl` on every page, through shared variables that the header uses too.
+  - The region reserves the scrollbar gutter on both edges; the header and the page top pad by the measured gutter (`--sbw`), so their edges match the list's with or without a scrollbar. The gutter is measured as `scrollbar-gutter` reserves it: headless Chromium hides `overflow: scroll` bars (0 px) but still reserves 15 px.
+  - The region is `relative`: an `sr-only` text inside it (the unread marker) otherwise sat below the window and gave the page a scrollbar at 1280 × 720.
+  - `useScrollMemory` restores the region per history entry on back and forward; any other navigation starts it at the top, as `<ScrollRestoration>` does for the window.
+- evidence:
+  - Green: `npm run verify` (unit 63 files / 637 passed). `e2e/fit.spec.ts` 7 passed. Full E2E on three projects without the axe groups for unrelated screens: 231 passed, 2 failed. The two failures were `requester.spec.ts` "audit findings" on WebKit; it clicked "next" twice without waiting, and a click during the step's async validation landed on the same step. That was 3 of 8 on the branch under load, and 0 of 8 and then 12 of 12 passing in later runs. With a wait for the step heading, phone, tablet and desktop pass 12 of 12.
+  - Edges measured equal for header, page top and list at 1920×1080, 1280×720 and 1366×650. Screenshots at 1920×1080 and 1280×720 checked by eye.
+- caveats:
+  - Pilot only: the rest of the pages, the multi-panel ones (detail, dashboard, home: one scrolling region per column), the wizard's step bar and `#drafts` anchor, and the demo banner's "scrolls away" wording follow in the next change.
+  - Card columns at `2xl` are unchanged (two on /work); whether the wider page wants three is left to review.
+- review notes:
+
 ## 2026-11-10 - UI: "new request" as the middle phone tab; the usage page's chip beside its title
 
 - status: needs_review

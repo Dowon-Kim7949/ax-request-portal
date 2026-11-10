@@ -6,7 +6,7 @@ tags:
 status: verified
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-09
+last_updated: 2026-11-10
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -35,7 +35,7 @@ related:
 visibility: public
 contains_sensitive_info: false
 reviewed_by: Kim Dowon
-reviewed_at: 2026-11-09
+reviewed_at: 2026-11-10
 ---
 
 # Release Schedule
@@ -66,6 +66,10 @@ A read-only calendar of scheduled releases at `/schedule` (`schedule:view`, held
 - Moving a request from `release_scheduled` to `done` (`markReleased`) needs a saved scheduled date (guard `releaseUnscheduled`, `releaseDateMissing`); the release panel's button stays disabled until then ([Work](12_work.md)).
 - The mock refuses a new scheduled date earlier than the head office's today: `400 bad_request` `releaseDateInPast`, whose message names that today. Sending the date already set is accepted.
 - Server texts about a date — the `releaseDateSet` notification body and the `releaseDateInPast` error — write it with `readableDate` per language ("11월 5일 (목)", "Thu, Nov 5"), not as raw `YYYY-MM-DD`.
+
+## Layout
+
+- A `fit` route ([Frontend Profile](../profiles/frontend.md)): on a big screen the title (with the list or month switch), the head-office note, the project filter, the month stepper and the refresh notice stay in place, and the list or the month calendar scrolls ("배포 일정 내용").
 
 ## API Services
 

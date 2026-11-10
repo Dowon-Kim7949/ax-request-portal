@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useIsMutating, useQuery } from '@tanstack/react-query'
 import { ChevronLeft, X } from 'lucide-react'
-import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { FormProvider, useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import {
@@ -19,6 +19,7 @@ import { api, type SavedDraft } from '@/api/contract'
 import { errorText } from '@/api/error-text'
 import { CREATE_REQUEST_KEY, keys, useCreateRequest, usePrecheck } from '@/api/queries'
 import { useCurrentUser, useDirectory } from '@/app/hooks'
+import { Page, PagePlain, PageScroll } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { Button } from '@/components/ui/button'
 import { ErrorState, Spinner } from '@/components/ui/feedback'
@@ -127,10 +128,12 @@ export default function WizardPage() {
   if (waiting && !sending) setWaiting(false)
   if (waiting) {
     return (
-      <div className="mx-auto flex max-w-2xl flex-col items-center gap-2 py-16 text-center">
-        <Spinner label={t('wizard.sendingEarlier.title')} />
-        <p className="text-sm text-ink-500">{t('wizard.sendingEarlier.body')}</p>
-      </div>
+      <PagePlain>
+        <div className="mx-auto flex max-w-2xl flex-col items-center gap-2 py-16 text-center">
+          <Spinner label={t('wizard.sendingEarlier.title')} />
+          <p className="text-sm text-ink-500">{t('wizard.sendingEarlier.body')}</p>
+        </div>
+      </PagePlain>
     )
   }
   return <WizardSession />
@@ -224,43 +227,49 @@ function WizardOpener({ draftParam, owned }: { draftParam: string | null; owned:
 
   if (start === null) {
     return (
-      <div className="mx-auto flex max-w-2xl justify-center py-16">
-        <Spinner label={t('wizard.loadingDraft')} />
-      </div>
+      <PagePlain>
+        <div className="mx-auto flex max-w-2xl justify-center py-16">
+          <Spinner label={t('wizard.loadingDraft')} />
+        </div>
+      </PagePlain>
     )
   }
   if (start === 'failed') {
     return (
-      <div className="mx-auto max-w-2xl py-6">
-        <LoadFailed
-          error={read.error}
-          retrying={read.isFetching}
-          onRetry={() => {
-            setStart(null)
-            void read.refetch()
-          }}
-        />
-      </div>
+      <PagePlain>
+        <div className="mx-auto max-w-2xl py-6">
+          <LoadFailed
+            error={read.error}
+            retrying={read.isFetching}
+            onRetry={() => {
+              setStart(null)
+              void read.refetch()
+            }}
+          />
+        </div>
+      </PagePlain>
     )
   }
   if (start === 'notFound') {
     return (
-      <div className="mx-auto max-w-2xl py-6">
-        <ErrorState
-          title={t('wizard.notFound.title')}
-          body={t('wizard.notFound.body')}
-          action={
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Button asChild>
-                <Link to={DRAFTS_LIST_PATH}>{t('wizard.notFound.drafts')}</Link>
-              </Button>
-              <Button asChild variant="secondary">
-                <Link to="/requests/new">{t('wizard.notFound.newRequest')}</Link>
-              </Button>
-            </div>
-          }
-        />
-      </div>
+      <PagePlain>
+        <div className="mx-auto max-w-2xl py-6">
+          <ErrorState
+            title={t('wizard.notFound.title')}
+            body={t('wizard.notFound.body')}
+            action={
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button asChild>
+                  <Link to={DRAFTS_LIST_PATH}>{t('wizard.notFound.drafts')}</Link>
+                </Button>
+                <Button asChild variant="secondary">
+                  <Link to="/requests/new">{t('wizard.notFound.newRequest')}</Link>
+                </Button>
+              </div>
+            }
+          />
+        </div>
+      </PagePlain>
     )
   }
   return <WizardForm start={start} owned={owned} />
@@ -697,8 +706,12 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
   // could run after the user (or a test) has already started typing into the
   // first field, and pull focus away mid-input, dropping what was typed.
   const titleRef = useRef<HTMLDivElement>(null)
+  const formId = useId()
   useLayoutEffect(() => {
     window.scrollTo({ top: 0 })
+    // On a big screen the window does not scroll; the step scrolls in its region (Page parts).
+    const region = titleRef.current?.closest('[data-scroll-region]')
+    if (region) region.scrollTop = 0
     titleRef.current?.querySelector<HTMLElement>('[data-step-title]')?.focus({ preventScroll: true })
   }, [step])
   function focusTitle() {
@@ -858,89 +871,113 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
 
   return (
     <FormProvider {...form}>
-      <div className="mx-auto flex max-w-2xl flex-col">
-        {/* progress */}
-        {/* Pinned under the header: its height plus the notch inset it sits below (AppShell). */}
-        <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 -mx-4 flex items-center gap-3 bg-canvas/95 px-2 py-2 backdrop-blur sm:-mx-6 sm:px-4 md:top-[calc(4rem+env(safe-area-inset-top))]">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={back}
-            aria-label={step === 0 ? t('common.close') : t('common.back')}
-          >
-            {step === 0 ? <X aria-hidden /> : <ChevronLeft aria-hidden />}
-          </Button>
-          <div
-            className="h-1.5 flex-1 overflow-hidden rounded-full bg-line"
-            role="progressbar"
-            aria-valuemin={1}
-            aria-valuemax={STEPS.length}
-            aria-valuenow={step + 1}
-            aria-label={t('wizard.title')}
-          >
-            <div
-              className="h-full rounded-full bg-brand-600 transition-[width] duration-300"
-              style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
-            />
-          </div>
-          <span className="w-10 text-right font-mono text-sm text-ink-500">
-            {t('wizard.step', { current: step + 1, total: STEPS.length })}
-          </span>
-        </div>
-
-        <DraftStatusBar
-          state={saveState}
-          onDiscard={draftKey || onServer ? askDiscard : undefined}
-          // A new request: the drafts there are to continue instead, until this one is saved.
-          idle={start.key === null ? <DraftsNotice exclude={[draftKey]} /> : undefined}
-        />
-        {saveState === 'conflict' ? (
-          <ConflictNotice
-            busy={resolving}
-            onKeepMine={() => void keepMine()}
-            onLoadSaved={() => void loadSaved()}
-          />
-        ) : saveState === 'limited' ? (
-          <LimitNotice />
-        ) : null}
-
-        <form
-          noValidate
-          className="pt-2 pb-32 md:pb-6"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (current.key === 'review') void submit()
-            else void next()
-          }}
-        >
-          <StepNotice.Provider
-            value={
-              saveState === 'conflict'
-                ? CONFLICT_NOTICE_TEXT
-                : saveState === 'limited'
-                  ? LIMIT_NOTICE_TEXT
-                  : undefined
-            }
-          >
-            <div ref={titleRef}>{body}</div>
-          </StepNotice.Provider>
-
-          {/* actions: pinned to the bottom on phones (tab bar is hidden here), inline from md */}
-          <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur md:static md:mt-8 md:border-0 md:bg-transparent md:p-0">
-            <div className="mx-auto flex max-w-2xl gap-2">
-              {current.key === 'review' ? (
-                <Button type="submit" size="lg" block loading={submitting} disabled={precheck.isPending}>
-                  {submitting ? t('wizard.review.submitting') : t('wizard.review.submit')}
+      <Page>
+        {/*
+          Progress. While the window scrolls it is pinned under the header: the header's height plus
+          the notch inset it sits below (AppShell); a child of Page, so it stays pinned all the way
+          down. On a big screen the window does not scroll and it simply stays on top.
+        */}
+        <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 mt-4 bg-canvas/95 backdrop-blur md:top-[calc(4rem+env(safe-area-inset-top))] md:mt-6 fit:static fit:shrink-0">
+          <div className="page-band">
+            <div className="mx-auto max-w-2xl">
+              <div className="-mx-2 flex items-center gap-3 py-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={back}
+                  aria-label={step === 0 ? t('common.close') : t('common.back')}
+                >
+                  {step === 0 ? <X aria-hidden /> : <ChevronLeft aria-hidden />}
                 </Button>
-              ) : (
-                <Button type="submit" size="lg" block>
-                  {t('common.next')}
-                </Button>
-              )}
+                <div
+                  className="h-1.5 flex-1 overflow-hidden rounded-full bg-line"
+                  role="progressbar"
+                  aria-valuemin={1}
+                  aria-valuemax={STEPS.length}
+                  aria-valuenow={step + 1}
+                  aria-label={t('wizard.title')}
+                >
+                  <div
+                    className="h-full rounded-full bg-brand-600 transition-[width] duration-300"
+                    style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
+                  />
+                </div>
+                <span className="w-10 text-right font-mono text-sm text-ink-500">
+                  {t('wizard.step', { current: step + 1, total: STEPS.length })}
+                </span>
+              </div>
             </div>
           </div>
-        </form>
-      </div>
+        </div>
+
+        <PageScroll label={t('common.contentOf', { title: t('wizard.title') })} className="md:pb-0">
+          <div className="mx-auto max-w-2xl">
+            <DraftStatusBar
+              state={saveState}
+              onDiscard={draftKey || onServer ? askDiscard : undefined}
+              // A new request: the drafts there are to continue instead, until this one is saved.
+              idle={start.key === null ? <DraftsNotice exclude={[draftKey]} /> : undefined}
+            />
+            {saveState === 'conflict' ? (
+              <ConflictNotice
+                busy={resolving}
+                onKeepMine={() => void keepMine()}
+                onLoadSaved={() => void loadSaved()}
+              />
+            ) : saveState === 'limited' ? (
+              <LimitNotice />
+            ) : null}
+
+            <form
+              id={formId}
+              noValidate
+              className="pt-2 pb-32 md:pb-6"
+              onSubmit={(e) => {
+                e.preventDefault()
+                if (current.key === 'review') void submit()
+                else void next()
+              }}
+            >
+              <StepNotice.Provider
+                value={
+                  saveState === 'conflict'
+                    ? CONFLICT_NOTICE_TEXT
+                    : saveState === 'limited'
+                      ? LIMIT_NOTICE_TEXT
+                      : undefined
+                }
+              >
+                <div ref={titleRef}>{body}</div>
+              </StepNotice.Provider>
+            </form>
+          </div>
+        </PageScroll>
+
+        {/*
+            Actions, outside the form (`form` links them): pinned to the bottom on phones (the tab bar
+            is hidden here), after the form on a tablet, along the bottom of the window on a big screen.
+          */}
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] backdrop-blur md:static md:border-0 md:bg-transparent md:px-6 md:pt-8 md:pb-12 fit:shrink-0 fit:border-t fit:bg-surface/95 fit:py-3">
+          <div className="mx-auto flex max-w-2xl gap-2">
+            {current.key === 'review' ? (
+              <Button
+                type="submit"
+                form={formId}
+                size="lg"
+                block
+                loading={submitting}
+                disabled={precheck.isPending}
+              >
+                {submitting ? t('wizard.review.submitting') : t('wizard.review.submit')}
+              </Button>
+            ) : (
+              <Button type="submit" form={formId} size="lg" block>
+                {t('common.next')}
+              </Button>
+            )}
+          </div>
+        </div>
+      </Page>
 
       <Sheet
         open={blocker.state === 'blocked'}

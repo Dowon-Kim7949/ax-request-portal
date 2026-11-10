@@ -14,6 +14,7 @@ import { Link } from 'react-router'
 import { useAiUsage, useRequests } from '@/api/queries'
 import { refreshOf } from '@/api/refresh'
 import { useCan, useCurrentUser, useDirectory } from '@/app/hooks'
+import { Page, PageScroll, PageTop } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { ProjectIcon } from '@/components/request/project-icon'
 import { RequestCard } from '@/components/request/request-card'
@@ -289,35 +290,40 @@ export default function HomePage() {
   const ops = can('usage:view') || can('agent:manage') || can('budget:manage')
 
   return (
-    <div className="flex flex-col gap-8">
-      <header className="flex flex-col gap-1">
-        <p className="text-[15px] text-ink-500">{t('home.greeting', { name: user.name })}</p>
-        <h1 className="text-[28px] leading-tight font-bold tracking-tight sm:text-[32px]">
-          {t('home.question')}
-        </h1>
-      </header>
+    <Page>
+      <PageTop>
+        <header className="mb-8 flex flex-col gap-1">
+          <p className="text-[15px] text-ink-500">{t('home.greeting', { name: user.name })}</p>
+          <h1 className="text-[28px] leading-tight font-bold tracking-tight sm:text-[32px]">
+            {t('home.question')}
+          </h1>
+        </header>
+      </PageTop>
+      <PageScroll label={t('common.contentOf', { title: t('nav.home') })}>
+        <div className="flex flex-col gap-8">
+          {can('dashboard:view') ? (
+            <Link
+              to="/dashboard"
+              className="flex items-center gap-3 rounded-2xl bg-inverse px-4 py-4 text-on-inverse hover:opacity-90"
+            >
+              <ChartColumn className="size-5" aria-hidden />
+              <span className="flex-1 font-bold">{t('home.dashboardCta')}</span>
+              <ChevronRight className="size-4" aria-hidden />
+            </Link>
+          ) : null}
 
-      {can('dashboard:view') ? (
-        <Link
-          to="/dashboard"
-          className="flex items-center gap-3 rounded-2xl bg-inverse px-4 py-4 text-on-inverse hover:opacity-90"
-        >
-          <ChartColumn className="size-5" aria-hidden />
-          <span className="flex-1 font-bold">{t('home.dashboardCta')}</span>
-          <ChevronRight className="size-4" aria-hidden />
-        </Link>
-      ) : null}
-
-      {reviewer ? (
-        <>
-          <DeveloperSection />
-          {/* Reviewers file requests too: their drafts show here (only when there are any). */}
-          <DraftsSection variant="home" />
-        </>
-      ) : null}
-      {can('request:create') && !reviewer ? <RequesterSection /> : null}
-      {admin ? <AdminSection /> : null}
-      {ops ? <OpsSection /> : null}
-    </div>
+          {reviewer ? (
+            <>
+              <DeveloperSection />
+              {/* Reviewers file requests too: their drafts show here (only when there are any). */}
+              <DraftsSection variant="home" />
+            </>
+          ) : null}
+          {can('request:create') && !reviewer ? <RequesterSection /> : null}
+          {admin ? <AdminSection /> : null}
+          {ops ? <OpsSection /> : null}
+        </div>
+      </PageScroll>
+    </Page>
   )
 }

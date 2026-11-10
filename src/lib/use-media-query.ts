@@ -4,6 +4,12 @@ import { useCallback, useSyncExternalStore } from 'react'
 export const TABLET_UP = '(min-width: 48rem)'
 
 /**
+ * A desktop window big enough for a page to fill it, with only its lists
+ * scrolling (the `fit:` variant in src/index.css, which must say the same).
+ */
+export const FIT_QUERY = '(min-width: 80rem) and (min-height: 45rem)'
+
+/**
  * Whether the viewport matches a media query, following changes. Without
  * `matchMedia` (jsdom) nothing matches.
  */

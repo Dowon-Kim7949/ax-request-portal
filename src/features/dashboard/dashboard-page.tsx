@@ -5,7 +5,7 @@ import { Link } from 'react-router'
 import { useDashboard } from '@/api/queries'
 import { refreshOf } from '@/api/refresh'
 import { useDirectory } from '@/app/hooks'
-import { PageHeader } from '@/app/page'
+import { Page, PageColumns, PageHeader, PageScroll, PageTop } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Meter } from '@/components/ui/controls'
@@ -116,30 +116,34 @@ export default function DashboardPage() {
   const budgetPct = data && data.aiBudgetKrw > 0 ? (data.aiCostKrw / data.aiBudgetKrw) * 100 : 0
 
   return (
-    <>
-      <PageHeader
-        title={t('dashboard.title')}
-        description={t('dashboard.subtitle', { month: formatMonth(month) })}
-      />
+    <Page>
+      <PageTop>
+        <PageHeader
+          title={t('dashboard.title')}
+          description={t('dashboard.subtitle', { month: formatMonth(month) })}
+        />
 
-      {/* Filters: one row, above everything they scope */}
-      <MonthStepper month={month} onChange={setMonth} />
+        {/* Filters: one row, above everything they scope */}
+        <MonthStepper month={month} onChange={setMonth} />
 
-      <RefreshFailed {...refreshOf(query)} className="mb-3" />
-      {query.isPending ? (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {Array.from({ length: 4 }, (_, i) => (
-            <Skeleton key={i} className="h-28" />
-          ))}
-        </div>
-      ) : query.isLoadingError || !data ? (
-        <LoadFailed error={query.error} onRetry={() => void query.refetch()} retrying={query.isFetching} />
-      ) : (
-        <div
-          className={cn('flex flex-col gap-4 transition-opacity', stale && 'opacity-60')}
-          aria-busy={stale}
-        >
-          <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 lg:grid-cols-4">
+        <RefreshFailed {...refreshOf(query)} className="mb-3" />
+        {query.isPending ? (
+          <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {Array.from({ length: 4 }, (_, i) => (
+              <Skeleton key={i} className="h-28" />
+            ))}
+          </div>
+        ) : query.isLoadingError || !data ? (
+          <LoadFailed error={query.error} onRetry={() => void query.refetch()} retrying={query.isFetching} />
+        ) : (
+          // The month's figures stay in view above the panels.
+          <div
+            className={cn(
+              'mb-4 grid grid-cols-1 gap-3 transition-opacity min-[420px]:grid-cols-2 lg:grid-cols-4',
+              stale && 'opacity-60',
+            )}
+            aria-busy={stale}
+          >
             <StatTile
               label={t('dashboard.received')}
               value={t('common.count', { count: data.received })}
@@ -171,8 +175,14 @@ export default function DashboardPage() {
               </div>
             </StatTile>
           </div>
-
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+        )}
+      </PageTop>
+      {!query.isPending && !query.isLoadingError && data ? (
+        <PageColumns
+          className={cn('transition-opacity lg:grid-cols-[minmax(0,1fr)_340px]', stale && 'opacity-60')}
+          busy={stale}
+        >
+          <PageScroll column id="projects" label={t('dashboard.byProject')}>
             <Card>
               <CardHeader>
                 <CardTitle>{t('dashboard.byProject')}</CardTitle>
@@ -180,7 +190,8 @@ export default function DashboardPage() {
               </CardHeader>
               <ProjectBars rows={data.byProject} />
             </Card>
-
+          </PageScroll>
+          <PageScroll column id="side" label={`${t('dashboard.upcoming')} · ${t('dashboard.attention')}`}>
             <div className="flex flex-col gap-4">
               <Card>
                 <CardHeader>
@@ -238,9 +249,9 @@ export default function DashboardPage() {
                 )}
               </section>
             </div>
-          </div>
-        </div>
-      )}
-    </>
+          </PageScroll>
+        </PageColumns>
+      ) : null}
+    </Page>
   )
 }

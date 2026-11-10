@@ -4,6 +4,14 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
+ * Big screens (a desktop window at least 1280 × 720): a page made of `Page`
+ * parts (src/app/page.tsx) fills the window and only its lists scroll. Smaller
+ * windows, a phone, a tablet or a 200 % zoom keep the ordinary page scroll.
+ * Keep in step with FIT_QUERY in src/lib/use-media-query.ts.
+ */
+@custom-variant fit (@media (min-width: 80rem) and (min-height: 45rem));
+
+/*
  * ─────────────────────────────────────────────────────────────
  *  Design tokens — rebrand the template by editing this block
  *  and its dark-mode counterpart (`.dark` further down).
@@ -96,6 +104,37 @@
 @layer base {
   :root {
     color-scheme: light;
+
+    /*
+     * Page width, shared by the shell header and every part of a page so their
+     * edges line up (`page-band`, `page-column` below). --page-gutter is the
+     * scrollbar's width where a page's lists scroll on their own: each scroll
+     * region reserves it on both edges, and the bands above, which do not
+     * scroll, pad by the same amount. --sbw is measured at start-up
+     * (src/lib/scrollbar-width.ts) and is 0 with overlay scrollbars.
+     */
+    --page-max: 72rem;
+    --page-pad: 1rem;
+    --page-gutter: 0px;
+  }
+  @media (min-width: 40rem) {
+    :root {
+      --page-pad: 1.5rem;
+    }
+  }
+  @media (min-width: 96rem) {
+    :root {
+      --page-max: 90rem;
+    }
+  }
+  @media (min-width: 80rem) and (min-height: 45rem) {
+    [data-fit] {
+      --page-gutter: var(--sbw, 0px);
+    }
+    /* A line under a page's fixed top once its list has scrolled beneath it. */
+    [data-page]:has([data-scrolled]) > [data-page-top] {
+      box-shadow: inset 0 -1px var(--color-line);
+    }
   }
 
   /* Dark theme: same token names, values tuned for a dark page (see src/theme.test.ts). */
@@ -225,4 +264,32 @@
 
 @utility pt-safe {
   padding-top: env(safe-area-inset-top);
+}
+
+/* The page width for a band that does not scroll: the shell header, the fixed top of a page. */
+@utility page-band {
+  margin-inline: auto;
+  width: 100%;
+  max-width: calc(var(--page-max) + 2 * var(--page-gutter));
+  padding-inline: calc(var(--page-pad) + var(--page-gutter));
+}
+
+/*
+ * Columns that each scroll (PageColumns): the band's width, but the right padding leaves out the
+ * gutter, where the last column's own scrollbar sits.
+ */
+@utility page-columns {
+  margin-inline: auto;
+  width: 100%;
+  max-width: calc(var(--page-max) + 2 * var(--page-gutter));
+  padding-left: calc(var(--page-pad) + var(--page-gutter));
+  padding-right: var(--page-pad);
+}
+
+/* The page width inside a scroll region (whose gutter is already reserved), or the whole page. */
+@utility page-column {
+  margin-inline: auto;
+  width: 100%;
+  max-width: var(--page-max);
+  padding-inline: var(--page-pad);
 }

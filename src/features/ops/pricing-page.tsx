@@ -11,7 +11,7 @@ import * as z from 'zod'
 import { ApiError } from '@/api/client'
 import { useAiPricing, useAiSettings, useUpdateAiPricing } from '@/api/queries'
 import { refreshOf } from '@/api/refresh'
-import { PageHeader } from '@/app/page'
+import { Page, PageHeader, PageScroll, PageTop } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { ProviderSwatch } from '@/components/ai/ai'
 import { Badge } from '@/components/ui/badge'
@@ -286,10 +286,12 @@ export default function PricingPage() {
   }
 
   return (
-    <>
-      <PageHeader title={t('pricing.title')} description={t('pricing.subtitle')} />
-      <RefreshFailed {...refreshOf(pricing, settings)} className="mb-3" />
-      {body()}
-    </>
+    <Page>
+      <PageTop>
+        <PageHeader title={t('pricing.title')} description={t('pricing.subtitle')} />
+        <RefreshFailed {...refreshOf(pricing, settings)} className="mb-3" />
+      </PageTop>
+      <PageScroll label={t('common.contentOf', { title: t('pricing.title') })}>{body()}</PageScroll>
+    </Page>
   )
 }

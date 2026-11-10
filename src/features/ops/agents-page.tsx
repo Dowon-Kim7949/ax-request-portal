@@ -17,7 +17,7 @@ import {
   useUpdateAiSettings,
 } from '@/api/queries'
 import { useDirectory } from '@/app/hooks'
-import { PageHeader } from '@/app/page'
+import { Page, PageHeader, PageScroll, PageTop } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { ModelName, ProviderSwatch } from '@/components/ai/ai'
 import { Badge } from '@/components/ui/badge'
@@ -513,10 +513,12 @@ export default function AgentsPage() {
   }
 
   return (
-    <>
-      <PageHeader title={t('agents.title')} description={t('agents.subtitle')} />
-      <RefreshFailed {...refreshOf(settings, pricing)} className="mb-3" />
-      {body()}
-    </>
+    <Page>
+      <PageTop>
+        <PageHeader title={t('agents.title')} description={t('agents.subtitle')} />
+        <RefreshFailed {...refreshOf(settings, pricing)} className="mb-3" />
+      </PageTop>
+      <PageScroll label={t('common.contentOf', { title: t('agents.title') })}>{body()}</PageScroll>
+    </Page>
   )
 }

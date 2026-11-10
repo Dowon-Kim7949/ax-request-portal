@@ -8,6 +8,9 @@
  */
 const ko = {
   common: {
+    /** Names of the parts of a page that scroll on their own on a big screen (PageScroll) */
+    listOf: '{{title}} 목록',
+    contentOf: '{{title}} 내용',
     next: '다음',
     back: '이전',
     cancel: '취소',
@@ -451,6 +454,7 @@ const ko = {
     pastDue: '지남',
   },
   detail: {
+    sideLabel: '배포와 진행 기록',
     requestedBy: '요청자 {{name}}',
     filedOn: '{{date}} 접수',
     whatIAsked: '요청 내용',
@@ -567,6 +571,7 @@ const ko = {
   work: {
     title: '배정된 요청',
     subtitle: '담당 프로젝트의 요청과 내가 맡은 요청이에요.',
+    listLabel: '배정된 요청 목록',
     filter: {
       myTurn: '내 차례',
       ai: 'AI 작업 중',
@@ -914,6 +919,7 @@ const ko = {
   },
   notifications: {
     title: '알림',
+    listLabel: '알림 목록',
     markAll: '모두 읽음',
     empty: '새 알림이 없어요.',
     unread: '읽지 않음',

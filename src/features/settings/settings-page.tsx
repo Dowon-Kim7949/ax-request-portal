@@ -6,7 +6,7 @@ import { useNotificationSettings, useUpdateNotificationSettings } from '@/api/qu
 import { refreshOf } from '@/api/refresh'
 import { demoDataLanguage } from '@/app/demo'
 import { LanguagePicker, ThemePicker } from '@/app/display-controls'
-import { PageHeader } from '@/app/page'
+import { Page, PageHeader, PageScroll, PageTop } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { SwitchRow } from '@/components/ui/controls'
@@ -105,13 +105,17 @@ export default function SettingsPage() {
   const { t } = useTranslation()
   usePageTitle(t('settings.title'))
   return (
-    <>
-      <PageHeader title={t('settings.title')} description={t('settings.subtitle')} />
-      <div className="grid max-w-2xl grid-cols-1 gap-4">
-        <DisplaySection />
-        <TimeZoneSection />
-        <NotificationsSection />
-      </div>
-    </>
+    <Page>
+      <PageTop>
+        <PageHeader title={t('settings.title')} description={t('settings.subtitle')} />
+      </PageTop>
+      <PageScroll label={t('common.contentOf', { title: t('settings.title') })}>
+        <div className="grid max-w-2xl grid-cols-1 gap-4">
+          <DisplaySection />
+          <TimeZoneSection />
+          <NotificationsSection />
+        </div>
+      </PageScroll>
+    </Page>
   )
 }

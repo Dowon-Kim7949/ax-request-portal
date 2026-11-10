@@ -5,7 +5,7 @@ import { ApiError } from '@/api/client'
 import { useRequest } from '@/api/queries'
 import { refreshOf } from '@/api/refresh'
 import { useCan, useCurrentUser, useDirectory } from '@/app/hooks'
-import { PageHeader } from '@/app/page'
+import { Page, PageColumns, PageHeader, PagePlain, PageScroll, PageTop } from '@/app/page'
 import { NotFoundPage } from '@/app/pages'
 import { usePageTitle } from '@/app/title'
 import { StatusBadge, Stepper } from '@/components/request/status'
@@ -49,13 +49,32 @@ export default function RequestDetailPage() {
   const request = query.data
   usePageTitle(request ? `#${request.id} ${request.title}` : undefined)
 
-  if (!Number.isInteger(id) || id <= 0) return <NotFoundPage />
-  if (query.isPending) return <DetailSkeleton />
+  if (!Number.isInteger(id) || id <= 0)
+    return (
+      <PagePlain>
+        <NotFoundPage />
+      </PagePlain>
+    )
+  if (query.isPending)
+    return (
+      <PagePlain>
+        <DetailSkeleton />
+      </PagePlain>
+    )
   // Gone, or no longer visible to this person: even over a copy loaded before.
-  if (query.error instanceof ApiError && query.error.status === 404) return <NotFoundPage />
+  if (query.error instanceof ApiError && query.error.status === 404)
+    return (
+      <PagePlain>
+        <NotFoundPage />
+      </PagePlain>
+    )
   // Nothing loaded at all. A failed refresh keeps the request on screen (RefreshFailed below).
   if (query.isLoadingError || !request) {
-    return <LoadFailed error={query.error} onRetry={() => void query.refetch()} retrying={query.isFetching} />
+    return (
+      <PagePlain>
+        <LoadFailed error={query.error} onRetry={() => void query.refetch()} retrying={query.isFetching} />
+      </PagePlain>
+    )
   }
 
   const project = dir.project(request.projectId)
@@ -76,136 +95,143 @@ export default function RequestDetailPage() {
       : { to: '/', label: t('nav.home') }
 
   return (
-    <>
-      <PageHeader
-        back={back}
-        eyebrow={
-          <span className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={request.status} />
-            <span className="text-ink-400">#{request.id}</span>
-          </span>
-        }
-        title={request.title}
-        description={
-          <span className="flex flex-wrap gap-x-2 text-sm">
-            <span>{dir.projectName(request.projectId)}</span>
-            <span aria-hidden>·</span>
-            <span>{t(`requestType.${request.type}.label`)}</span>
-            <span aria-hidden>·</span>
-            <span>{t('detail.requestedBy', { name: dir.userName(request.requesterId) })}</span>
-            <span aria-hidden>·</span>
-            <DateTimeText
-              iso={request.createdAt}
-              variant="date"
-              sentence={(date) => t('detail.filedOn', { date })}
-            />
-          </span>
-        }
-      />
-
-      <RefreshFailed {...refreshOf(query)} className="mb-4" />
-      <Card className="mb-4">
-        <Stepper status={request.status} />
-      </Card>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="flex min-w-0 flex-col gap-4">
-          {technical ? null : <StatusExplainer request={request} />}
-
-          {/* Developer: the decision comes first on every screen size */}
-          {showDecision ? (
-            <DecisionCard
-              request={request}
-              canAsk={events.includes('requestInfo')}
-              canReject={events.includes('reject')}
-              askPrefill={request.report?.openQuestions ?? []}
-              sheet={sheet}
-              setSheet={setSheet}
-            />
-          ) : null}
-
-          {/* Requester: what needs my action */}
-          {events.includes('approveScope') ? <ScopeCheckCard request={request} /> : null}
-          {events.includes('provideInfo') ? <InfoAnswerCard request={request} /> : null}
-          {events.includes('confirmResult') ? <VerificationCard request={request} /> : null}
-          {isRequester && request.status === 'code_review' && request.work?.preview ? (
-            <PreviewCard request={request} />
-          ) : null}
-
-          {/* The scope the work follows; hidden while a new reading is being written */}
-          {request.scope && !events.includes('approveScope') && !REWRITING.includes(request.status) ? (
-            <ScopeSummaryCard request={request} />
-          ) : null}
-
-          {technical && request.work ? (
-            <WorkPanel request={request} project={project} canReview={responsible} />
-          ) : null}
-
-          {technical && request.regression.length ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>{t('regression.title')}</CardTitle>
-              </CardHeader>
-              <RegressionChecks
-                requestId={request.id}
-                checks={request.regression}
-                editable={responsible && !isTerminal(request.status)}
+    <Page>
+      <PageTop>
+        <PageHeader
+          back={back}
+          eyebrow={
+            <span className="flex flex-wrap items-center gap-2">
+              <StatusBadge status={request.status} />
+              <span className="text-ink-400">#{request.id}</span>
+            </span>
+          }
+          title={request.title}
+          description={
+            <span className="flex flex-wrap gap-x-2 text-sm">
+              <span>{dir.projectName(request.projectId)}</span>
+              <span aria-hidden>·</span>
+              <span>{t(`requestType.${request.type}.label`)}</span>
+              <span aria-hidden>·</span>
+              <span>{t('detail.requestedBy', { name: dir.userName(request.requesterId) })}</span>
+              <span aria-hidden>·</span>
+              <DateTimeText
+                iso={request.createdAt}
+                variant="date"
+                sentence={(date) => t('detail.filedOn', { date })}
               />
-            </Card>
-          ) : null}
+            </span>
+          }
+        />
 
-          {technical && request.type !== 'non_code' ? (
-            <ReportPanel
-              request={request}
-              onAsk={events.includes('requestInfo') ? () => setSheet('ask') : undefined}
-            />
-          ) : null}
+        <RefreshFailed {...refreshOf(query)} className="mb-4" />
+        {/* Where the request stands stays in view with its title. */}
+        <Card className="mb-4">
+          <Stepper status={request.status} />
+        </Card>
+      </PageTop>
 
-          {request.infoRequest && !events.includes('provideInfo') ? (
+      <PageColumns className="lg:grid-cols-[minmax(0,1fr)_340px]">
+        <PageScroll column id="body" label={t('common.contentOf', { title: `#${request.id}` })}>
+          <div className="flex min-w-0 flex-col gap-4">
+            {technical ? null : <StatusExplainer request={request} />}
+
+            {/* Developer: the decision comes first on every screen size */}
+            {showDecision ? (
+              <DecisionCard
+                request={request}
+                canAsk={events.includes('requestInfo')}
+                canReject={events.includes('reject')}
+                askPrefill={request.report?.openQuestions ?? []}
+                sheet={sheet}
+                setSheet={setSheet}
+              />
+            ) : null}
+
+            {/* Requester: what needs my action */}
+            {events.includes('approveScope') ? <ScopeCheckCard request={request} /> : null}
+            {events.includes('provideInfo') ? <InfoAnswerCard request={request} /> : null}
+            {events.includes('confirmResult') ? <VerificationCard request={request} /> : null}
+            {isRequester && request.status === 'code_review' && request.work?.preview ? (
+              <PreviewCard request={request} />
+            ) : null}
+
+            {/* The scope the work follows; hidden while a new reading is being written */}
+            {request.scope && !events.includes('approveScope') && !REWRITING.includes(request.status) ? (
+              <ScopeSummaryCard request={request} />
+            ) : null}
+
+            {technical && request.work ? (
+              <WorkPanel request={request} project={project} canReview={responsible} />
+            ) : null}
+
+            {technical && request.regression.length ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t('regression.title')}</CardTitle>
+                </CardHeader>
+                <RegressionChecks
+                  requestId={request.id}
+                  checks={request.regression}
+                  editable={responsible && !isTerminal(request.status)}
+                />
+              </Card>
+            ) : null}
+
+            {technical && request.type !== 'non_code' ? (
+              <ReportPanel
+                request={request}
+                onAsk={events.includes('requestInfo') ? () => setSheet('ask') : undefined}
+              />
+            ) : null}
+
+            {request.infoRequest && !events.includes('provideInfo') ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t('detail.info.title')}</CardTitle>
+                </CardHeader>
+                <ul className="mb-3 flex list-disc flex-col gap-1 pl-5 text-[15px]">
+                  {request.infoRequest.questions.map((q) => (
+                    <li key={q}>{q}</li>
+                  ))}
+                </ul>
+                {request.infoRequest.answer ? (
+                  <p className="rounded-xl bg-muted px-3.5 py-2.5 text-sm">
+                    <span className="font-semibold">{t('detail.info.yourAnswer')}: </span>
+                    {request.infoRequest.answer}
+                  </p>
+                ) : null}
+              </Card>
+            ) : null}
+
+            {request.status === 'rejected' && technical ? <StatusExplainer request={request} /> : null}
+
+            <RequestContent request={request} />
+
+            {events.includes('cancel') ? (
+              <div className="flex justify-center">
+                <CancelRequest request={request} />
+              </div>
+            ) : null}
+          </div>
+        </PageScroll>
+
+        <PageScroll column id="side" label={t('detail.sideLabel')}>
+          <aside className="flex min-w-0 flex-col gap-4">
+            {showRelease ? (
+              <ReleasePanel request={request} canRelease={events.includes('markReleased')} />
+            ) : (
+              <ReleaseCard request={request} />
+            )}
+            {technical && request.aiUsage ? <AiUsageCard usage={request.aiUsage} /> : null}
             <Card>
               <CardHeader>
-                <CardTitle>{t('detail.info.title')}</CardTitle>
+                <CardTitle>{t('detail.timeline')}</CardTitle>
               </CardHeader>
-              <ul className="mb-3 flex list-disc flex-col gap-1 pl-5 text-[15px]">
-                {request.infoRequest.questions.map((q) => (
-                  <li key={q}>{q}</li>
-                ))}
-              </ul>
-              {request.infoRequest.answer ? (
-                <p className="rounded-xl bg-muted px-3.5 py-2.5 text-sm">
-                  <span className="font-semibold">{t('detail.info.yourAnswer')}: </span>
-                  {request.infoRequest.answer}
-                </p>
-              ) : null}
+              <Timeline entries={request.timeline} />
             </Card>
-          ) : null}
-
-          {request.status === 'rejected' && technical ? <StatusExplainer request={request} /> : null}
-
-          <RequestContent request={request} />
-
-          {events.includes('cancel') ? (
-            <div className="flex justify-center">
-              <CancelRequest request={request} />
-            </div>
-          ) : null}
-        </div>
-
-        <aside className="flex min-w-0 flex-col gap-4">
-          {showRelease ? (
-            <ReleasePanel request={request} canRelease={events.includes('markReleased')} />
-          ) : (
-            <ReleaseCard request={request} />
-          )}
-          {technical && request.aiUsage ? <AiUsageCard usage={request.aiUsage} /> : null}
-          <Card>
-            <CardHeader>
-              <CardTitle>{t('detail.timeline')}</CardTitle>
-            </CardHeader>
-            <Timeline entries={request.timeline} />
-          </Card>
-        </aside>
-      </div>
-    </>
+          </aside>
+        </PageScroll>
+      </PageColumns>
+    </Page>
   )
 }

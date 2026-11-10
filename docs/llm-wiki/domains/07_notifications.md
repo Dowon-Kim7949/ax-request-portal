@@ -6,7 +6,7 @@ tags:
 status: verified
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-10
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -33,7 +33,7 @@ related:
 visibility: public
 contains_sensitive_info: false
 reviewed_by: Kim Dowon
-reviewed_at: 2026-11-09
+reviewed_at: 2026-11-10
 ---
 
 # Notifications
@@ -48,6 +48,7 @@ The in-app inbox at `/notifications` (authentication only). Preferences are edit
 - Marking read is optimistic: the dot in the list and the count on the shell's notifications link change at once. If the server refuses, only the items this action marked are put back and a toast says so ("Could not mark as read"); this also works after leaving the screen.
 - Each item shows a relative time; its `title` holds the full local time (and head-office time when the viewer's clock differs, see [Glossary](../GLOSSARY.md)).
 - A failed first load shows `LoadFailed`; a failed poll keeps the list with a `RefreshFailed` line.
+- Layout: a `fit` route. On a big screen the title, "Mark all read" and the refresh notice stay in place and only the list scrolls, in a region named "알림 목록" / "Notification list" ([Frontend Profile](../profiles/frontend.md)). Its top and list keep a reading width at the left (`max-w-3xl`), like the settings page.
 
 ## Stored as key and parameters
 

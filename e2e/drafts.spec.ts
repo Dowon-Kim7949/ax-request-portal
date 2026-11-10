@@ -25,6 +25,12 @@ const MOCK_DB_PREFIX = 'ax-request-portal:mock-db'
 const DEVICE_DRAFT_KEY = /^ax-request-portal:drafts?:/
 
 /**
+ * The step a picked type moves to. Wait for it before "다음": the router commits the move as a
+ * transition, and a click while the type step still shows advances from that step again.
+ */
+const SCREENS_STEP = '어느 화면이나 기능인가요?'
+
+/**
  * Opens a new request. From another screen: openInApp moves the way the back
  * button does, and the wizard keeps its form for moves like that.
  */
@@ -40,6 +46,7 @@ async function startRequest(page: Page, query = '') {
 async function writeDraft(page: Page, title: string) {
   await startRequest(page, '?project=p-field')
   await page.getByRole('radio', { name: /버그/ }).click() // auto-advances
+  await expect(page.getByRole('heading', { name: SCREENS_STEP })).toBeVisible()
   await page.getByRole('button', { name: '다음' }).click()
   await page.getByLabel('요청 제목').fill(title)
   await expect(page.getByText('계정에 저장됨')).toBeVisible()
@@ -179,6 +186,7 @@ test('signing out deletes the drafts kept on this device, after asking about the
   })
   await startRequest(page, '?project=p-portal')
   await page.getByRole('radio', { name: /기존 기능 변경/ }).click() // auto-advances
+  await expect(page.getByRole('heading', { name: SCREENS_STEP })).toBeVisible()
   await page.getByRole('button', { name: '다음' }).click()
   await page.getByLabel('요청 제목').fill('이 기기에만 있는 초안')
   // The line under the progress bar (a live region repeats it for screen readers).

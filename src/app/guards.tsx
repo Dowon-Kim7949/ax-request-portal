@@ -7,6 +7,7 @@ import { ErrorState } from '@/components/ui/feedback'
 import type { Permission } from '@/domain/roles'
 import { useSession } from '@/stores/session'
 import { useCan } from './hooks'
+import { PagePlain } from './page'
 import { useSessionSync } from './session-sync'
 
 export const LOGIN_PATH = '/login'
@@ -42,12 +43,15 @@ export function SessionSync() {
   return null
 }
 
-/** Renders a friendly "not allowed" page instead of the route when a permission is missing. */
+/**
+ * Renders a friendly "not allowed" page instead of the route when a permission is missing.
+ * It brings the page width and padding, which the shell leaves to `fit` pages (`RouteHandle.fit`).
+ */
 export function RequirePermission({ permission, children }: { permission: Permission; children: ReactNode }) {
   const can = useCan()
   const { t } = useTranslation()
   if (!can(permission)) {
-    return (
+    const denied = (
       <ErrorState
         title={t('errors.forbidden')}
         action={
@@ -57,6 +61,7 @@ export function RequirePermission({ permission, children }: { permission: Permis
         }
       />
     )
+    return <PagePlain>{denied}</PagePlain>
   }
   return <>{children}</>
 }

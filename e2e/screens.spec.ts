@@ -20,6 +20,8 @@ test('capture requester screens', async ({ page }, info) => {
 
   await page.goto('/requests/new?project=p-portal&step=1')
   await page.getByRole('radio', { name: /버그/ }).click()
+  // The type moves on by itself; "다음" before the next step shows would act on the type step again.
+  await expect(page.getByRole('heading', { name: '어느 화면이나 기능인가요?' })).toBeVisible()
   await page.getByRole('button', { name: '다음' }).click()
   await page.getByLabel('요청 제목').waitFor()
   await shot('wizard-describe')

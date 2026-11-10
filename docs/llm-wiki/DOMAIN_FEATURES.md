@@ -109,6 +109,7 @@ User-facing features by role. Each row names the domain document that holds the 
 | Language (Korean / English), theme (system / light / dark), notification preferences | [Settings](domains/10_settings.md) | `i18n.spec.ts`, `theme.spec.ts`, `admin.spec.ts` |
 | Notice when a newer version is deployed, with a reload button | [Architecture Conventions](ARCHITECTURE_CONVENTIONS.md) | `update.spec.ts` |
 | Same workflows on phone, tablet and desktop, down to 320 px | [Architecture Conventions](ARCHITECTURE_CONVENTIONS.md) | `layout.spec.ts`, `smoke.spec.ts` |
+| On a big screen (from 1280 × 720) every page fits the window and only its lists scroll, side by side where a page has columns; back returns each list to where it was | [Frontend Profile](profiles/frontend.md) | `fit.spec.ts` |
 | Every main screen free of serious accessibility findings, light and dark; nothing blocked by the production security policy | [Accessibility](WCAG.md), [Architecture Conventions](ARCHITECTURE_CONVENTIONS.md) | `axe.spec.ts`, `csp.spec.ts` |
 
 ## API Services

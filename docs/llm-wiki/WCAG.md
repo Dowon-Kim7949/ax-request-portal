@@ -18,10 +18,12 @@ source_files:
   - src/app/shell.tsx
   - e2e/cursor.spec.ts
   - e2e/layout.spec.ts
+  - e2e/fit.spec.ts
   - e2e/theme.spec.ts
   - e2e/a11y.spec.ts
   - e2e/axe.spec.ts
 evidence:
+  - src/app/page.tsx#symbol:PageScroll
   - src/app/update-notice.tsx#symbol:UpdateNotice
   - src/components/request/request-card.tsx#symbol:RequestDates
   - src/components/ui/sheet.tsx#symbol:Sheet
@@ -29,8 +31,8 @@ evidence:
   - src/features/wizard/draft-status.tsx#symbol:DraftStatusBar
   - src/theme.test.ts#symbol:PAIRS
   - src/theme.test.ts#L37-L39
-  - src/index.css#L154-L188
-  - src/index.css#L190-L203
+  - src/index.css#L200-L234
+  - src/index.css#L236-L249
   - src/app/shell.tsx#symbol:SkipLink
   - src/i18n/en.ts#symbol:skipToContent
   - src/i18n/ko.ts#symbol:skipToContent
@@ -49,7 +51,7 @@ evidence:
   - src/features/schedule/schedule-page.tsx#symbol:DateGroup
   - src/features/schedule/month-view.tsx#symbol:MonthCalendar
   - src/features/admin/projects-page.tsx#symbol:ProjectsPage
-  - playwright.config.ts#L14-L15
+  - playwright.config.ts#L17-L18
 related:
   - docs/llm-wiki/COMPONENT_INVENTORY.md
   - docs/llm-wiki/E2E_WORKFLOWS.md
@@ -92,7 +94,7 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 ## Semantics and focus management
 
 - Skip link: `SkipLink` is the first tab stop on every signed-in screen; it is visually hidden until focused and moves focus to `<main id="main" tabIndex={-1}>` in code, so the URL hash and the router are not touched. The login screen has no navigation to skip. `e2e/a11y.spec.ts` checks it on the desktop project only: WebKit (phone and tablet projects) does not tab to links by default.
-- Landmarks come from the shell: `header`, `main`, a labelled `nav` for the sidebar/rail and a separately labelled `nav` for the phone tab bar, where "new request" keeps the middle place on every account that has it (consistent navigation, SC 3.2.3; `phoneTabs`). In a mock build the demo banner above the header is a labelled `aside` ("Demo mode"), because it sits outside `header` and `main`; it has nothing focusable, so the skip link stays the first tab stop. On the login screen the demo note is a plain paragraph inside `main`. Icon-only links carry `aria-label` (the notifications link includes the unread count, "알림 (N)").
+- Landmarks come from the shell: `header`, `main`, a labelled `nav` for the sidebar/rail and a separately labelled `nav` for the phone tab bar, where "new request" keeps the middle place on every account that has it (consistent navigation, SC 3.2.3; `phoneTabs`). In a mock build the phone's demo strip above the header is a labelled `aside` ("Demo mode"), because it sits outside `header` and `main`; from `md` the notice is a plain paragraph inside `header` and the strip is hidden (`display: none`, so it is not read twice). Neither has anything focusable, so the skip link stays the first tab stop. On the login screen the demo note is a plain paragraph inside `main`. Icon-only links carry `aria-label` (the notifications link includes the unread count, "알림 (N)").
 - Label in Name (2.5.3): the visible text of a control must be part of its accessible name. Decorative text inside a control whose name already says it — the brand initials, the unread counter on the bell, the account initial — is drawn by CSS with the shell's `Glyph` (`content: attr(data-glyph)`, `aria-hidden`), not as DOM text. The account button is named by a visually hidden "My account" plus the user's name, visible from `lg`.
 - A `<dl>` group holds only `<dt>` and `<dd>`: the wizard's review rows keep their edit button inside the `<dd>`, and a project card's target and rule counts sit outside its `<dl>`.
 - The schedule's month view is a `<table>` (caption: the month), not an ARIA `grid`: screen readers move by week and day with their table commands, and no arrow-key handling is owed. Column headers show short weekday names and give screen readers the full ones; each cell starts with its full date, hidden visually, beside the visible day number (hidden from the accessibility tree). Release chips are links named "#id title, service, status"; a day's overflow is a button with `aria-expanded` and `aria-controls`; the table is `aria-busy` while another range's data stands in; the month name beside the arrows is a polite live region.
@@ -109,6 +111,8 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 
 - `e2e/layout.spec.ts` visits every route for every role at 320×568 and on a landscape tablet and asserts no horizontal scroll, including the English UI, and the schedule's month view on the landscape tablet. A CSS grid without `grid-cols-1` let `nowrap` children overflow at phone width; keep that class on single-column grids.
 - At 320 px it also opens the notices and error states that only appear in some conditions — the demo banner (login and signed in), the time-zone settings and a detail screen with both clocks far from the head office, the session-expired notice, and a compact and a full `LoadFailed` — and checks that each one lies inside the viewport and that its own text is not clipped.
+- Big screens: a `fit` page ([Frontend Profile](profiles/frontend.md)) scrolls its list inside a region rather than the window only from 1280 × 720; a narrower or shorter window, and a 200 % zoom of a 1080p screen, get the ordinary window scroll, so zoom and reflow behave as on every other page (SC 1.4.4, 1.4.10). Nothing clips: content that outgrows the window gives it a scrollbar instead of being cut off.
+- Keyboard access to each such region (SC 2.1.1): it is `tabIndex=0` with `role="region"` and a name ("배정된 요청 목록", "알림 목록", "{title} 목록" / "{title} 내용" through `common.listOf` / `common.contentOf`, the request page's "#1024 내용" and "배포와 진행 기록"), because Safari does not let a keyboard into a scroll area that has no focusable content of its own, and a long text with no links in it would be out of reach; its focus ring is drawn inside it (`-outline-offset-2`), and its top padding keeps the first row's ring from being clipped. Back restores its position, as the router does for the window. `e2e/fit.spec.ts` checks that PageDown scrolls a focused list.
 
 ## Automated scan
 
@@ -119,8 +123,9 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 ## Evidence
 
 - `src/theme.test.ts#symbol:PAIRS` — the 43 checked pairs; `src/theme.test.ts#L37-L39` — the 4.5:1 and 3:1 thresholds.
-- `src/index.css#L154-L188` — focus outline and cursor contract; `src/index.css#L190-L203` — reduced-motion rule.
+- `src/index.css#L200-L234` — focus outline and cursor contract; `src/index.css#L236-L249` — reduced-motion rule.
 - `src/components/request/request-card.tsx#symbol:RequestDates` — a past-due date in words as well as colour.
+- `src/app/page.tsx#symbol:PageScroll`, `e2e/fit.spec.ts` — the big-screen list region: when it applies, its name and keyboard access.
 - `src/app/shell.tsx#symbol:SkipLink` — skip link and the focusable `main`; `src/i18n/en.ts#symbol:skipToContent` — its label, with `src/i18n/ko.ts#symbol:skipToContent` for Korean.
 - `index.html#L13-L31` — pre-paint theme script.
 - `src/app/theme.ts#symbol:applyTheme` — runtime theme sync.
@@ -128,7 +133,7 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 - `src/components/request/status.tsx#symbol:Stepper` — `aria-current="step"`.
 - `src/features/wizard/steps.tsx#symbol:StepTitle` — focus target for step changes.
 - `src/components/ui/sheet.tsx#symbol:Sheet`, `src/components/ui/sheet.test.tsx` — focus given back when a sheet closes; `src/features/wizard/draft-status.tsx#symbol:DraftStatusBar` — the save line's announcements.
-- `e2e/cursor.spec.ts`, `e2e/layout.spec.ts`, `e2e/theme.spec.ts`, `e2e/a11y.spec.ts`, `e2e/axe.spec.ts` — the automated checks; `playwright.config.ts#L14-L15` — which projects skip which specs.
+- `e2e/cursor.spec.ts`, `e2e/layout.spec.ts`, `e2e/theme.spec.ts`, `e2e/a11y.spec.ts`, `e2e/axe.spec.ts` — the automated checks; `playwright.config.ts#L17-L18` — which projects skip which specs.
 - `src/app/shell.tsx#symbol:Glyph`, `src/app/demo-banner.tsx#symbol:DemoBanner` — CSS-drawn glyphs and the banner landmark.
 - `src/components/ui/load-failed.tsx#symbol:LoadFailed`, `src/components/ui/load-failed.tsx#symbol:RefreshFailed`, `src/features/auth/login-page.tsx#symbol:ANNOUNCE_DELAY_MS`, `src/features/settings/time-zone-section.tsx#symbol:TimeZonePicker` — status semantics and the delayed announcement.
 - `src/features/wizard/steps.tsx#symbol:ReviewStep`, `src/features/admin/projects-page.tsx#symbol:ProjectsPage`, `src/features/schedule/schedule-page.tsx#symbol:DateGroup` — `<dl>` structure and the muted past dates.

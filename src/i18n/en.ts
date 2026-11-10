@@ -7,6 +7,8 @@ import type { Messages } from './ko'
 
 const en: Messages = {
   common: {
+    listOf: '{{title}} list',
+    contentOf: '{{title}} content',
     next: 'Next',
     back: 'Back',
     cancel: 'Cancel',
@@ -455,6 +457,7 @@ const en: Messages = {
     pastDue: 'past due',
   },
   detail: {
+    sideLabel: 'Release and history',
     requestedBy: 'Requested by {{name}}',
     filedOn: 'Filed {{date}}',
     whatIAsked: 'The request',
@@ -571,6 +574,7 @@ const en: Messages = {
   work: {
     title: 'Assigned',
     subtitle: 'Requests on your projects and requests assigned to you.',
+    listLabel: 'Assigned requests',
     filter: {
       myTurn: 'My turn',
       ai: 'AI working',
@@ -921,6 +925,7 @@ const en: Messages = {
   },
   notifications: {
     title: 'Notifications',
+    listLabel: 'Notification list',
     markAll: 'Mark all as read',
     empty: 'No new notifications.',
     unread: 'unread',

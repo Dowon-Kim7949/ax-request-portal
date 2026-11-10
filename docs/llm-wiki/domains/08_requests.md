@@ -71,6 +71,11 @@ The requester's own list at `/requests` (`request:read:own`), with their saved d
 - Opened at `#drafts`, the section scrolls itself into view once it renders (the router's scroll restoration runs before the data arrives), with a scroll margin for the sticky header. Focus does not move.
 - `DraftsNotice` (same file): on a new, empty request the wizard's save line shows "Saved drafts: N · Continue", linking to `/requests#drafts`; the open draft is not counted.
 
+## Layout
+
+- A `fit` route ([Frontend Profile](../profiles/frontend.md)): on a big screen the title and the new-request button stay in place; the saved drafts, the filter and search, and the cards scroll in one region ("내 요청 목록"), where the filter and search stay at the region's top once the drafts have gone by (`sticky`). Cards go to three columns on a 1344 px list.
+- `#drafts` still lands on the drafts: they are the first thing in the region, and a #hash address is not reset to the top (`useScrollMemory`).
+
 ## API Services
 
 - `useRequests({ scope: 'mine' })` → `GET /requests?scope=mine` → `WorkRequestSummary[]`. Keeps previous data while refetching and polls every 4 s while any request is live. A failed first load shows `LoadFailed` (the API's message and a retry); a failed poll keeps the list on screen with a `RefreshFailed` line above it. There is no toast.
