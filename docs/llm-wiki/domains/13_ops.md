@@ -2,11 +2,11 @@
 title: AI Operations
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-10
+last_updated: 2026-11-11
 author: claude-code
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -80,9 +80,9 @@ The sidebar shows these under an "AI operations" heading (`NavGroup` `ops`); the
 - **Providers**: `anthropic` (Claude models through the Claude API, a Claude coding agent for AI work) and `openai` (GPT models through the OpenAI API, Codex for AI work). Charts call them "Claude" and "GPT"; the connection screen uses the vendor names. The runtime id `claude_code` is shown as "Claude Agent": Anthropic's Agent SDK branding guidelines do not permit "Claude Code" as a name in third-party products, and allow "Claude Agent".
 - **Tasks**: `precheck` (draft advice), `report` (feasibility report) and `work` (code change and merge request). `runtimeFor` maps precheck and report to `api` and work to `claude_code` or `codex`.
 - **Selection**: per-task defaults plus per-project overrides; `resolveSelection` picks the override, else the default.
-- **Usage entry**: one ledger row per AI call or agent run with provider, model, runtime, request id (absent for a precheck), the person who started it (`userId`) and their team at that moment (`team`, absent for someone without one), normalized tokens, and cost in USD and KRW.
+- **Usage entry**: one ledger row per AI call or agent run with provider, model, runtime, request id (absent for a precheck), the person who started it (`userId`) and the id of their team at that moment (`teamId`, absent for someone without one), normalized tokens, and cost in USD and KRW.
 - **Caller**: every call is booked against the person whose action started it. A precheck is the author's (it runs when they reach the wizard's review step). A report is the requester's: the one made automatically on submission (a `system` step in the timeline) as well as a new reading after `reviseScope` or `provideInfo`. AI work is the developer's who chose `runWork` or `requestRevision`. There is no "system" caller, so the people add up to the month's total. The mock books reports and runs when they finish, so it finds that person in the request's timeline (`startedBy`).
-- **Team at the time**: the team is copied onto the entry when it is booked (`bookAi`). Someone who moves to another team ([Admin](01_admin.md)) keeps their earlier calls under the old one, so monthly team totals do not change after the fact.
+- **Team at the time**: the team id is copied onto the entry when it is booked (`bookAi`). Someone who moves to another team ([Admin](01_admin.md)) keeps their earlier calls under the old one, so monthly team totals do not change after the fact; renaming a team keeps one row under the new name, because rows are by id and the name is looked up (`useTeamDirectory`).
 
 ## Workflows
 
@@ -113,7 +113,7 @@ The sidebar shows these under an "AI operations" heading (`NavGroup` `ops`); the
 | `useSetProviderKey` | `PUT /ai/providers/{provider}/key` | `{ apiKey }` (8–500 chars, write-only) → `ProviderConnection` | Invalidates settings. |
 | `useRemoveProviderKey` | `DELETE /ai/providers/{provider}/key` | → `null` | 409 `providerInUse` while a task or override uses it. |
 | `useAiPricing` / `useUpdateAiPricing` | `GET` / `PUT /ai/pricing` | `AiPricing { asOf, usdKrw, models[] }` (unique provider/model) | Read needs `agent:manage` or `usage:view`. 409 `modelInUse` when a used model is removed. Invalidates usage. |
-| `useAiUsage(month)` | `GET /ai/usage?month=` | → `AiUsageReport` (totals, `byProvider`, `byModel`, `byTask`, `daily`, `topRequests` ≤ 10, `byTeam` by the team on each entry, `byPerson` for everyone with a call, each row with the team of their latest call; both most expensive first) | Keeps the previous month while loading. A month outside `01`–`12` is a 400 (`YearMonth`). |
+| `useAiUsage(month)` | `GET /ai/usage?month=` | → `AiUsageReport` (totals, `byProvider`, `byModel`, `byTask`, `daily`, `topRequests` ≤ 10, `byTeam` by the team id on each entry, `byPerson` for everyone with a call, each row with the team id of their latest call; both most expensive first) | Keeps the previous month while loading. A month outside `01`–`12` is a 400 (`YearMonth`). |
 | `useBudget` / `useUpdateBudget` | `GET` / `PUT /budget` | `BudgetInput` → `Budget` (`byModel` per provider/model) | 400 when a limit breaks the rule below. Invalidates dashboard and usage. |
 
 All calls carry the bearer token; failed changes show `toast.error` with the localized server message. A failed first load of a screen shows `LoadFailed` with a retry; a failed refresh keeps the data with a `RefreshFailed` line.
@@ -123,7 +123,7 @@ All calls carry the bearer token; failed changes show `toast.error` with the loc
 - Budget limits are whole won from 0 to `BUDGET_LIMIT_MAX_KRW` (10,000,000,000, "100억 원"); 0 means no limit. The per-request limit may not exceed the monthly one while both are set (`perRequestLimitFits`). `checkBudgetLimits` is the one rule: the contract's `BudgetInput` and the budget form both apply it.
 
 - Starting AI work or a revision run is refused with 409 `guard_failed` / `requestBudgetExceeded` once the costs booked against that request reach the per-request limit (`overRequestLimit`; `0` = no limit). The request page uses the same function to disable the buttons beforehand ([Developer Work](12_work.md)).
-- A request's usage (`WorkRequest.aiUsage`) is attached only for viewers with `report:read` (`present`); requesters never see costs. Its entries carry `userId` and `team` like every usage entry; the request page does not show them.
+- A request's usage (`WorkRequest.aiUsage`) is attached only for viewers with `report:read` (`present`); requesters never see costs. Its entries carry `userId` and `teamId` like every usage entry; the request page does not show them.
 - The usage report's `alertThresholdPct` is a display threshold; nothing sends an alert.
 - `useModelLabel` shows the operator's display names to people who may read the price table and falls back to the template defaults (`DEFAULT_AI_PRICING`), then the model id, for everyone else.
 - Provider colours are fixed tokens (`--color-provider-anthropic`, `--color-provider-openai`), checked for colour-vision separation and 3:1 contrast in both themes (`src/theme.test.ts`); every chart also names the providers in text.
@@ -143,7 +143,6 @@ All calls carry the bearer token; failed changes show `toast.error` with the loc
 ## Open Questions
 
 - OpenAI cache-write prices other than GPT-6 Astra are derived from the 1.25× input rule, and the OpenAI pricing page showed a promotional-price notice when checked; confirm before relying on them.
-- A team is a free-text field on the user, not an entity: renaming a team (editing every member's `team`) starts a new row, and the old name keeps its history. A team id would be needed to follow renames.
 - Per-user ChatGPT or Claude subscription sign-in is not offered: as checked on 2026-11-03, Anthropic does not allow third-party products to offer claude.ai login without approval, and OpenAI documents ChatGPT-plan sign-in only for open-source or locally hosted apps.
 
 ## Review Notes

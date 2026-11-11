@@ -30,11 +30,28 @@ export const User = named(
     name: z.string(),
     email: z.email(),
     role: Role,
-    team: z.string().optional(),
+    teamId: z.string().optional().describe('Id of the Team the person belongs to; absent for no team'),
     active: z.boolean(),
   }),
 )
 export type User = z.infer<typeof User>
+
+export const TEAM_NAME_MAX = 40
+
+export const Team = named(
+  'Team',
+  z.object({
+    id: z.string(),
+    name: z
+      .string()
+      .trim()
+      .min(1)
+      .max(TEAM_NAME_MAX)
+      .describe('Unique within the organization, ignoring case'),
+  }),
+  'A team people belong to. Records refer to it by id, so renaming a team carries its history with it; teams are never deleted, because past usage still points at them.',
+)
+export type Team = z.infer<typeof Team>
 
 /* ------------------------------------------------------------------ */
 /* Projects                                                            */
@@ -750,19 +767,19 @@ export const AiUsageReport = named(
     byTeam: z
       .array(
         z.object({
-          team: z.string().optional().describe('Absent for people without a team'),
+          teamId: z.string().optional().describe('Absent for calls by people without a team'),
           calls: Calls,
           costKrw: Krw,
         }),
       )
       .describe(
-        'Spending by the team each call was booked under, most expensive first; someone who moves keeps their earlier calls in the old team',
+        'Spending by the team each call was booked under, most expensive first. Rows are by team id, so a renamed team stays one row; someone who moves keeps their earlier calls in the old team',
       ),
     byPerson: z
       .array(
         z.object({
           userId: z.string(),
-          team: z.string().optional().describe('The team of their latest call in `month`'),
+          teamId: z.string().optional().describe('The team of their latest call in `month`'),
           calls: Calls,
           costKrw: Krw,
         }),

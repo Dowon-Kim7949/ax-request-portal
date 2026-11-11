@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: change_log
 project: ax-request-portal
-last_updated: 2026-11-10
+last_updated: 2026-11-11
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -23,6 +23,26 @@ contains_sensitive_info: false
 # LLM-WIKI Change Log
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
+
+## 2026-11-11 - Teams are records; AI usage follows a renamed team
+
+- status: needs_review
+- actor: claude-code
+- scope: code, tests, docs
+- changed:
+  - src/domain/model.ts (`Team`, `TEAM_NAME_MAX`; `User.teamId` replaces `User.team`; `AiUsageReport.byTeam` / `byPerson` rows carry `teamId`), src/domain/ai.ts (`AiUsageEntry.teamId`, `AiCaller.teamId`), src/api/contract.ts (`TeamList`, `TeamInput`; `GET/POST /teams`, `PATCH /teams/{id}`; `UserCreate.teamId`, `UserPatch.teamId` with null for no team), docs/openapi.json
+  - src/mocks/engine.ts (`teams`, `createTeam`, `updateTeam`, team checks on users; `STATE_VERSION` 8), src/mocks/seed.ts (`seedTeams`, team names per language), src/mocks/handlers.ts, src/mocks/store.ts, src/mocks/copy.ts (`teamNameTaken`, `teamNotFound`), src/mocks/browser.ts (demo accounts carry the team name)
+  - src/api/queries.ts (`useTeams`, `useSaveTeam`), src/app/hooks.ts (`useTeamDirectory`), src/app/demo.ts, src/features/admin/users-page.tsx (teams sheet; team pickers), src/features/auth/login-page.tsx, src/features/ops/usage-page.tsx, src/features/ops/usage-charts.tsx, src/i18n/ko.ts, en.ts
+  - src/mocks/api.test.ts, src/api/queries.test.tsx, src/domain/ai.test.ts, src/features/ops/usage-charts.test.tsx, src/stores/session.test.ts, e2e/admin.spec.ts, e2e/axe.spec.ts
+  - docs/llm-wiki: domains/01_admin.md, domains/13_ops.md, domains/00_overview.md, domains/06_login.md, GLOSSARY.md, DOMAIN_FEATURES.md, E2E_WORKFLOWS.md, WCAG.md, ARCHITECTURE_CONVENTIONS.md; domains/02_auth.md, 03_dashboard.md, 04_detail.md, 05_home.md, 07_notifications.md, 08_requests.md, 09_schedule.md, 10_settings.md, 11_wizard.md and 12_work.md only back to needs_review (they cite a changed hub file, and none of their claims changed)
+- summary:
+  - Closes the AI Operations open question about free-text teams. A team is a record referred to by id; usage entries keep the team id of the moment, and the usage screen looks names up, so a rename keeps one row while a person who moves still leaves earlier calls with the old team.
+  - Admins add and rename teams from the users page; teams are never deleted, because usage points at them. `User.team` is gone from the contract (a breaking change, made while no backend implements it).
+- evidence:
+  - src/mocks/api.test.ts ("lets admins add and rename teams", "books each call against the person who started it"), e2e/admin.spec.ts
+- caveats:
+  - Stored demo data from earlier versions is reseeded (`STATE_VERSION` 8).
+  - The status-only documents must not be approved on 2026-11-11: they were approved that day, so a same-day approval makes them identical to main and fails the impact gate.
 
 ## 2026-11-10 - AI usage records who started each call; usage by team and by person
 

@@ -345,6 +345,187 @@
         }
       }
     },
+    "/teams": {
+      "get": {
+        "operationId": "listTeams",
+        "summary": "Teams, by name (team names are shown with people and in AI usage)",
+        "tags": [
+          "users"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createTeam",
+        "summary": "Add a team (user:manage); 400 when the name is taken",
+        "tags": [
+          "users"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/teams/{id}": {
+      "patch": {
+        "operationId": "updateTeam",
+        "summary": "Rename a team (user:manage); records follow it by id",
+        "tags": [
+          "users"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/projects": {
       "get": {
         "operationId": "listProjects",
@@ -2819,8 +3000,8 @@
             "type": "string",
             "description": "The person whose action started the call. The feasibility report made automatically on submission counts against the requester who submitted"
           },
-          "team": {
-            "description": "The person's team when the call was booked, kept as it was; absent when they had none",
+          "teamId": {
+            "description": "Id of the person's team when the call was booked, kept as it was; absent when they had none",
             "type": "string"
           },
           "tokens": {
@@ -3038,8 +3219,8 @@
             "items": {
               "type": "object",
               "properties": {
-                "team": {
-                  "description": "Absent for people without a team",
+                "teamId": {
+                  "description": "Absent for calls by people without a team",
                   "type": "string"
                 },
                 "calls": {
@@ -3057,7 +3238,7 @@
                 "costKrw"
               ]
             },
-            "description": "Spending by the team each call was booked under, most expensive first; someone who moves keeps their earlier calls in the old team"
+            "description": "Spending by the team each call was booked under, most expensive first. Rows are by team id, so a renamed team stays one row; someone who moves keeps their earlier calls in the old team"
           },
           "byPerson": {
             "type": "array",
@@ -3067,7 +3248,7 @@
                 "userId": {
                   "type": "string"
                 },
-                "team": {
+                "teamId": {
                   "description": "The team of their latest call in `month`",
                   "type": "string"
                 },
@@ -5159,6 +5340,45 @@
           "user"
         ]
       },
+      "Team": {
+        "description": "A team people belong to. Records refer to it by id, so renaming a team carries its history with it; teams are never deleted, because past usage still points at them.",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "description": "Unique within the organization, ignoring case"
+          }
+        },
+        "required": [
+          "id",
+          "name"
+        ]
+      },
+      "TeamInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "description": "Unique within the organization, ignoring case"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "TeamList": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/Team"
+        }
+      },
       "TimelineEntry": {
         "type": "object",
         "properties": {
@@ -5535,7 +5755,8 @@
           "role": {
             "$ref": "#/components/schemas/Role"
           },
-          "team": {
+          "teamId": {
+            "description": "Id of the Team the person belongs to; absent for no team",
             "type": "string"
           },
           "active": {
@@ -5565,7 +5786,7 @@
           "role": {
             "$ref": "#/components/schemas/Role"
           },
-          "team": {
+          "teamId": {
             "type": "string"
           }
         },
@@ -5587,8 +5808,12 @@
           "role": {
             "$ref": "#/components/schemas/Role"
           },
-          "team": {
-            "type": "string"
+          "teamId": {
+            "description": "null takes the person out of their team",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "active": {
             "type": "boolean"

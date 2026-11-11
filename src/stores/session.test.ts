@@ -52,7 +52,9 @@ describe('sessionChangeFrom', () => {
       kind: 'refreshed',
       session: { token: 'token-2', user: kim },
     })
-    expect(sessionChangeFrom(signedIn, stored('token-1', { ...kim, team: '기획팀' }))?.kind).toBe('refreshed')
+    expect(sessionChangeFrom(signedIn, stored('token-1', { ...kim, teamId: 't-planning' }))?.kind).toBe(
+      'refreshed',
+    )
     expect(sessionChangeFrom(signedIn, stored('token-1', kim))).toBeNull()
   })
 

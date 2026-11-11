@@ -67,6 +67,7 @@ import type {
   RequestAiUsage,
   RequestDraft,
   RequestStatus,
+  Team,
   User,
   WorkRequest,
   WorkRequestSummary,
@@ -82,7 +83,7 @@ import { renderNotification, type ErrorKey, type NotificationKey, type ServerLan
 /* ------------------------------------------------------------------ */
 
 /** Bump when the stored shape changes: older demo data is discarded and reseeded. */
-export const STATE_VERSION = 7
+export const STATE_VERSION = 8
 
 /** Notifications kept per person; older ones are dropped as new ones arrive. */
 export const NOTIFICATIONS_PER_USER_MAX = 200
@@ -142,6 +143,7 @@ export interface MockState {
   seq: number
   nextRequestId: number
   users: User[]
+  teams: Team[]
   projects: Project[]
   requests: WorkRequest[]
   notifications: StoredNotification[]
@@ -318,7 +320,7 @@ export class MockEngine {
   /**
    * Books one AI job: the provider's usage report (simulated here, returned by
    * the call in production), normalized and priced at today's table, against
-   * the person who started it and the team they are in now.
+   * the person who started it and the id of the team they are in now.
    */
   bookAi(
     task: AiTask,
@@ -329,8 +331,8 @@ export class MockEngine {
     requestId?: number,
   ): AiUsageEntry | undefined {
     const tokens = normalizeUsage(simulateUsage(task, selection.provider, shape))
-    const team = this.user(userId)?.team
-    const caller: AiCaller = { userId, ...(team ? { team } : {}) }
+    const teamId = this.user(userId)?.teamId
+    const caller: AiCaller = { userId, ...(teamId ? { teamId } : {}) }
     const entry = bookUsage(this.state.ai.pricing, {
       id: this.newId('ai'),
       at,
@@ -1060,18 +1062,23 @@ export class MockEngine {
 
   /* ---------- users & projects ---------- */
 
-  createUser(actor: User, input: { name: string; email: string; role: User['role']; team?: string }): User {
+  createUser(actor: User, input: { name: string; email: string; role: User['role']; teamId?: string }): User {
     this.require(actor, 'user:manage')
     if (input.role === 'operator') throw new HttpError(403, 'forbidden', 'operatorProvisioned')
     if (this.state.users.some((u) => u.email.toLowerCase() === input.email.toLowerCase())) {
       throw new HttpError(400, 'bad_request', 'emailTaken')
     }
+    if (input.teamId !== undefined) this.findTeam(input.teamId)
     const user: User = { id: this.newId('u'), active: true, ...input }
     this.state.users.push(user)
     return user
   }
 
-  updateUser(actor: User, id: string, patch: Partial<Pick<User, 'role' | 'team' | 'active'>>): User {
+  updateUser(
+    actor: User,
+    id: string,
+    patch: { role?: User['role']; teamId?: string | null; active?: boolean },
+  ): User {
     this.require(actor, 'user:manage')
     const i = this.state.users.findIndex((u) => u.id === id)
     if (i < 0) throw new HttpError(404, 'not_found', 'userNotFound')
@@ -1082,9 +1089,48 @@ export class MockEngine {
     if (id === actor.id && (patch.active === false || (patch.role && patch.role !== actor.role))) {
       throw new HttpError(400, 'bad_request', 'cannotChangeSelf')
     }
-    const next = { ...this.state.users[i]!, ...patch }
+    const { teamId, ...rest } = patch
+    if (teamId) this.findTeam(teamId)
+    const next: User = { ...this.state.users[i]!, ...rest }
+    if (teamId) next.teamId = teamId
+    else if (teamId === null) delete next.teamId
     this.state.users[i] = next
     return next
+  }
+
+  private findTeam(id: string): Team {
+    const team = this.state.teams.find((t) => t.id === id)
+    if (!team) throw new HttpError(404, 'not_found', 'teamNotFound')
+    return team
+  }
+
+  private assertTeamNameFree(name: string, except?: string): void {
+    const key = name.trim().toLowerCase()
+    if (this.state.teams.some((t) => t.id !== except && t.name.toLowerCase() === key)) {
+      throw new HttpError(400, 'bad_request', 'teamNameTaken')
+    }
+  }
+
+  /** Teams by name. Readable by everyone signed in: team names appear with people and in usage. */
+  teams(): Team[] {
+    return [...this.state.teams].sort((a, b) => a.name.localeCompare(b.name))
+  }
+
+  createTeam(actor: User, input: { name: string }): Team {
+    this.require(actor, 'user:manage')
+    this.assertTeamNameFree(input.name)
+    const team: Team = { id: this.newId('t'), name: input.name.trim() }
+    this.state.teams.push(team)
+    return team
+  }
+
+  /** Renames a team; people and usage refer to it by id, so they follow the new name. */
+  updateTeam(actor: User, id: string, input: { name: string }): Team {
+    this.require(actor, 'user:manage')
+    const team = this.findTeam(id)
+    this.assertTeamNameFree(input.name, id)
+    team.name = input.name.trim()
+    return team
   }
 
   saveProject(actor: User, input: ProjectInput, id?: string): Project {
@@ -1235,7 +1281,7 @@ export class MockEngine {
     const daily = group((e) => `${this.dateOf(e.at)}/${e.provider}`)
     const byRequest = group((e) => e.requestId ?? 0)
     byRequest.delete(0)
-    const byTeam = group((e) => e.team ?? null)
+    const byTeam = group((e) => e.teamId ?? null)
     const byPerson = group((e) => e.userId)
     // A person's row shows the team of their latest call, so someone who moved shows under the new one.
     const latest = new Map<string, AiUsageEntry>()
@@ -1288,14 +1334,14 @@ export class MockEngine {
             ? [{ requestId, projectId: req.projectId, costKrw: money(a.costKrw), calls: a.calls }]
             : []
         }),
-      byTeam: byCost(byTeam).map(([team, a]) => ({
-        ...(team !== null ? { team } : {}),
+      byTeam: byCost(byTeam).map(([teamId, a]) => ({
+        ...(teamId !== null ? { teamId } : {}),
         calls: a.calls,
         costKrw: money(a.costKrw),
       })),
       byPerson: byCost(byPerson).map(([userId, a]) => {
-        const team = latest.get(userId)?.team
-        return { userId, ...(team ? { team } : {}), calls: a.calls, costKrw: money(a.costKrw) }
+        const teamId = latest.get(userId)?.teamId
+        return { userId, ...(teamId ? { teamId } : {}), calls: a.calls, costKrw: money(a.costKrw) }
       }),
     }
   }

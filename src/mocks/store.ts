@@ -60,6 +60,7 @@ export function stateProblem(value: unknown): string | null {
 
   const lists = [
     'users',
+    'teams',
     'projects',
     'requests',
     'notifications',

@@ -96,12 +96,12 @@ describe('cost', () => {
       task: 'work',
       selection: { provider: 'anthropic', model: 'claude-opus-5-5' },
       requestId: 7,
-      caller: { userId: 'u-choi', team: 'Engineering' },
+      caller: { userId: 'u-choi', teamId: 't-engineering' },
       tokens: { input: 10_000, cacheRead: 100_000, cacheWrite: 0, output: 2_000 },
     })
     // 0.04 + 0.02 + 0.04 = 0.10 USD
     expect(entry).toMatchObject({ runtime: 'claude_code', costUsd: 0.1, costKrw: 140, requestId: 7 })
-    expect(entry).toMatchObject({ userId: 'u-choi', team: 'Engineering' })
+    expect(entry).toMatchObject({ userId: 'u-choi', teamId: 't-engineering' })
   })
 
   it('books a person without a team with no team', () => {
@@ -114,7 +114,7 @@ describe('cost', () => {
       tokens: { input: 1, cacheRead: 0, cacheWrite: 0, output: 1 },
     })
     expect(entry?.userId).toBe('u-new')
-    expect(entry).not.toHaveProperty('team')
+    expect(entry).not.toHaveProperty('teamId')
   })
 
   it('books nothing for a model without a price', () => {

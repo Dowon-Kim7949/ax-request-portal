@@ -35,6 +35,7 @@ const en: Messages = {
     ai: 'AI',
     system: 'System',
     unknownUser: 'Unknown user',
+    unknownTeam: 'Unknown team',
     justNow: 'just now',
   },
   loadError: {
@@ -777,6 +778,19 @@ const en: Messages = {
     invited: 'User added.',
     selfLocked: 'You cannot change your own role or status.',
     operatorLocked: 'Operator accounts are managed by the service.',
+    noTeam: 'No team',
+    teams: 'Teams',
+    teamsTitle: 'Teams',
+    teamsHint:
+      'Renaming a team keeps its people and its AI usage history with it. Teams cannot be deleted, because past records point at them.',
+    teamName: 'Team name',
+    newTeam: 'New team name',
+    addTeam: 'Add team',
+    rename: 'Save name',
+    teamAdded: 'Team added.',
+    teamRenamed: 'Team renamed.',
+    teamNameTooLong: 'Use {{max}} characters or fewer.',
+    noTeams: 'No teams yet.',
   },
   budget: {
     title: 'AI budget',
@@ -920,7 +934,7 @@ const en: Messages = {
     topRequests: 'Most expensive requests',
     byTeam: 'By team',
     byTeamNote:
-      'Counted under the team the person was in at the time; calls made before someone moves stay with their old team.',
+      'Counted under the team the person was in at the time. A renamed team stays one row under its new name; calls made before someone moves stay with their old team.',
     noTeam: 'No team',
     byPerson: 'By person',
     byPersonNote: 'The feasibility report made on submission counts against the person who submitted.',

@@ -2,11 +2,11 @@
 title: Domain Overview
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain_overview
 project: ax-request-portal
-last_updated: 2026-11-10
+last_updated: 2026-11-11
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -95,7 +95,7 @@ Thirteen statuses (`RequestStatus`) and sixteen events (`TRANSITIONS` in `src/do
 | [Developer Work](12_work.md) | `/work`, `/work/regression`, developer panels | `request:review`, `regression:view` |
 | [Release Schedule](09_schedule.md) | `/schedule` | `schedule:view` |
 | [Executive Dashboard](03_dashboard.md) | `/dashboard` | `dashboard:view` |
-| [Admin](01_admin.md) | `/admin/projects`, `/admin/users` | `project:manage`, `user:manage` |
+| [Admin](01_admin.md) | `/admin/projects`, `/admin/users` (people and teams) | `project:manage`, `user:manage` |
 | [AI Operations](13_ops.md) | `/ops/usage`, `/ops/agents`, `/ops/pricing`, `/ops/budget` | `usage:view`, `agent:manage`, `budget:manage` |
 | [Notifications](07_notifications.md) | `/notifications` | everyone |
 | [Settings](10_settings.md) | `/settings` | everyone |

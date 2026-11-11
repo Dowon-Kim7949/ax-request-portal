@@ -2,11 +2,11 @@
 title: E2E Workflows
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: e2e_workflows
 project: ax-request-portal
-last_updated: 2026-11-10
+last_updated: 2026-11-11
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -81,7 +81,7 @@ Every user workflow is tested end to end against the production build with the i
 | `attachments.spec.ts` | A PNG attached in the wizard is kept inline by the demo and, from the request page, opens in a new tab through a `blob:` URL. |
 | `time-zone.spec.ts` | A viewer in Los Angeles sees local time with Korea time beside it on detail screens, can turn Korea time off, and a zone picked in Settings wins over the device; a viewer in Seoul sees nothing added; date-only values read the same date in both zones. |
 | `developer.spec.ts` | Developer reads the report's assumptions and a rule conflict (#1026), ticks the assumption to enable the run, runs AI work and approves the merge request, sees the preview and that the requester has not reacted (#1024), asks questions, requests a revision and sees the rework, marks a release done; the assigned and regression queues fit the screen. |
-| `admin.spec.ts` | Executive reads the dashboard, and files a request through the wizard, finds it in My requests, reads someone else's, and finds no developer queue in the menu or at its address; admin changes a role and adds a project with a rule to keep, and cannot assign or change the operator role; notifications are read and their settings changed. |
+| `admin.spec.ts` | Executive reads the dashboard, and files a request through the wizard, finds it in My requests, reads someone else's, and finds no developer queue in the menu or at its address; admin changes a role, adds a team, moves someone into it and renames it (the person's row follows the new name), and adds a project with a rule to keep, and cannot assign or change the operator role; notifications are read and their settings changed. |
 | `operator.spec.ts` | Operator replaces a provider key (only the last four characters come back), moves a task to another model, cannot disconnect a provider in use, edits the exchange rate, reads the usage dashboard, its table view and the team and person cards, and sets the budget at `/admin/budget` → `/ops/budget`; a developer then sees the request's AI usage and the run button disabled with the reason. |
 | `smoke.spec.ts` | Login screen fits each viewport; per-device navigation (phone tab bar, tablet rail, desktop sidebar) reaches My requests and Schedule. |
 | `schedule.spec.ts` | On a tablet and a desktop the release schedule switches to the month view (`?view=month`), finds #1019 on the head office's tomorrow (stepping to the next month when tomorrow falls there), opens it and comes Back to the same month, steps months and returns with "This month", and switches back to the list. On a phone a `?view=month` link opens the list, with no switch. |
@@ -89,7 +89,7 @@ Every user workflow is tested end to end against the production build with the i
 | `fit.spec.ts` | Big screens: at 1920×1080 and 1280×720 every signed-in screen of every role (`FIT_ROUTES`) leaves the window unscrolled, each scrolling part is a focusable named region, and header, page top and scrolling parts (from the first column's left to the last one's right) share their left and right edges; back restores the list's position, a new visit and a filter change start at the top, PageDown scrolls a focused list; at 1366×650 the window scrolls instead and there is no region. |
 | `demo-banner.spec.ts` | A demo build says so on the login screen and on signed-in screens, without a close button and without widening a phone screen: a strip above the header on a phone, a box in the header on a tablet and a desktop, and never both. |
 | `csp.spec.ts` | The page carries the production policy, and walking the requester's, operator's and executive's screens (one test each) raises no CSP violation event and no console error. |
-| `axe.spec.ts` | axe-core finds nothing serious or critical on the login screen and every role's main screens, light and dark, and on the saved drafts (home, the expanded list with both badges, the delete sheet, the new-request notice), and on the schedule's month view (see [Accessibility](WCAG.md)). |
+| `axe.spec.ts` | axe-core finds nothing serious or critical on the login screen and every role's main screens, light and dark, and on the saved drafts (home, the expanded list with both badges, the delete sheet, the new-request notice), on the schedule's month view, and on the admin's teams sheet (see [Accessibility](WCAG.md)). |
 | `i18n.spec.ts` | With an English browser no Korean text appears on any role's screens (elements with an explicit `lang` excluded); a request can be filed in English; the saved drafts (list, badges, delete sheet, new-request notice) are in English; switching language at runtime works; edited demo data keeps its language. |
 | `theme.spec.ts` | System dark mode applies before first paint; no horizontal scroll in dark mode; an explicit light choice persists; the login-screen toggle works. |
 | `a11y.spec.ts` | The skip link is the first tab stop and focuses `main` (desktop only: WebKit does not tab to links by default); nothing animates under `prefers-reduced-motion: reduce`; on a landscape tablet the rail's menu opens as a dialog that takes focus, keeps Tab and Shift+Tab inside, and closes on Escape (focus back on the button), on a click outside and on following a link. |

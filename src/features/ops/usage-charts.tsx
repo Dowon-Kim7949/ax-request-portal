@@ -314,16 +314,24 @@ export function ModelBars({ rows }: { rows: AiUsageReport['byModel'] }) {
  * One bar per team, largest first (the API's order), in one neutral color:
  * teams are not providers. People without a team share one row.
  */
-export function TeamBars({ rows }: { rows: AiUsageReport['byTeam'] }) {
+export function TeamBars({
+  rows,
+  teamName,
+}: {
+  rows: AiUsageReport['byTeam']
+  teamName: (id: string) => string
+}) {
   const { t } = useTranslation()
   const max = Math.max(1, ...rows.map((r) => r.costKrw))
   return (
     <ul className="flex flex-col gap-3">
       {rows.map((r) => (
-        <li key={r.team ?? ''} className="flex flex-col gap-1.5">
+        <li key={r.teamId ?? ''} className="flex flex-col gap-1.5">
           <div className="flex items-baseline justify-between gap-3 text-sm">
-            <span className={cn('min-w-0 truncate font-semibold', r.team ? 'text-ink-900' : 'text-ink-500')}>
-              {r.team ?? t('usage.noTeam')}
+            <span
+              className={cn('min-w-0 truncate font-semibold', r.teamId ? 'text-ink-900' : 'text-ink-500')}
+            >
+              {r.teamId ? teamName(r.teamId) : t('usage.noTeam')}
             </span>
             <span className="shrink-0 text-ink-600 tabular-nums">
               {formatKrw(r.costKrw)} · {t('usage.callsValue', { n: formatNumber(r.calls) })}
@@ -351,9 +359,11 @@ export const TOP_PEOPLE = 10
 export function PeopleList({
   rows,
   userName,
+  teamName,
 }: {
   rows: AiUsageReport['byPerson']
   userName: (id: string) => string
+  teamName: (id: string) => string
 }) {
   const { t } = useTranslation()
   const shown = rows.slice(0, TOP_PEOPLE)
@@ -371,7 +381,7 @@ export function PeopleList({
         <li key={r.userId} className={row}>
           <span className="min-w-0 truncate">
             <span className="font-semibold text-ink-900">{userName(r.userId)}</span>
-            {r.team ? <span className="text-ink-600"> {r.team}</span> : null}
+            {r.teamId ? <span className="text-ink-600"> {teamName(r.teamId)}</span> : null}
           </span>
           {figures(r.costKrw, r.calls)}
         </li>

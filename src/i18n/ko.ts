@@ -37,6 +37,7 @@ const ko = {
     ai: 'AI',
     system: '시스템',
     unknownUser: '알 수 없는 사용자',
+    unknownTeam: '알 수 없는 팀',
     justNow: '방금 전',
   },
   loadError: {
@@ -773,6 +774,19 @@ const ko = {
     invited: '사용자를 추가했어요.',
     selfLocked: '자신의 역할과 상태는 바꿀 수 없어요.',
     operatorLocked: '운영자 계정은 서비스가 관리해요.',
+    noTeam: '팀 없음',
+    teams: '팀 관리',
+    teamsTitle: '팀',
+    teamsHint:
+      '이름을 바꿔도 소속된 사람과 AI 사용 기록은 그대로 이 팀에 남아요. 지난 기록이 팀을 가리키므로 팀은 지울 수 없어요.',
+    teamName: '팀 이름',
+    newTeam: '새 팀 이름',
+    addTeam: '팀 추가',
+    rename: '이름 저장',
+    teamAdded: '팀을 추가했어요.',
+    teamRenamed: '팀 이름을 바꿨어요.',
+    teamNameTooLong: '{{max}}자 이하로 입력해 주세요.',
+    noTeams: '아직 팀이 없어요.',
   },
   budget: {
     title: 'AI 비용 한도',
@@ -913,7 +927,8 @@ const ko = {
     byTask: '작업별',
     topRequests: '비용이 큰 요청',
     byTeam: '팀별',
-    byTeamNote: '호출한 사람이 그때 속했던 팀으로 세요. 팀을 옮겨도 지난 호출은 원래 팀에 남아요.',
+    byTeamNote:
+      '호출한 사람이 그때 속했던 팀으로 세요. 팀 이름을 바꾸면 이 행도 새 이름으로 이어지고, 사람이 팀을 옮겨도 지난 호출은 원래 팀에 남아요.',
     noTeam: '팀 없음',
     byPerson: '사람별',
     byPersonNote: '제출하면 바로 만드는 구현 확인 보고서도 제출한 사람 몫으로 세요.',

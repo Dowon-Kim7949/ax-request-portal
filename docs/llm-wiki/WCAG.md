@@ -2,11 +2,11 @@
 title: Accessibility (WCAG)
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: wcag
 project: ax-request-portal
-last_updated: 2026-11-10
+last_updated: 2026-11-11
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -118,7 +118,7 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 
 ## Automated scan
 
-- `e2e/axe.spec.ts` runs `@axe-core/playwright` on the login screen and every main screen of every role, in the light and the dark theme, with reduced motion so no scan catches a half-faded colour. Tags: `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` and `best-practice`. Findings of impact `serious` or `critical` fail the test (soft assertions, so one run lists every screen). A screen state that lives in the URL query, such as `/schedule?view=month`, is visited as its own entry, after a different screen (`openInApp` waits for the heading to change); the scan does not otherwise reach it.
+- `e2e/axe.spec.ts` runs `@axe-core/playwright` on the login screen and every main screen of every role, in the light and the dark theme, with reduced motion so no scan catches a half-faded colour. Tags: `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, `wcag22aa` and `best-practice`. Findings of impact `serious` or `critical` fail the test (soft assertions, so one run lists every screen). Sheets that change a screen are opened and scanned on their own (the admin's new-project and teams sheets). A screen state that lives in the URL query, such as `/schedule?view=month`, is visited as its own entry, after a different screen (`openInApp` waits for the heading to change); the scan does not otherwise reach it.
 - It runs in the phone and desktop projects; the tablet project skips it (`NOT_ON_TABLET` in `playwright.config.ts`): same engine and components as the phone, no findings of its own.
 - `EXCLUDED_RULES` is empty: everything the first scan found was fixed. A rule added there needs its reason next to it.
 

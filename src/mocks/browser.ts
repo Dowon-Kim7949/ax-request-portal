@@ -113,9 +113,15 @@ export function followLanguage(language: ServerLanguage): boolean {
 }
 
 /** The demo accounts as they exist in the current data (names follow its language). */
-export function demoAccounts(): User[] {
-  const users = store?.engine.state.users ?? []
-  return DEMO_ACCOUNT_IDS.map((id) => users.find((u) => u.id === id)).filter((u): u is User => Boolean(u))
+export function demoAccounts(): Array<User & { teamName?: string }> {
+  const state = store?.engine.state
+  const users = state?.users ?? []
+  return DEMO_ACCOUNT_IDS.map((id) => users.find((u) => u.id === id))
+    .filter((u): u is User => Boolean(u))
+    .map((u) => {
+      const teamName = state?.teams.find((t) => t.id === u.teamId)?.name
+      return teamName ? { ...u, teamName } : u
+    })
 }
 
 export function demoDataLanguage(): ServerLanguage | undefined {
