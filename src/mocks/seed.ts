@@ -1214,11 +1214,14 @@ export function buildSeedState(now: Date, opts: EngineOptions, lang: ServerLangu
 
   // Older usage, so the budget and usage screens have history on any day of the month:
   // three jobs a day over 45 days, booked against the background requests, about a third
-  // of them on OpenAI. Booked through the engine, so prices come from the table.
+  // of them on OpenAI. Booked through the engine, so prices come from the table. The
+  // request's requester checks and gets the reading; its project's developer runs the work.
   for (let d = 1; d <= 45; d++) {
     for (let k = 0; k < 3; k++) {
       const n = d * 3 + k
       const requestId = 990 + (n % 14)
+      const req = state.requests.find((r) => r.id === requestId)!
+      const dev = state.projects.find((p) => p.id === req.projectId)!.ownerIds[0]!
       const openai = n % 3 === 0
       const shape = { seed: n, criteria: 1 + (n % 3), targets: 1 + (n % 2), attempt: n % 5 === 0 ? 2 : 1 }
       const pick = (task: 'precheck' | 'report' | 'work') =>
@@ -1229,9 +1232,9 @@ export function buildSeedState(now: Date, opts: EngineOptions, lang: ServerLangu
               model: task === 'precheck' ? 'claude-haiku-5-5' : 'claude-opus-5-5',
             }
       const hour = 24 * d + 3 + k * 4
-      engine.bookAi('precheck', pick('precheck'), shape, at(hour + 1).toISOString())
-      engine.bookAi('report', pick('report'), shape, at(hour + 0.5).toISOString(), requestId)
-      if (n % 2) engine.bookAi('work', pick('work'), shape, at(hour).toISOString(), requestId)
+      engine.bookAi('precheck', pick('precheck'), shape, at(hour + 1).toISOString(), req.requesterId)
+      engine.bookAi('report', pick('report'), shape, at(hour + 0.5).toISOString(), req.requesterId, requestId)
+      if (n % 2) engine.bookAi('work', pick('work'), shape, at(hour).toISOString(), dev, requestId)
     }
   }
 

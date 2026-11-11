@@ -97,7 +97,7 @@ related:
 visibility: public
 contains_sensitive_info: false
 reviewed_by: Kim Dowon
-reviewed_at: 2026-11-10
+reviewed_at: 2026-11-11
 ---
 
 # Request Wizard
@@ -204,7 +204,7 @@ There are no query hooks for saving a draft: the sync engine sends each draft's 
 
 The desired-date input's minimum is today on the head-office business calendar (`hqToday`); a person whose clock differs sees the "dates follow head office" hint under it ([Glossary](../GLOSSARY.md)). If the project list cannot be loaded, the project step shows a compact `LoadFailed` with a retry, and a `?project=` preset is kept instead of cleared.
 
-`toDraft` trims strings, turns empty values into `undefined`, drops empty criteria and finding rows, sends findings only for `checklist` (and no criteria then) and omits the date reason when there is no date. The precheck also flags a repeated finding number and a finding without "fixed when". The mock precheck (`precheckDraft`) is deterministic, recognises Korean and English text and answers in the request language; it also books a small light-model cost.
+`toDraft` trims strings, turns empty values into `undefined`, drops empty criteria and finding rows, sends findings only for `checklist` (and no criteria then) and omits the date reason when there is no date. The precheck also flags a repeated finding number and a finding without "fixed when". The mock precheck (`precheckDraft`) is deterministic, recognises Korean and English text and answers in the request language; it also books a small light-model cost against the author, with their team ([AI Operations](13_ops.md)), so every visit to the review step is a paid call.
 
 ## Accessibility
 

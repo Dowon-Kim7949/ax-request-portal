@@ -497,6 +497,53 @@ describe('AI operations', () => {
     expect(openai.work?.costKrw).toBe(work!.costKrw)
   })
 
+  it('books each call against the person who started it, under the team they had then', async () => {
+    const ledger = () => t.store.engine.state.aiUsage
+    const from = ledger().length
+    const kim = await loginAs('planner@example.com')
+    await call(api.precheckRequest, { body: draft })
+    const { id } = await call(api.createRequest, { body: draft })
+    t.advance(6)
+    expect((await call(api.getRequest, { params: { id } })).status).toBe('scope_check')
+
+    // Moving to another team does not move what was booked before.
+    await loginAs('admin@example.com')
+    await call(api.updateUser, { params: { id: kim.id }, body: { team: 'AX TF' } })
+    await loginAs('planner@example.com')
+    await call(api.transitionRequest, {
+      params: { id },
+      body: { event: 'reviseScope', note: '공지 본문은 검색하지 않아요' },
+    })
+    t.advance(6)
+    await confirmScope(id)
+    const dev = await loginAs('dev1@example.com')
+    await call(api.transitionRequest, { params: { id }, body: { event: 'runWork' } })
+    t.advance(20)
+    await call(api.getRequest, { params: { id } })
+
+    // Other requests' jobs may finish meanwhile; prechecks come from this test only.
+    const booked = ledger()
+      .slice(from)
+      .filter((e) => e.requestId === id || e.task === 'precheck')
+      .map((e) => [e.task, e.userId, e.team])
+    expect(booked).toEqual([
+      ['precheck', kim.id, kim.team],
+      // The report made on submission is the requester's.
+      ['report', kim.id, kim.team],
+      ['report', kim.id, 'AX TF'],
+      ['work', dev.id, dev.team],
+    ])
+
+    await loginAs('operator@example.com')
+    const report = await call(api.aiUsage, { query: {} })
+    expect(report.byTeam.map((r) => r.team)).toEqual(expect.arrayContaining([kim.team, 'AX TF']))
+    // A person's row shows the team of their latest call.
+    expect(report.byPerson.find((r) => r.userId === kim.id)?.team).toBe('AX TF')
+
+    await loginAs('admin@example.com')
+    await call(api.updateUser, { params: { id: kim.id }, body: { team: kim.team! } })
+  })
+
   it('shows request cost to engineering viewers only', async () => {
     await loginAs('planner@example.com')
     const mine = await call(api.listRequests, { query: { scope: 'mine' } })
@@ -556,7 +603,7 @@ describe('AI operations', () => {
     await call(api.updateAiPricing, { body: pricing })
   })
 
-  it('reports usage by provider, model, task and request for the month', async () => {
+  it('reports usage by provider, model, task, request, team and person for the month', async () => {
     await loginAs('operator@example.com')
     const report = await call(api.aiUsage, { query: {} })
     expect(report.calls).toBeGreaterThan(0)
@@ -566,6 +613,17 @@ describe('AI operations', () => {
     expect(Math.abs(sum(report.byProvider) - report.totalKrw)).toBeLessThanOrEqual(report.byProvider.length)
     expect(Math.abs(sum(report.byTask) - report.totalKrw)).toBeLessThanOrEqual(report.byTask.length)
     expect(report.topRequests.length).toBeLessThanOrEqual(10)
+
+    // Every call is someone's, and in exactly one team row (no team included).
+    const calls = (rows: Array<{ calls: number }>) => rows.reduce((n, r) => n + r.calls, 0)
+    expect(calls(report.byPerson)).toBe(report.calls)
+    expect(calls(report.byTeam)).toBe(report.calls)
+    expect(Math.abs(sum(report.byPerson) - report.totalKrw)).toBeLessThanOrEqual(report.byPerson.length)
+    expect(Math.abs(sum(report.byTeam) - report.totalKrw)).toBeLessThanOrEqual(report.byTeam.length)
+    const costs = report.byPerson.map((r) => r.costKrw)
+    expect(costs).toEqual([...costs].sort((a, b) => b - a))
+    const users = await call(api.listUsers)
+    expect(report.byPerson.every((r) => users.some((u) => u.id === r.userId))).toBe(true)
   })
 
   it('keeps AI operations to the operator, and the operator out of requests', async () => {

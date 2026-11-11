@@ -46,7 +46,7 @@ related:
 visibility: public
 contains_sensitive_info: false
 reviewed_by: Kim Dowon
-reviewed_at: 2026-11-10
+reviewed_at: 2026-11-11
 ---
 
 # Glossary
@@ -78,7 +78,7 @@ Terms as the code uses them. Identifiers are kept in English in both UI language
 | Operator | The person running the service's AI side: providers and keys, model per task, prices, AI budget and usage. Provisioned by the service, not by an admin. | `src/domain/roles.ts` |
 | Provider | `anthropic` (Claude) or `openai` (GPT). | `src/domain/ai.ts` |
 | Runtime | How a task drives the model: `api` for precheck and report, `claude_code` or `codex` for AI work. | `src/domain/ai.ts` |
-| Usage entry | One booked AI call or agent run: provider, model, runtime, normalized tokens and estimated cost, priced once and never re-priced. | `src/domain/ai.ts` |
+| Usage entry | One booked AI call or agent run: provider, model, runtime, the person who started it and their team at that moment, normalized tokens and estimated cost, priced once and never re-priced. | `src/domain/ai.ts` |
 | Precheck (`PrecheckIssue`) | Advice on a draft before submission; never blocks. | `src/domain/precheck.ts` |
 | Saved draft (`SavedDraft`; "임시 저장" / "Saved drafts") | An unsubmitted request saved to the person's account: step, content (`DraftContent`) and a `version` that grows with every save. Continued on any device; deleted by the server when a request names it (`draftId`). At most `drafts.maxPerAccount` (20) per account. | `src/api/contract.ts` |
 | Draft on this device (`LocalDraft`) | What the person wrote that the account does not have yet, kept in `localStorage` per person and deleted once the account holds the same. Keyed by a local id (`local-…`) until the server saves it, then by the server id. Shown as "This device only" when it cannot reach the account. | `src/stores/draft.ts` |

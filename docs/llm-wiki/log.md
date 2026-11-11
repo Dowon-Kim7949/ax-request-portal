@@ -24,6 +24,30 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-10 - AI usage records who started each call; usage by team and by person
+
+- status: needs_review
+- actor: claude-code
+- scope: code, tests, docs
+- changed:
+  - src/domain/ai.ts (`AiUsageEntry.userId`, `AiUsageEntry.team?`, `AiCaller`; `bookUsage` takes the caller), src/domain/model.ts (`AiUsageReport.byTeam`, `AiUsageReport.byPerson`), docs/openapi.json
+  - src/mocks/engine.ts (`bookAi` takes the person; `startedBy`; `aiUsageReport` groups by team and person; `STATE_VERSION` 7), src/mocks/seed.ts (the usage history is the background requests' requesters' and their projects' developers')
+  - src/features/ops/usage-page.tsx, src/features/ops/usage-charts.tsx (`TeamBars`, `PeopleList`, `TOP_PEOPLE`), src/i18n/ko.ts, en.ts (`usage.byTeam`, `byTeamNote`, `noTeam`, `byPerson`, `byPersonNote`, `otherPeople`; the subtitle)
+  - src/domain/ai.test.ts, src/mocks/api.test.ts, src/features/ops/usage-charts.test.tsx, e2e/operator.spec.ts
+  - docs/llm-wiki: domains/13_ops.md, ARCHITECTURE_CONVENTIONS.md, GLOSSARY.md, E2E_WORKFLOWS.md, DOMAIN_FEATURES.md, domains/01_admin.md, domains/11_wizard.md, domains/12_work.md; WCAG.md, domains/00_overview.md, 03_dashboard.md, 06_login.md, 07_notifications.md and 09_schedule.md only back to needs_review (they cite a changed hub file, and none of their claims changed)
+- summary:
+  - Closes the AI Operations open question "usage entries do not record who triggered the call". Every entry names the person whose action started it. The feasibility report made automatically on submission is the requester's, so there is no "system" row and the people add up to the month's total.
+  - The team is copied onto each entry when it is booked: someone who changes team keeps earlier calls under the old one.
+  - `/ops/usage` adds a team card (bars) and a person card (the ten who spent most, then everyone else in one row), side by side from `lg`. There is no team or person filter.
+  - New open question: a team is free text, so renaming one starts a new row.
+- evidence:
+  - `api.test.ts` "books each call against the person who started it": a precheck and the automatic report are the requester's, a report after a team change carries the new team while the earlier ones keep the old, AI work is the developer's who ran it, and a person's row shows their latest team. The month's report: people and teams each add up to every call.
+  - `npm run verify` passed (unit 645). E2E on three projects, the operator scenario and the operator groups of axe, fit, layout, theme, i18n and cursor: 13 passed.
+- caveats:
+  - Stored demo data from version 6 is discarded and reseeded once.
+  - The request page's AI usage list does not show who started each call; the entries carry it for `report:read` viewers only.
+- review notes:
+
 ## 2026-11-10 - The rail's menu as a dialog; menus read the routes' permissions; executives' requester E2E
 
 - status: needs_review

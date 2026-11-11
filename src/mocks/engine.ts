@@ -32,6 +32,7 @@ import {
   runtimeFor,
   selectionsInUse,
   ZERO_USAGE,
+  type AiCaller,
   type AiPricing,
   type AiProjectOverride,
   type AiProvider,
@@ -81,7 +82,7 @@ import { renderNotification, type ErrorKey, type NotificationKey, type ServerLan
 /* ------------------------------------------------------------------ */
 
 /** Bump when the stored shape changes: older demo data is discarded and reseeded. */
-export const STATE_VERSION = 6
+export const STATE_VERSION = 7
 
 /** Notifications kept per person; older ones are dropped as new ones arrive. */
 export const NOTIFICATIONS_PER_USER_MAX = 200
@@ -316,26 +317,45 @@ export class MockEngine {
 
   /**
    * Books one AI job: the provider's usage report (simulated here, returned by
-   * the call in production), normalized and priced at today's table.
+   * the call in production), normalized and priced at today's table, against
+   * the person who started it and the team they are in now.
    */
   bookAi(
     task: AiTask,
     selection: AiSelection,
     shape: UsageShape,
     at: string,
+    userId: string,
     requestId?: number,
   ): AiUsageEntry | undefined {
     const tokens = normalizeUsage(simulateUsage(task, selection.provider, shape))
+    const team = this.user(userId)?.team
+    const caller: AiCaller = { userId, ...(team ? { team } : {}) }
     const entry = bookUsage(this.state.ai.pricing, {
       id: this.newId('ai'),
       at,
       task,
       selection,
+      caller,
       tokens,
       ...(requestId !== undefined ? { requestId } : {}),
     })
     if (entry) this.state.aiUsage.push(entry)
     return entry
+  }
+
+  /**
+   * Who started the AI job a request is in: the person who moved it into `status`
+   * last. The first report starts by itself on submission, so it is the requester's.
+   */
+  private startedBy(req: WorkRequest, status: RequestStatus): string {
+    for (let i = req.timeline.length - 1; i >= 0; i--) {
+      const entry = req.timeline[i]!
+      if (entry.to !== status) continue
+      if (entry.actor.type === 'user') return entry.actor.userId
+      break
+    }
+    return req.requesterId
   }
 
   /** AI spending booked against one request, all months. */
@@ -515,6 +535,7 @@ export class MockEngine {
         selection,
         this.shapeOf(req, (req.report?.revision ?? 0) + 1),
         at.toISOString(),
+        this.startedBy(req, 'reporting'),
         req.id,
       )
       const report = { ...generateReport(req, project, at, lang), generatedBy: selection }
@@ -551,6 +572,7 @@ export class MockEngine {
         { provider: agent.provider, model: agent.model },
         this.shapeOf(req, req.work.attempt),
         at.toISOString(),
+        this.startedBy(req, 'in_progress'),
         req.id,
       )
       const work = { ...finished.work, agent, ...(entry ? { costKrw: entry.costKrw } : {}) }
@@ -584,7 +606,13 @@ export class MockEngine {
         targets: draft.targetIds.length,
         attempt: 1,
       }
-      this.bookAi('precheck', this.selectionFor(draft.projectId, 'precheck'), shape, now.toISOString())
+      this.bookAi(
+        'precheck',
+        this.selectionFor(draft.projectId, 'precheck'),
+        shape,
+        now.toISOString(),
+        user.id,
+      )
     }
     return precheckDraft(draft, this.today(now), lang)
   }
@@ -1207,6 +1235,15 @@ export class MockEngine {
     const daily = group((e) => `${this.dateOf(e.at)}/${e.provider}`)
     const byRequest = group((e) => e.requestId ?? 0)
     byRequest.delete(0)
+    const byTeam = group((e) => e.team ?? null)
+    const byPerson = group((e) => e.userId)
+    // A person's row shows the team of their latest call, so someone who moved shows under the new one.
+    const latest = new Map<string, AiUsageEntry>()
+    for (const e of entries) {
+      const seen = latest.get(e.userId)
+      if (!seen || e.at > seen.at) latest.set(e.userId, e)
+    }
+    const byCost = <K>(m: Map<K, Acc>) => [...m.entries()].sort((x, y) => y[1].costKrw - x[1].costKrw)
     return {
       month,
       totalKrw: money(entries.reduce((n, e) => n + e.costKrw, 0)),
@@ -1251,6 +1288,15 @@ export class MockEngine {
             ? [{ requestId, projectId: req.projectId, costKrw: money(a.costKrw), calls: a.calls }]
             : []
         }),
+      byTeam: byCost(byTeam).map(([team, a]) => ({
+        ...(team !== null ? { team } : {}),
+        calls: a.calls,
+        costKrw: money(a.costKrw),
+      })),
+      byPerson: byCost(byPerson).map(([userId, a]) => {
+        const team = latest.get(userId)?.team
+        return { userId, ...(team ? { team } : {}), calls: a.calls, costKrw: money(a.costKrw) }
+      }),
     }
   }
 

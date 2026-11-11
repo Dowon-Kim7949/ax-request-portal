@@ -52,7 +52,7 @@ related:
 visibility: public
 contains_sensitive_info: false
 reviewed_by: Kim Dowon
-reviewed_at: 2026-11-10
+reviewed_at: 2026-11-11
 ---
 
 # E2E Workflows
@@ -82,7 +82,7 @@ Every user workflow is tested end to end against the production build with the i
 | `time-zone.spec.ts` | A viewer in Los Angeles sees local time with Korea time beside it on detail screens, can turn Korea time off, and a zone picked in Settings wins over the device; a viewer in Seoul sees nothing added; date-only values read the same date in both zones. |
 | `developer.spec.ts` | Developer reads the report's assumptions and a rule conflict (#1026), ticks the assumption to enable the run, runs AI work and approves the merge request, sees the preview and that the requester has not reacted (#1024), asks questions, requests a revision and sees the rework, marks a release done; the assigned and regression queues fit the screen. |
 | `admin.spec.ts` | Executive reads the dashboard, and files a request through the wizard, finds it in My requests, reads someone else's, and finds no developer queue in the menu or at its address; admin changes a role and adds a project with a rule to keep, and cannot assign or change the operator role; notifications are read and their settings changed. |
-| `operator.spec.ts` | Operator replaces a provider key (only the last four characters come back), moves a task to another model, cannot disconnect a provider in use, edits the exchange rate, reads the usage dashboard and its table view, and sets the budget at `/admin/budget` → `/ops/budget`; a developer then sees the request's AI usage and the run button disabled with the reason. |
+| `operator.spec.ts` | Operator replaces a provider key (only the last four characters come back), moves a task to another model, cannot disconnect a provider in use, edits the exchange rate, reads the usage dashboard, its table view and the team and person cards, and sets the budget at `/admin/budget` → `/ops/budget`; a developer then sees the request's AI usage and the run button disabled with the reason. |
 | `smoke.spec.ts` | Login screen fits each viewport; per-device navigation (phone tab bar, tablet rail, desktop sidebar) reaches My requests and Schedule. |
 | `schedule.spec.ts` | On a tablet and a desktop the release schedule switches to the month view (`?view=month`), finds #1019 on the head office's tomorrow (stepping to the next month when tomorrow falls there), opens it and comes Back to the same month, steps months and returns with "This month", and switches back to the list. On a phone a `?view=month` link opens the list, with no switch. |
 | `layout.spec.ts` | No horizontal scroll on any route for any role at 320 px and on a landscape tablet, in Korean and English; the schedule's month view is one of the routes. At 320 px, the notices and error states that only appear in some conditions (demo banner, time-zone settings and a detail screen with both clocks, session-expired notice, compact and full `LoadFailed`) lie inside the viewport and do not clip their text. |

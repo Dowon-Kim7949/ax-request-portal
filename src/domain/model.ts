@@ -747,6 +747,29 @@ export const AiUsageReport = named(
     topRequests: z
       .array(z.object({ requestId: z.int().positive(), projectId: z.string(), costKrw: Krw, calls: Calls }))
       .describe('Most expensive requests in `month`, at most ten'),
+    byTeam: z
+      .array(
+        z.object({
+          team: z.string().optional().describe('Absent for people without a team'),
+          calls: Calls,
+          costKrw: Krw,
+        }),
+      )
+      .describe(
+        'Spending by the team each call was booked under, most expensive first; someone who moves keeps their earlier calls in the old team',
+      ),
+    byPerson: z
+      .array(
+        z.object({
+          userId: z.string(),
+          team: z.string().optional().describe('The team of their latest call in `month`'),
+          calls: Calls,
+          costKrw: Krw,
+        }),
+      )
+      .describe(
+        'Spending by the person who started each call, everyone with a call in `month`, most expensive first',
+      ),
   }),
 )
 export type AiUsageReport = z.infer<typeof AiUsageReport>

@@ -901,7 +901,7 @@ const en: Messages = {
   },
   usage: {
     title: 'AI usage',
-    subtitle: 'AI usage and estimated cost for {{month}} by provider, model and task.',
+    subtitle: 'AI usage and estimated cost for {{month}} by provider, model, task, team and person.',
     total: 'AI cost',
     totalUsd: 'about {{usd}}',
     ofLimit: '{{pct}}% of the limit',
@@ -918,6 +918,13 @@ const en: Messages = {
     byModel: 'By model',
     byTask: 'By task',
     topRequests: 'Most expensive requests',
+    byTeam: 'By team',
+    byTeamNote:
+      'Counted under the team the person was in at the time; calls made before someone moves stay with their old team.',
+    noTeam: 'No team',
+    byPerson: 'By person',
+    byPersonNote: 'The feasibility report made on submission counts against the person who submitted.',
+    otherPeople: 'Everyone else ({{count}})',
     showTable: 'Show as a table',
     date: 'Date',
     sum: 'Total',

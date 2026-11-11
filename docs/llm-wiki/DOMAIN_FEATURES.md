@@ -36,7 +36,7 @@ related:
 visibility: public
 contains_sensitive_info: false
 reviewed_by: Kim Dowon
-reviewed_at: 2026-11-10
+reviewed_at: 2026-11-11
 ---
 
 # Domain Features
@@ -93,7 +93,7 @@ User-facing features by role. Each row names the domain document that holds the 
 | --- | --- | --- |
 | AI budget: monthly and per-request limits, alert threshold, spending by provider and model | [AI Operations](domains/13_ops.md) | `operator.spec.ts` |
 | AI agents: provider keys (write-only), model per task, per-project overrides | [AI Operations](domains/13_ops.md) | `operator.spec.ts` |
-| AI prices and exchange rate; AI usage by provider (Claude / GPT), day, model, task and request | [AI Operations](domains/13_ops.md) | `operator.spec.ts` |
+| AI prices and exchange rate; AI usage by provider (Claude / GPT), day, model, task, request, team and person | [AI Operations](domains/13_ops.md) | `operator.spec.ts` |
 | AI usage of one request, and the run button disabled at the per-request limit | [Request Detail](domains/04_detail.md), [Developer Work](domains/12_work.md) | `operator.spec.ts` |
 
 ## Everyone
