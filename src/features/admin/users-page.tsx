@@ -181,6 +181,7 @@ function TeamRow({ team }: { team: Team }) {
         <Button
           type="submit"
           variant="secondary"
+          className="h-12"
           disabled={!changed || !!error}
           loading={save.isPending}
           aria-label={`${team.name} ${t('users.rename')}`}
@@ -229,7 +230,7 @@ function TeamsPanel({ dir }: { dir: TeamDirectory }) {
           onChange={setName}
           error={tried ? error : undefined}
         />
-        <Button type="submit" loading={save.isPending}>
+        <Button type="submit" className="h-12" loading={save.isPending}>
           <Plus aria-hidden />
           {t('users.addTeam')}
         </Button>
