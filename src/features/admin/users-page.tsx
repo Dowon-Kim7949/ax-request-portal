@@ -314,7 +314,7 @@ function UserRow({ user, isMe, teams }: { user: User; isMe: boolean; teams: Team
         </Select>
         <Button
           variant="secondary"
-          className="col-span-2 sm:col-span-1"
+          className="col-span-2 h-12 sm:col-span-1"
           disabled={locked || update.isPending}
           title={lockedReason}
           onClick={() => patch({ active: !user.active })}
