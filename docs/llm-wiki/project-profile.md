@@ -2,8 +2,8 @@
 title: Project Profile
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: project_profile
 project: ax-request-portal
 last_updated: 2026-11-12
@@ -59,6 +59,7 @@ React 19, TypeScript (strict), Vite 8 (Rolldown), React Router 8 (data router, S
 ## Deployment
 
 - Static build served by nginx (`deploy/nginx.conf`, verified in CI by `deploy/check-nginx.sh`), or the GitHub Pages demo in mock mode.
+- A real backend implements `docs/openapi.json` and follows the steps in `README.md` ("Connect a real backend"): the mock's rules for drafts, request visibility (`canOpen` on the release schedule), server search (`q`) and the notification channels it sends (`notifications.channels`), then the lifecycle and the two AI jobs.
 - Environment: `VITE_BASE`, `VITE_API_MOCK`, `VITE_API_BASE_URL`, optional `VITE_BUILD_ID` (`.env.example`). `vite build` fails on a wrong value: `VITE_API_MOCK` other than `true` / `false` / unset, or `false` without a usable `VITE_API_BASE_URL` (placeholder host, credentials, query, `.`/`..` segments, or the same path as the app's `VITE_BASE`). A fresh clone builds in demo mode, and a demo build shows a demo-mode banner on every screen. Each build writes `version.json`; open tabs offer a reload when the deployed id differs.
 - nginx sends a strict Content-Security-Policy (the inline theme script by hash), `Permissions-Policy`, `Cross-Origin-Opener-Policy`, `nosniff`, `X-Frame-Options` and `Referrer-Policy` on every response. A backend or image host on another origin must be added to `connect-src` / `img-src`; HSTS belongs on the TLS-terminating proxy (a commented example is included). A real-backend build ships no `mockServiceWorker.js`.
 

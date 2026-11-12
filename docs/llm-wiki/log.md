@@ -24,6 +24,21 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-12 - README: what a real backend must match
+
+- status: needs_review
+- actor: claude-code
+- scope: docs
+- changed:
+  - README.md, README.ko.md ("Connect a real backend" / "실제 백엔드 연결": a new step 2)
+  - docs/llm-wiki/project-profile.md
+- summary:
+  - The backend steps now name the visibility rule (own, developed, or `request:read:all`; else `404`), `canOpen` on the company-wide release schedule, server search with `q`, and `notifications.channels`.
+- evidence:
+  - src/mocks/engine.ts#symbol:MockEngine, src/api/contract.ts, src/config/app.config.ts
+- caveats:
+  - None.
+
 ## 2026-11-12 - Page preloading; the schedule says what may be opened; server search; notification channels; prices checked
 
 - status: needs_review
