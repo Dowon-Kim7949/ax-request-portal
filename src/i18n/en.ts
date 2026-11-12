@@ -564,7 +564,7 @@ const en: Messages = {
     today: 'Today',
     view: 'View',
     viewList: 'List',
-    viewMonth: 'Month',
+    viewMonth: 'Calendar',
     prevMonth: 'Previous month',
     nextMonth: 'Next month',
     thisMonth: 'This month',

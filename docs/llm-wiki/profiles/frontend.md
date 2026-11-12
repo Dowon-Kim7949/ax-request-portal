@@ -2,11 +2,11 @@
 title: Frontend Profile
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: profile
 project: ax-request-portal
-last_updated: 2026-11-10
+last_updated: 2026-11-12
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -70,6 +70,7 @@ Front-end rules that apply to every screen. The deeper references are [Architect
 ## Pages
 
 - Each page is a lazy route created with `page(load, handle?)`, where `handle` is a `RouteHandle` (`permission`, `focus`, `fit`); a declared permission wraps it in `RequirePermission` and also decides where a sign-in may return ([Auth](../domains/02_auth.md)). A page whose code fails to load triggers an immediate new-version check (`checkForUpdateNow`) before the error page (`RouteErrorView`) shows.
+- Navigation feedback (`src/app/navigation-feedback.ts`, `src/app/navigation-progress.tsx`, used by `AppShell`): while the router waits for a page's code, it keeps the old page on screen, so once a navigation has been pending for 150 ms (`useSlowNavigation`) a thin `NavigationProgress` bar sweeps along the window's top (`aria-hidden`) and `main` is `aria-busy`. The delay keeps a page whose code is already loaded from flashing the bar. When the leaf route changes (`usePageFade`), `main` fades in over 160 ms through the Web Animations API; a new request on the same route or a changed search parameter does not fade.
 - Use `PageHeader` for the page heading and `usePageTitle` for the document title (`<page> · <brand>`). A chip about the whole page (the usage page's "estimate") goes in `badge`, on the title's row and centred on it; `actions` is for buttons, at the bottom right or wrapped below on a phone.
 - A `fit` page is built from `Page` > `PageTop` (header, filters, page-wide notices such as `RefreshFailed`, and figures that frame the list: the dashboard's and usage page's tiles, the request page's stepper) + `PageScroll` (the list), and brings its own width and padding; the shell's `main` adds none. Side-by-side parts are `PageColumns` of `PageScroll column`s, each scrolling on its own (the request page's body and its release-and-history side, the dashboard's two panels). A loading, failed, forbidden or not-found state that replaces the whole page is wrapped in `PagePlain` (`RequirePermission` does it for the forbidden one). On a big screen `PageScroll` is a named, focusable region (Safari gives a keyboard no other way into a scroll area without links), with `relative` so visually hidden text stays inside it, and a line appears under `PageTop` once the list has scrolled (`data-scrolled`). `useScrollMemory` does for the region what `<ScrollRestoration>` does for the window: back and forward restore it per history entry and region `id`, any other navigation, a changed filter included, starts at the top. A `#hash` address with no remembered position is left where the page scrolled its target (the drafts on `/requests`).
 - Grids of `RequestCard` (`/work`, `/requests`) go to three columns once their list is 1344 px wide (`@container` on `PageScroll`, `@min-[84rem]:grid-cols-3`: FHD, not a 1536 px window), where a card still keeps its details on one line. A column of short items (notifications, settings) keeps a reading width at the left (`max-w-3xl`, `max-w-2xl`).

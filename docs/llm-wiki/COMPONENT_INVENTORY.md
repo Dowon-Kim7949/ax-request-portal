@@ -2,11 +2,11 @@
 title: Component Inventory
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: component_inventory
 project: ax-request-portal
-last_updated: 2026-11-10
+last_updated: 2026-11-12
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -90,7 +90,7 @@ The primitives are written by hand in the shadcn style (Tailwind classes, `class
 | `RefreshFailed` | plain elements | A refresh failed while earlier data stays on screen: "may be out of date" and a retry. Always rendered as a polite `role="status"`, visually hidden (`sr-only`) until `failed`, so screen readers hear the line appear and it takes no room meanwhile. Props usually come from `refreshOf(...queries)`. |
 | `DateTimeText`, `HqCalendarNote` | `<time>` | `DateTimeText iso variant` renders a timestamp in the viewing time zone inside `<time dateTime>`: `compact` (lists, cards: local time, full form in the tooltip), `full` (detail screens, timelines: adds the zone and head-office time when the clocks differ), `date` (the date it falls on; `calendar="viewer"` by default, `calendar="hq"` for business days such as a release day, whose tooltip always adds head-office time; optional `weekday`). `sentence={(time) => t(key, { time })}` keeps a translated sentence's word order. `HqCalendarNote` is the "dates follow head-office time" line, rendered only for viewers on another clock. Both re-render when Settings change (`useTimeView`). |
 | `Input`, `Textarea`, `Label`, `Field`, `AdviceText` | native | `Field` wires label, hint and error with `useId`; the error is a `role="alert"` paragraph. `AdviceText` renders precheck advice next to a field. |
-| `Segmented` | ARIA radio group | Generic over the value type; options are `role="radio"` with `aria-checked`, optional count badges. Used for list filters, theme and language. |
+| `Segmented` | ARIA radio group | Generic over the value type; options are `role="radio"` with `aria-checked`, optional count badges and an optional decorative `icon` before the label (the label stays: it is the radio's name). Used for list filters, theme and language. |
 | `Sheet` | Radix `Dialog` | Bottom sheet on phones, centered dialog on larger screens; focus trap and Escape come from Radix. Close button is 44 px. Opened from state, not a Radix trigger, so it remembers what had focus when it opened (a layout effect, before Radix moves focus in) and gives focus back to it on closing. `onCloseAutoFocus(event)` runs first: call `preventDefault()` and move focus yourself when that element is gone (a deleted row). |
 | `StatTile` | plain elements | Label, value, an optional short note (muted or warning with an icon) and optional children such as a `Meter` or a description. Used by the executive dashboard and the AI usage dashboard. |
 | `MonthStepper` | buttons | Previous / next month above a monthly dashboard; "next" is disabled at the current month of the head-office calendar, and `HqCalendarNote` sits beside it. |

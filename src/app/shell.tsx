@@ -24,6 +24,8 @@ import { SIDEBAR_UP, TABLET_UP, useMediaQuery } from '@/lib/use-media-query'
 import { useBrand } from './brand'
 import { resetDemoData } from './demo'
 import { DemoBanner } from './demo-banner'
+import { usePageFade, useSlowNavigation } from './navigation-feedback'
+import { NavigationProgress } from './navigation-progress'
 import { useCan, useCurrentUser } from './hooks'
 import { phoneTabs, visibleNav, type NavItem } from './nav'
 import type { RouteHandle } from './router'
@@ -491,10 +493,14 @@ export function AppShell({ permissionsFor }: { permissionsFor: (path: string) =>
   const focus = handles.some((h) => h?.focus)
   // A page made of `Page` parts fills the window on a big screen; only its lists scroll (src/app/page.tsx).
   const fit = handles.some((h) => h?.fit)
+  const loading = useSlowNavigation()
+  const mainRef = useRef<HTMLElement>(null)
+  usePageFade(mainRef)
 
   return (
     <div data-fit={fit || undefined} className={cn('min-h-dvh', fit && 'fit:flex fit:h-dvh fit:flex-col')}>
       <SkipLink />
+      <NavigationProgress active={loading} />
       <Sidebar items={items} />
       <div className={cn('md:pl-[76px] xl:pl-64', fit && 'fit:flex fit:min-h-0 fit:flex-1 fit:flex-col')}>
         {/* On a phone the demo notice is a strip above the header; from a tablet up, a box in the header. */}
@@ -534,8 +540,10 @@ export function AppShell({ permissionsFor }: { permissionsFor: (path: string) =>
           </div>
         </header>
         <main
+          ref={mainRef}
           id="main"
           tabIndex={-1}
+          aria-busy={loading || undefined}
           className={cn(
             'outline-none',
             fit

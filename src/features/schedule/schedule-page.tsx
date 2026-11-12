@@ -1,4 +1,4 @@
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, List } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useSearchParams } from 'react-router'
@@ -121,6 +121,11 @@ export default function SchedulePage() {
     }
   }, [items, today])
 
+  // Not while another range's data stands in: that would claim an empty month too early.
+  const monthHasReleases = useMemo(() => items.some((i) => i.date.startsWith(month)), [items, month])
+  const emptyMonth =
+    view === 'month' && releases.isSuccess && !releases.isPlaceholderData && !monthHasReleases
+
   const sections = [
     { key: 'thisWeek', label: t('schedule.thisWeek'), groups: thisWeek },
     { key: 'upcoming', label: t('schedule.upcoming'), groups: upcoming },
@@ -140,8 +145,8 @@ export default function SchedulePage() {
                 value={view}
                 onChange={showView}
                 options={[
-                  { value: 'list', label: t('schedule.viewList') },
-                  { value: 'month', label: t('schedule.viewMonth') },
+                  { value: 'list', label: t('schedule.viewList'), icon: <List aria-hidden /> },
+                  { value: 'month', label: t('schedule.viewMonth'), icon: <CalendarDays aria-hidden /> },
                 ]}
               />
             ) : null
@@ -188,6 +193,10 @@ export default function SchedulePage() {
             >
               {t('schedule.thisMonth')}
             </Button>
+            {/* On the month's line, announced once the month's releases are in. */}
+            <p role="status" className="ml-3 text-[15px] text-ink-500">
+              {emptyMonth ? t('schedule.emptyMonth') : null}
+            </p>
           </div>
         ) : null}
         <RefreshFailed {...refreshOf(releases)} className="mb-3" />
@@ -202,20 +211,14 @@ export default function SchedulePage() {
             retrying={releases.isFetching}
           />
         ) : view === 'month' ? (
-          <>
-            {/* Not while another range's data stands in: that would claim an empty month too early. */}
-            {!releases.isPlaceholderData && !items.some((i) => i.date.startsWith(month)) ? (
-              <p className="mb-3 text-[15px] text-ink-500">{t('schedule.emptyMonth')}</p>
-            ) : null}
-            <MonthCalendar
-              key={month}
-              month={month}
-              weeks={weeks}
-              today={today}
-              items={items}
-              busy={releases.isPlaceholderData}
-            />
-          </>
+          <MonthCalendar
+            key={month}
+            month={month}
+            weeks={weeks}
+            today={today}
+            items={items}
+            busy={releases.isPlaceholderData}
+          />
         ) : sections.length ? (
           <div className="flex flex-col gap-8">
             {sections.map((s) => (

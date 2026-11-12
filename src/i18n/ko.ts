@@ -561,7 +561,7 @@ const ko = {
     today: '오늘',
     view: '보기',
     viewList: '목록',
-    viewMonth: '월',
+    viewMonth: '달력',
     prevMonth: '이전 달',
     nextMonth: '다음 달',
     thisMonth: '이번 달',
