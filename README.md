@@ -135,9 +135,10 @@ Set at build time, in the environment or in `.env.local` (copy [`.env.example`](
 ## Connect a real backend
 
 1. Implement the endpoints in [`docs/openapi.json`](docs/openapi.json). Requests carry `Authorization: Bearer <token>` from `POST /auth/login`. Errors use the `ApiError` body (`code`, `message`, optional `issues`). A transition that doesn't fit the current status is a `409`. Saved drafts (`/drafts`) belong to the person who wrote them: an update over an old `baseVersion` is `409 conflict`, a create beyond `drafts.maxPerAccount` in [`src/config/app.config.ts`](src/config/app.config.ts) is `409 limit_reached`, and a request created with a `draftId` deletes that draft. Requests also carry `Accept-Language`: write error messages, notifications and AI text in that language.
-2. Enforce the lifecycle on the server. [`src/domain/lifecycle.ts`](src/domain/lifecycle.ts) and [`src/domain/report.ts`](src/domain/report.ts) are plain TypeScript with no browser dependency. Port them or import them.
-3. Run the two AI jobs server-side: the feasibility report (read-only access to the code and wiki) and the work run (branch → tests → merge request). The UI polls a request while its status is `submitted`, `reporting` or `in_progress`.
-4. Build against it:
+2. Apply the same visibility rules as the mock API. A person may open a request they filed, one they develop, or any with `request:read:all`; any other id is a `404`. The release schedule (`GET /releases`) is company-wide, but each listed request carries `canOpen` by that same rule, and the screen links only those. My requests searches with `q` (a title substring or an exact `#id`), so search on the server. List in `notifications.channels` (in [`src/config/app.config.ts`](src/config/app.config.ts)) only the channels your backend sends besides in-app; the settings screen offers a switch for each listed one.
+3. Enforce the lifecycle on the server. [`src/domain/lifecycle.ts`](src/domain/lifecycle.ts) and [`src/domain/report.ts`](src/domain/report.ts) are plain TypeScript with no browser dependency. Port them or import them.
+4. Run the two AI jobs server-side: the feasibility report (read-only access to the code and wiki) and the work run (branch → tests → merge request). The UI polls a request while its status is `submitted`, `reporting` or `in_progress`.
+5. Build against it:
 
    ```bash
    VITE_API_MOCK=false VITE_API_BASE_URL=/api npm run build

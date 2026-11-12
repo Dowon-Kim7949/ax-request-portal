@@ -119,9 +119,10 @@ npm run dev
 ## 실제 백엔드 연결
 
 1. [`docs/openapi.json`](docs/openapi.json)의 엔드포인트를 구현합니다. 요청에는 `POST /auth/login`에서 받은 `Authorization: Bearer <token>`이 붙습니다. 오류 응답은 `ApiError` 형식(`code`, `message`, 선택 `issues`)을 씁니다. 현재 상태에서 할 수 없는 전이는 `409`입니다. 임시 저장 초안(`/drafts`)은 쓴 사람의 것입니다. 오래된 `baseVersion`으로 고치려 하면 `409 conflict`, [`src/config/app.config.ts`](src/config/app.config.ts)의 `drafts.maxPerAccount`를 넘겨 만들려 하면 `409 limit_reached`이고, `draftId`를 넣어 요청을 만들면 그 초안을 지웁니다. 요청에는 `Accept-Language`도 붙으니, 오류 메시지와 알림, AI가 쓰는 글을 그 언어로 돌려주세요.
-2. Lifecycle은 서버에서 강제합니다. [`src/domain/lifecycle.ts`](src/domain/lifecycle.ts)와 [`src/domain/report.ts`](src/domain/report.ts)는 브라우저 의존이 없는 순수 TypeScript라서 그대로 옮기거나 가져다 쓸 수 있습니다.
-3. AI 작업 두 가지는 서버에서 돌립니다. 구현 확인 보고서(코드와 위키 읽기 전용)와 작업 수행(브랜치 → 테스트 → MR)입니다. 화면은 상태가 `submitted`, `reporting`, `in_progress`인 동안 요청을 주기적으로 다시 불러옵니다.
-4. 이렇게 빌드합니다.
+2. 열람 규칙은 목 API와 같게 맞춥니다. 요청은 자기가 낸 것, 자기가 개발을 맡은 것만 열 수 있고, `request:read:all`이 있으면 전부 열 수 있습니다. 그 밖의 번호는 `404`입니다. 배포 일정(`GET /releases`)은 전사 공개지만 항목마다 같은 규칙으로 계산한 `canOpen`을 붙여야 하고, 화면은 이 값이 참인 항목만 링크로 보여 줍니다. 내 요청 검색은 `q`(제목 일부 또는 정확한 `#번호`)로 서버에 묻기 때문에 서버에서 검색해야 합니다. [`src/config/app.config.ts`](src/config/app.config.ts)의 `notifications.channels`에는 인앱 외에 백엔드가 실제로 보내는 채널만 남깁니다. 설정 화면은 남긴 채널에만 스위치를 보여 줍니다.
+3. Lifecycle은 서버에서 강제합니다. [`src/domain/lifecycle.ts`](src/domain/lifecycle.ts)와 [`src/domain/report.ts`](src/domain/report.ts)는 브라우저 의존이 없는 순수 TypeScript라서 그대로 옮기거나 가져다 쓸 수 있습니다.
+4. AI 작업 두 가지는 서버에서 돌립니다. 구현 확인 보고서(코드와 위키 읽기 전용)와 작업 수행(브랜치 → 테스트 → MR)입니다. 화면은 상태가 `submitted`, `reporting`, `in_progress`인 동안 요청을 주기적으로 다시 불러옵니다.
+5. 이렇게 빌드합니다.
 
    ```bash
    VITE_API_MOCK=false VITE_API_BASE_URL=/api npm run build
