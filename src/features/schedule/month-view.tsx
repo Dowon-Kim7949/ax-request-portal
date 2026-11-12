@@ -23,16 +23,17 @@ function ReleaseChip({ release }: { release: DayRelease }) {
   const dir = useDirectory()
   const project = dir.project(release.projectId)
   const done = release.status === 'done'
+  // Someone else's request is listed but not a link: its page would not open for this viewer.
+  const Chip = release.canOpen ? Link : 'span'
   return (
     <li>
-      <Link
+      <Chip
         to={`/requests/${release.id}`}
         title={release.title}
         className={cn(
           'flex min-h-6 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold',
-          done
-            ? 'bg-muted text-ink-600 ring-1 ring-line ring-inset hover:bg-line/60'
-            : 'bg-brand-50 text-accent-strong hover:bg-brand-100',
+          done ? 'bg-muted text-ink-600 ring-1 ring-line ring-inset' : 'bg-brand-50 text-accent-strong',
+          release.canOpen && (done ? 'hover:bg-line/60' : 'hover:bg-brand-100'),
         )}
       >
         {/* The space sits outside the span, where no name computation trims it; the flex row does not draw it. */}
@@ -46,7 +47,7 @@ function ReleaseChip({ release }: { release: DayRelease }) {
         <span className="sr-only">
           , {project?.name ?? release.projectId}, <StatusBadge status={release.status} />
         </span>
-      </Link>
+      </Chip>
     </li>
   )
 }

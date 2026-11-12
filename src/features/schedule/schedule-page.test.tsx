@@ -68,7 +68,9 @@ describe('the month view of the release schedule', () => {
     const tuesday = within(calendar).getByRole('cell', { name: /^11월 3일 \(화\)/ })
     expect(within(tuesday).getByRole('link', { name: /#1019/ })).toHaveAttribute('href', '/requests/1019')
     const thursday = within(calendar).getByRole('cell', { name: /^11월 5일 \(목\)/ })
-    expect(within(thursday).getByRole('link', { name: /#1020/ })).toHaveAttribute('href', '/requests/1020')
+    // Someone else's request: listed (the schedule is company-wide), but its page would not open.
+    expect(within(thursday).getByText(/#1020/)).toBeInTheDocument()
+    expect(within(thursday).queryByRole('link')).not.toBeInTheDocument()
 
     const today = within(calendar).getByRole('cell', { name: /^11월 2일 \(월\), 오늘/ })
     expect(today).toHaveAttribute('aria-current', 'date')
@@ -149,14 +151,16 @@ describe('a busy day in the month view', () => {
       date: day,
       projectId: 'p-portal',
       requests: [1, 2, 3].map(
-        (n) => ({ id: 2000 + n, title: `포털 변경 ${n}`, status: 'release_scheduled' }) as const,
+        (n) =>
+          ({ id: 2000 + n, title: `포털 변경 ${n}`, status: 'release_scheduled', canOpen: true }) as const,
       ),
     },
     {
       date: day,
       projectId: 'p-field',
       requests: [4, 5].map(
-        (n) => ({ id: 2000 + n, title: `현장 변경 ${n}`, status: 'release_scheduled' }) as const,
+        (n) =>
+          ({ id: 2000 + n, title: `현장 변경 ${n}`, status: 'release_scheduled', canOpen: true }) as const,
       ),
     },
   ]
@@ -203,5 +207,27 @@ describe('a busy day in the month view', () => {
       'href',
       '/requests/2001',
     )
+  })
+
+  it("lists someone else's release without a link to a page that would not open", () => {
+    renderAt(
+      '/schedule?view=month',
+      <MonthCalendar
+        month="2026-11"
+        weeks={monthWeeks('2026-11')}
+        today="2026-11-02"
+        items={[
+          {
+            date: day,
+            projectId: 'p-portal',
+            requests: [{ id: 2009, title: '다른 팀 변경', status: 'release_scheduled', canOpen: false }],
+          },
+        ]}
+        busy={false}
+      />,
+    )
+    const cell = screen.getByRole('cell', { name: /^11월 10일 \(화\)/ })
+    expect(within(cell).getByText('다른 팀 변경')).toBeInTheDocument()
+    expect(within(cell).queryByRole('link')).not.toBeInTheDocument()
   })
 })

@@ -2,11 +2,11 @@
 title: My Requests
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-10
+last_updated: 2026-11-12
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -54,7 +54,7 @@ The requester's own list at `/requests` (`request:read:own`), with their saved d
 ## Behaviour
 
 - Filters `open` (default), `myTurn`, `closed`, `all`, applied on the client with `isTerminal` and `turnOf(status) === 'requester'`. The filter is kept in `?filter=` (replace navigation); an unknown value falls back to `open`. Counts on each filter come from the full list.
-- Search is local state: a title substring or an exact `#id` (a leading `#` is stripped). The server's `q` parameter is not used.
+- Search goes to the server: the box is local state, and 250 ms after typing pauses it becomes `GET /requests?scope=mine&q=` (`q` matches a title substring or an exact `#id`; a leading `#` is stripped). The previous results stay on screen, `aria-busy`, while a new search loads. The filter's counts come from the unsearched list, so they count every request; with an empty box the list and the counts are one query.
 - Empty states differ: no requests at all shows a "new request" call-to-action, an empty filter result says so.
 - The new-request button is hidden below `sm`; phones reach the wizard from the navigation.
 - Cards here do not show the wanted-by or release date (`RequestCard` without `showDates`); the requester sees both on the request page and the release date on the schedule.
@@ -78,7 +78,7 @@ The requester's own list at `/requests` (`request:read:own`), with their saved d
 
 ## API Services
 
-- `useRequests({ scope: 'mine' })` → `GET /requests?scope=mine` → `WorkRequestSummary[]`. Keeps previous data while refetching and polls every 4 s while any request is live. A failed first load shows `LoadFailed` (the API's message and a retry); a failed poll keeps the list on screen with a `RefreshFailed` line above it. There is no toast.
+- `useRequests({ scope: 'mine' })` → `GET /requests?scope=mine` → `WorkRequestSummary[]`, and `useRequests({ scope: 'mine', q })` while searching (another cache entry). Keeps previous data while refetching and polls every 4 s while any request is live. A failed first load shows `LoadFailed` (the API's message and a retry); a failed poll keeps the list on screen with a `RefreshFailed` line above it. There is no toast.
 - The list never changes itself: other domains' mutations call `onRequestChanged`, which invalidates every request list.
 - `useDrafts` → `GET /drafts` → `SavedDraftSummary[]` (the caller's drafts, most recently changed first; `request:create`), key `keys.drafts()`. A save (by the sync or a hook) puts the answer into that list at once and then reads it again (`storeSavedDraft`), so a row neither disappears nor shows an old title when this device's copy is deleted in the same moment; a delete or a submission takes the row out at once (`dropSavedDraft`). Deleting goes through `useDiscardDraft` → `DELETE /drafts/{id}` (a `404` counts as deleted) after this device's copy is gone, then retries drafts waiting for room ([Request Wizard](11_wizard.md)).
 
@@ -96,7 +96,6 @@ The requester's own list at `/requests` (`request:read:own`), with their saved d
 
 ## Open Questions
 
-- Search is client-side over the loaded list; with a real backend and many requests it should move to the server's `q` parameter.
 - `N/20` counts the account's drafts, so with drafts on this device only it can be lower than the number of rows (for example 4/20 with five rows).
 - A local-only draft on its way to the server has no badge until the send fails or times out.
 

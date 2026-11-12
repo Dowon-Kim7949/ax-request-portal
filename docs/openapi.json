@@ -2168,7 +2168,7 @@
     "/releases": {
       "get": {
         "operationId": "releases",
-        "summary": "Planned and past releases grouped by date and project",
+        "summary": "Planned and past releases grouped by date and project, company-wide for every viewer (schedule:view); cancelled and rejected requests are left out",
         "tags": [
           "insights"
         ],
@@ -4691,12 +4691,17 @@
                 },
                 "status": {
                   "$ref": "#/components/schemas/RequestStatus"
+                },
+                "canOpen": {
+                  "type": "boolean",
+                  "description": "Whether the viewer may open the request; the schedule lists every request, not only readable ones"
                 }
               },
               "required": [
                 "id",
                 "title",
-                "status"
+                "status",
+                "canOpen"
               ]
             }
           }

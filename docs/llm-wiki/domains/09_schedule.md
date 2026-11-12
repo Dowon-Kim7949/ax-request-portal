@@ -2,8 +2,8 @@
 title: Release Schedule
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
 last_updated: 2026-11-12
@@ -44,6 +44,8 @@ reviewed_at: 2026-11-12
 
 A read-only calendar of scheduled releases at `/schedule` (`schedule:view`, held by every default role), shown as a list of dates or, on a tablet or a desktop, a month at a time. Dates are set by the responsible developer in the release panel on the request page ([Work](12_work.md)).
 
+The schedule is company-wide on purpose: every viewer sees every request with a release date except cancelled and rejected ones, as the contract states for `GET /releases`. Each listed request carries `canOpen`, whether the viewer may open its page (`canRead` in the mock: their own, one they develop, or `request:read:all`); someone else's request is listed without a link, so it never leads to a "not found" page.
+
 ## Behaviour
 
 - Release dates are days on the head-office business calendar ([Glossary](../GLOSSARY.md)): a scheduled date is a date-only value, and a release that happened is grouped by the day its `releasedAt` falls on at the head office (`businessDate` in the mock engine). "Today" is therefore `hqToday()`, not the device's date.
@@ -55,10 +57,10 @@ A read-only calendar of scheduled releases at `/schedule` (`schedule:view`, held
 
 - The view lives in the URL: `?view=month` is the month view, no `view` is the list. A "List | Calendar" `Segmented` beside the title switches it (each option with an icon: a list, a calendar; the label stays as the radio's name), replacing the history entry, so Back leaves the schedule instead of stepping through the views.
 - The month view needs seven columns, so it exists from the `md` breakpoint (768 px, where the navigation becomes a rail or a sidebar) up: `useMediaQuery(TABLET_UP)`. A phone shows no switch and opens the list even from a `?view=month` link; turning a tablet across the breakpoint switches live.
-- **List** (default): loads releases from 45 days before to 90 days after the head office's today and groups them by date into "this week" (today to +6 days), "later" and "past" (newest first). Empty sections are hidden. Each date lists its projects and requests (links to `/requests/:id`) with status badges; today is badged. Past dates are told apart by a muted background and a grey date, not by fading (reduced opacity breaks text contrast).
+- **List** (default): loads releases from 45 days before to 90 days after the head office's today and groups them by date into "this week" (today to +6 days), "later" and "past" (newest first). Empty sections are hidden. Each date lists its projects and requests with status badges, as links to `/requests/:id` where the viewer may open the request (`canOpen`) and as plain rows otherwise; today is badged. Past dates are told apart by a muted background and a grey date, not by fading (reduced opacity breaks text contrast).
 - **Month**: `?month=YYYY-MM` picks the month (any month, past or future); a missing or malformed value (`isMonth`) means the head office's current month, and stepping back to it drops the parameter. Previous / next month buttons and a "This month" button (disabled on the current month) replace the history entry like the switch. The month name beside the arrows is a polite live region. "No releases this month." sits on the same line, after "This month", in a `role="status"` region that is always present, so the line is announced when it appears.
 - The month grid (`monthWeeks`) runs Sunday to Saturday over every week that holds a day of the month: four to six weeks, padded with the neighbouring months' days, whose releases also show. It loads exactly that range from `GET /releases`.
-- Each day cell shows the day number (the month's name on the 1st), today in a filled circle, past days on the muted tint and the neighbouring months' numbers in grey. Releases are chips linking to `/requests/:id`: the project's icon and the title (truncated, full title as a tooltip), a check mark once `done`; done chips are neutral, scheduled ones brand-tinted. A day with more than three releases shows two and an "N more" button (`aria-expanded`) that unfolds the rest in place.
+- Each day cell shows the day number (the month's name on the 1st), today in a filled circle, past days on the muted tint and the neighbouring months' numbers in grey. Releases are chips, links to `/requests/:id` when `canOpen` and plain otherwise: the project's icon and the title (truncated, full title as a tooltip), a check mark once `done`; done chips are neutral, scheduled ones brand-tinted. A day with more than three releases shows two and an "N more" button (`aria-expanded`) that unfolds the rest in place.
 - While another month's (or the list's) data stands in during a load, the table is `aria-busy` and the "No releases this month." line is withheld, so an empty month is never claimed early.
 
 ## Rules that feed the calendar
@@ -88,7 +90,7 @@ A read-only calendar of scheduled releases at `/schedule` (`schedule:view`, held
 
 ## Open Questions
 
-- Which requests a requester may see on the calendar is decided by the mock server; the contract does not state it. A real backend must define that visibility rule.
+- None at the moment.
 
 ## Review Notes
 

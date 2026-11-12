@@ -64,6 +64,22 @@ describe('business calendar', () => {
     expect(day('2026-10-31')).not.toContain(request.id)
   })
 
+  it('lists every request company-wide, and says which ones the viewer may open', () => {
+    const state = structuredClone(seeded)
+    const engine = new MockEngine(state, OPTS)
+    const requester = state.users.find((u) => u.role === 'requester')!
+    const listed = engine.releases(requester).flatMap((g) => g.requests)
+    const byId = new Map(state.requests.map((r) => [r.id, r]))
+    expect(listed.some((r) => byId.get(r.id)!.requesterId !== requester.id)).toBe(true)
+    for (const r of listed) expect(r.canOpen).toBe(engine.canRead(requester, byId.get(r.id)!))
+    expect(
+      engine
+        .releases(exec(state))
+        .flatMap((g) => g.requests)
+        .every((r) => r.canOpen),
+    ).toBe(true)
+  })
+
   it('books AI spending of the early morning in Seoul to the new month', () => {
     const state = structuredClone(seeded)
     const template = state.aiUsage[0]!

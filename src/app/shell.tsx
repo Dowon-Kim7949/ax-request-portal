@@ -24,6 +24,7 @@ import { SIDEBAR_UP, TABLET_UP, useMediaQuery } from '@/lib/use-media-query'
 import { useBrand } from './brand'
 import { resetDemoData } from './demo'
 import { DemoBanner } from './demo-banner'
+import { preloadPage, preloadWhenIdle } from './page-preload'
 import { usePageFade, useSlowNavigation } from './navigation-feedback'
 import { NavigationProgress } from './navigation-progress'
 import { useCan, useCurrentUser } from './hooks'
@@ -210,6 +211,12 @@ function AccountMenu() {
 /* Sidebar (tablet rail / desktop)                                     */
 /* ------------------------------------------------------------------ */
 
+/** A pointer over a menu item, a touch or keyboard focus starts loading its page. */
+function preloadOnIntent(to: string) {
+  const preload = () => preloadPage(to)
+  return { onPointerEnter: preload, onFocus: preload, onTouchStart: preload }
+}
+
 function SideLink({
   item,
   expanded,
@@ -226,6 +233,7 @@ function SideLink({
       to={item.to}
       end={item.end}
       onClick={onNavigate}
+      {...preloadOnIntent(item.to)}
       title={expanded ? undefined : label}
       aria-label={expanded ? undefined : label}
       className={({ isActive }) =>
@@ -363,6 +371,7 @@ function BottomNav({ items }: { items: NavItem[] }) {
               key={i.key}
               to={i.to}
               end={i.end}
+              {...preloadOnIntent(i.to)}
               className={({ isActive }) => cn(tab, isActive ? 'text-accent' : 'text-ink-500')}
             >
               {i.key === 'newRequest' ? (
@@ -494,6 +503,10 @@ export function AppShell({ permissionsFor }: { permissionsFor: (path: string) =>
   // A page made of `Page` parts fills the window on a big screen; only its lists scroll (src/app/page.tsx).
   const fit = handles.some((h) => h?.fit)
   const loading = useSlowNavigation()
+  // The menu's pages load in the background once the first screen is up.
+  // Keyed by the joined paths: `items` is a new array on every render.
+  const menuPaths = items.map((i) => i.to).join(' ')
+  useEffect(() => preloadWhenIdle(menuPaths.split(' ')), [menuPaths])
   const mainRef = useRef<HTMLElement>(null)
   usePageFade(mainRef)
 

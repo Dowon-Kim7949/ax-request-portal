@@ -54,21 +54,31 @@ function DateGroup({ date, items, today }: { date: string; items: ReleaseSchedul
                 </span>
               </div>
               <ul className="flex flex-col">
-                {item.requests.map((r) => (
-                  <li key={r.id}>
-                    <Link
-                      to={`/requests/${r.id}`}
-                      className={cn(
-                        '-mx-2 flex min-h-11 items-center gap-2 rounded-lg px-2 py-1.5',
-                        past ? 'hover:bg-surface' : 'hover:bg-muted',
-                      )}
-                    >
+                {item.requests.map((r) => {
+                  const row = (
+                    <>
                       <span className="text-xs text-ink-400">#{r.id}</span>
                       <span className="min-w-0 flex-1 truncate text-[15px]">{r.title}</span>
                       <StatusBadge status={r.status} />
-                    </Link>
-                  </li>
-                ))}
+                    </>
+                  )
+                  const rowClass = '-mx-2 flex min-h-11 items-center gap-2 rounded-lg px-2 py-1.5'
+                  return (
+                    <li key={r.id}>
+                      {/* Someone else's request is listed but not a link: its page would not open for this viewer. */}
+                      {r.canOpen ? (
+                        <Link
+                          to={`/requests/${r.id}`}
+                          className={cn(rowClass, past ? 'hover:bg-surface' : 'hover:bg-muted')}
+                        >
+                          {row}
+                        </Link>
+                      ) : (
+                        <div className={rowClass}>{row}</div>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             </section>
           )

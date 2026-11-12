@@ -12,15 +12,12 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { SwitchRow } from '@/components/ui/controls'
 import { Skeleton } from '@/components/ui/feedback'
 import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
-import type { NotificationSettings } from '@/domain/model'
+import { appConfig } from '@/config/app.config'
+import { notificationRows } from './notification-rows'
 import { TimeZoneSection } from './time-zone-section'
 
-const ROWS = [
-  { key: 'inApp', label: 'settings.inApp', hint: 'settings.inAppHint' },
-  { key: 'email', label: 'settings.email', hint: 'settings.emailHint' },
-  { key: 'messenger', label: 'settings.messenger', hint: 'settings.messengerHint' },
-  { key: 'onlyActionRequired', label: 'settings.onlyAction', hint: 'settings.onlyActionHint' },
-] as const satisfies ReadonlyArray<{ key: keyof NotificationSettings; label: string; hint: string }>
+// Channels the backend does not send have no switch (`notifications.channels` in src/config/app.config.ts).
+const ROWS = notificationRows(appConfig.notifications.channels)
 
 function DisplaySection() {
   const { t, i18n } = useTranslation()
@@ -96,7 +93,9 @@ function NotificationsSection() {
           ))}
         </div>
       )}
-      <p className="mt-2 text-[13px] text-ink-500">{t('settings.channelNote')}</p>
+      {appConfig.notifications.channels.length ? (
+        <p className="mt-2 text-[13px] text-ink-500">{t('settings.channelNote')}</p>
+      ) : null}
     </Card>
   )
 }

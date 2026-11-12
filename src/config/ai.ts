@@ -9,8 +9,8 @@
  *   Claude  https://platform.claude.com/docs/en/about-claude/pricing
  *   OpenAI  https://developers.openai.com/api/docs/pricing
  * Cache-write prices are the shortest TTL (Claude 5 minutes, OpenAI 30
- * minutes). Where a provider lists no cache-write price for a model, it is
- * derived from the provider's published multiplier (1.25× input).
+ * minutes); both providers list one per model. Claude Haiku 5.5 is priced by
+ * prompt length: these are its prices up to 100,000 tokens.
  */
 import {
   AiPricing,
@@ -20,7 +20,7 @@ import {
 } from '../domain/ai'
 
 export const DEFAULT_AI_PRICING: AiPricingType = AiPricing.parse({
-  asOf: '2026-11-03',
+  asOf: '2026-11-12',
   // Placeholder rate: set the one your finance team books against.
   usdKrw: 1400,
   models: [
@@ -38,7 +38,7 @@ export const DEFAULT_AI_PRICING: AiPricingType = AiPricing.parse({
       model: 'claude-sonnet-5-5',
       label: 'Claude Sonnet 5.5',
       inputUsd: 2,
-      cacheReadUsd: 0.2,
+      cacheReadUsd: 0.1,
       cacheWriteUsd: 2.5,
       outputUsd: 10,
     },

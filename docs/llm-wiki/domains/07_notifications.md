@@ -2,11 +2,11 @@
 title: Notifications
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-10
+last_updated: 2026-11-12
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -58,7 +58,7 @@ Dates inside server texts are calendar dates written for people with `readableDa
 
 The mock keeps only each person's newest `NOTIFICATIONS_PER_USER_MAX` (200) notifications (`trimNotifications`), so stored demo data stops growing. Reading a notification counts as an edit of the demo data (`dirty`), so switching language no longer rebuilds it.
 
-Delivery rules at creation time: nothing is stored when the recipient has turned off in-app notifications, or has "only when action is required" on and the notification does not require action; the actor never notifies themselves. Changing settings therefore does not affect notifications already stored. A person with no saved settings gets `DEFAULT_NOTIFICATION_SETTINGS`. E-mail and messenger channels are settings only; the mock delivers nothing on them.
+Delivery rules at creation time: nothing is stored when the recipient has turned off in-app notifications, or has "only when action is required" on and the notification does not require action; the actor never notifies themselves. Changing settings therefore does not affect notifications already stored. A person with no saved settings gets `DEFAULT_NOTIFICATION_SETTINGS`. E-mail and messenger channels are settings only, offered for the channels `notifications.channels` lists ([Settings](10_settings.md)); the mock delivers nothing on them.
 
 ## API Services
 

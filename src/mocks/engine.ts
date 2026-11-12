@@ -1446,7 +1446,7 @@ export class MockEngine {
       if (!date || (from && date < from) || (to && date > to)) continue
       const key = `${date}|${r.projectId}`
       const item = groups.get(key) ?? { date, projectId: r.projectId, requests: [] }
-      item.requests.push({ id: r.id, title: r.title, status: r.status })
+      item.requests.push({ id: r.id, title: r.title, status: r.status, canOpen: this.canRead(user, r) })
       groups.set(key, item)
     }
     return [...groups.values()].sort(

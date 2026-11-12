@@ -69,6 +69,15 @@ export const AppConfigSchema = z
        */
       maxPerAccount: z.int().positive(),
     }),
+    notifications: z.object({
+      /**
+       * Channels besides in-app that this deployment's backend actually sends.
+       * Settings offers a switch for each listed one, with a note that the
+       * backend sends them; an empty list leaves only the in-app switches.
+       * The contract keeps every field either way.
+       */
+      channels: z.array(z.enum(['email', 'messenger'])),
+    }),
     mock: z.object({
       /** Seconds the simulated AI takes to write a feasibility report */
       reportSeconds: z.number().positive(),

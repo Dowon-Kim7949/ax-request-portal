@@ -796,7 +796,18 @@ export const ReleaseScheduleItem = named(
   z.object({
     date: CalendarDate,
     projectId: z.string(),
-    requests: z.array(z.object({ id: z.int().positive(), title: z.string(), status: RequestStatus })),
+    requests: z.array(
+      z.object({
+        id: z.int().positive(),
+        title: z.string(),
+        status: RequestStatus,
+        canOpen: z
+          .boolean()
+          .describe(
+            'Whether the viewer may open the request; the schedule lists every request, not only readable ones',
+          ),
+      }),
+    ),
   }),
 )
 export type ReleaseScheduleItem = z.infer<typeof ReleaseScheduleItem>
