@@ -6,7 +6,7 @@ tags:
 status: verified
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-10
+last_updated: 2026-11-11
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -21,6 +21,10 @@ evidence:
   - src/mocks/engine.ts#symbol:updateUser
   - src/domain/roles.ts#symbol:DEFAULT_ROLE_PERMISSIONS
   - src/api/queries.ts#symbol:useUpdateUser
+  - src/api/queries.ts#symbol:useSaveTeam
+  - src/app/hooks.ts#symbol:useTeamDirectory
+  - src/mocks/engine.ts#symbol:createTeam
+  - src/mocks/engine.ts#symbol:updateTeam
   - src/app/hooks.ts#symbol:useDirectory
   - src/domain/url.ts#symbol:WebUrl
 related:
@@ -61,8 +65,10 @@ Administration of the organization's side of the workflow: projects (repositorie
 | --- | --- | --- | --- |
 | `useDirectory` (`useProjects`, `useUsers`) | `GET /projects`, `GET /users` | → `Project[]`, `User[]` | 60 s stale time; shared with every page that shows names. |
 | `useSaveProject` | `POST /projects` or `PUT /projects/{id}` (chosen by presence of `id`) | `ProjectInput` (name 1–60, description ≤ 300, repository, ≥ 1 owner, targets with optional id, constraints with optional id) → `Project` | Server: owners must be developers/admins (`ownersMustBeDevelopers`, 400), unknown id 404, missing target and constraint ids are generated; an empty rule text is 400. Invalidates projects. |
-| `useCreateUser` | `POST /users` | `UserCreate { name, email, role, team? }` → `User` | Duplicate e-mail → 400 `emailTaken`. Invalidates users. |
-| `useUpdateUser` | `PATCH /users/{id}` | `UserPatch { role?, team?, active? }` → `User` | Self-change → 400 `cannotChangeSelf`. Invalidates users, and `GET /auth/me` too when the changed user is the one signed in. |
+| `useCreateUser` | `POST /users` | `UserCreate { name, email, role, teamId? }` → `User` | Duplicate e-mail → 400 `emailTaken`; unknown team → 404 `teamNotFound`. Invalidates users. |
+| `useUpdateUser` | `PATCH /users/{id}` | `UserPatch { role?, teamId? (null = no team), active? }` → `User` | Self-change of role or active → 400 `cannotChangeSelf` (one's own team may change); unknown team → 404. Invalidates users, and `GET /auth/me` too when the changed user is the one signed in. |
+| `useTeamDirectory` (`useTeams`) | `GET /teams` | → `Team[]` by name | Readable by everyone signed in; `teamName(id)` gives the current name ("unknown team" once loaded without it). |
+| `useSaveTeam` | `POST /teams`, `PATCH /teams/{id}` | `TeamInput { name }` → `Team` | `user:manage`. Name 1–40 characters, unique ignoring case (400 `teamNameTaken`). Invalidates teams. |
 
 Creating a user with the `operator` role, or changing an operator, is refused with 403 `operatorProvisioned` (`createUser`, `updateUser`).
 
@@ -72,7 +78,7 @@ All calls carry the bearer token; mutation failures show `toast.error` with the 
 
 - Operator accounts are provisioned by the service (database, seed or an identity-provider group mapped to `operator`), never by an organization admin, so an admin cannot hand themselves the AI keys or the budget.
 - Permissions are enforced twice: the route guard hides the page and the mock engine rejects the call. A real backend must do the same; hiding UI is not security.
-- A user's `team` is free text, set in the invitation sheet; afterwards only `PATCH /users/{id}` changes it (a user's row shows the team but has no control for it). Each AI usage entry keeps the team its person had when it was booked, so changing the team does not move earlier AI spending to the new one ([AI Operations](13_ops.md)).
+- Teams are records (`Team { id, name }`); a user holds `teamId`. "Teams" on the users page opens a sheet to add a team and rename each one in place; there is no delete, because AI usage still points at old teams. The invitation sheet and each user's row pick the team from the list, "no team" first; an operator's row is locked. Renaming changes the name everywhere at once, since people and AI usage keep the id. Each AI usage entry keeps the team id its person had when it was booked, so moving someone does not move earlier AI spending ([AI Operations](13_ops.md)).
 
 ## Evidence
 

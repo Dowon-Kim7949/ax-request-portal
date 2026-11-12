@@ -258,10 +258,12 @@ export const AiUsageEntry = named(
       .describe(
         'The person whose action started the call. The feasibility report made automatically on submission counts against the requester who submitted',
       ),
-    team: z
+    teamId: z
       .string()
       .optional()
-      .describe("The person's team when the call was booked, kept as it was; absent when they had none"),
+      .describe(
+        "Id of the person's team when the call was booked, kept as it was; absent when they had none",
+      ),
     tokens: TokenUsage,
     costUsd: z.number().nonnegative(),
     costKrw: z.number().nonnegative(),
@@ -270,7 +272,7 @@ export const AiUsageEntry = named(
 export type AiUsageEntry = z.infer<typeof AiUsageEntry>
 
 /** Who a call is booked against: the person, and their team at that moment. */
-export type AiCaller = { userId: string; team?: string }
+export type AiCaller = { userId: string; teamId?: string }
 
 /** Prices one call and returns the ledger entry; `undefined` when the model has no price. */
 export function bookUsage(
@@ -297,7 +299,7 @@ export function bookUsage(
     runtime: runtimeFor(call.task, call.selection.provider),
     ...(call.requestId !== undefined ? { requestId: call.requestId } : {}),
     userId: call.caller.userId,
-    ...(call.caller.team ? { team: call.caller.team } : {}),
+    ...(call.caller.teamId ? { teamId: call.caller.teamId } : {}),
     tokens: call.tokens,
     costUsd: roundMoney(usd),
     costKrw: roundMoney(usd * pricing.usdKrw),

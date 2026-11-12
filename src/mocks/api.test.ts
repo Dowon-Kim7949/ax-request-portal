@@ -394,11 +394,53 @@ describe('visibility and permissions', () => {
   it('lets admins manage users but not demote themselves', async () => {
     await loginAs('admin@example.com')
     const created = await call(api.createUser, {
-      body: { name: '신규요청자', email: 'new@example.com', role: 'requester' },
+      body: { name: '신규요청자', email: 'new@example.com', role: 'requester', teamId: 't-sales' },
     })
+    expect(created.teamId).toBe('t-sales')
     const promoted = await call(api.updateUser, { params: { id: created.id }, body: { role: 'developer' } })
-    expect(promoted.role).toBe('developer')
+    expect(promoted).toMatchObject({ role: 'developer', teamId: 't-sales' })
+    // null takes them out of the team; an unknown team is refused.
+    const teamless = await call(api.updateUser, { params: { id: created.id }, body: { teamId: null } })
+    expect(teamless).not.toHaveProperty('teamId')
+    await expectApiError(
+      call(api.updateUser, { params: { id: created.id }, body: { teamId: 't-none' } }),
+      404,
+    )
+    await expectApiError(
+      call(api.createUser, {
+        body: { name: '없는팀', email: 'no-team@example.com', role: 'requester', teamId: 't-none' },
+      }),
+      404,
+    )
     await expectApiError(call(api.updateUser, { params: { id: 'u-han' }, body: { role: 'requester' } }), 400)
+  })
+
+  it('lets admins add and rename teams, with names unique ignoring case', async () => {
+    await loginAs('planner@example.com')
+    const seeded = await call(api.listTeams)
+    expect(seeded.map((x) => x.name)).toEqual(
+      [...seeded.map((x) => x.name)].sort((a, b) => a.localeCompare(b)),
+    )
+    await expectApiError(call(api.createTeam, { body: { name: '데이터팀' } }), 403)
+
+    await loginAs('admin@example.com')
+    const team = await call(api.createTeam, { body: { name: '  데이터팀 ' } })
+    expect(team.name).toBe('데이터팀')
+    await expectApiError(call(api.createTeam, { body: { name: seeded[0]!.name.toUpperCase() } }), 400)
+    await expectApiError(
+      call(api.updateTeam, { params: { id: team.id }, body: { name: seeded[0]!.name } }),
+      400,
+    )
+    // Saving its own name again is not a clash.
+    expect(await call(api.updateTeam, { params: { id: team.id }, body: { name: '데이터팀' } })).toEqual(team)
+    await expectApiError(call(api.updateTeam, { params: { id: 't-none' }, body: { name: 'x' } }), 404)
+    await expectApiError(call(api.createTeam, { body: { name: ' ' } }), 400)
+
+    // People keep the team's id, so a rename reaches them without touching them.
+    const kim = (await call(api.listUsers)).find((u) => u.id === 'u-kim')!
+    const renamed = await call(api.updateTeam, { params: { id: kim.teamId! }, body: { name: '전략기획팀' } })
+    expect((await call(api.listUsers)).find((u) => u.id === 'u-kim')).toEqual(kim)
+    expect((await call(api.listTeams)).find((x) => x.id === kim.teamId)).toEqual(renamed)
   })
 
   it('keeps the budget screen to the operator', async () => {
@@ -500,6 +542,8 @@ describe('AI operations', () => {
   it('books each call against the person who started it, under the team they had then', async () => {
     const ledger = () => t.store.engine.state.aiUsage
     const from = ledger().length
+    await loginAs('admin@example.com')
+    const tf = await call(api.createTeam, { body: { name: 'AX TF' } })
     const kim = await loginAs('planner@example.com')
     await call(api.precheckRequest, { body: draft })
     const { id } = await call(api.createRequest, { body: draft })
@@ -508,7 +552,7 @@ describe('AI operations', () => {
 
     // Moving to another team does not move what was booked before.
     await loginAs('admin@example.com')
-    await call(api.updateUser, { params: { id: kim.id }, body: { team: 'AX TF' } })
+    await call(api.updateUser, { params: { id: kim.id }, body: { teamId: tf.id } })
     await loginAs('planner@example.com')
     await call(api.transitionRequest, {
       params: { id },
@@ -525,23 +569,31 @@ describe('AI operations', () => {
     const booked = ledger()
       .slice(from)
       .filter((e) => e.requestId === id || e.task === 'precheck')
-      .map((e) => [e.task, e.userId, e.team])
+      .map((e) => [e.task, e.userId, e.teamId])
     expect(booked).toEqual([
-      ['precheck', kim.id, kim.team],
+      ['precheck', kim.id, kim.teamId],
       // The report made on submission is the requester's.
-      ['report', kim.id, kim.team],
-      ['report', kim.id, 'AX TF'],
-      ['work', dev.id, dev.team],
+      ['report', kim.id, kim.teamId],
+      ['report', kim.id, tf.id],
+      ['work', dev.id, dev.teamId],
     ])
 
     await loginAs('operator@example.com')
-    const report = await call(api.aiUsage, { query: {} })
-    expect(report.byTeam.map((r) => r.team)).toEqual(expect.arrayContaining([kim.team, 'AX TF']))
+    const before = await call(api.aiUsage, { query: {} })
+    expect(before.byTeam.map((r) => r.teamId)).toEqual(expect.arrayContaining([kim.teamId, tf.id]))
     // A person's row shows the team of their latest call.
-    expect(report.byPerson.find((r) => r.userId === kim.id)?.team).toBe('AX TF')
+    expect(before.byPerson.find((r) => r.userId === kim.id)?.teamId).toBe(tf.id)
+
+    // Renaming a team keeps its row: rows are by id, and the name is looked up.
+    await loginAs('admin@example.com')
+    await call(api.updateTeam, { params: { id: tf.id }, body: { name: 'AX 추진팀' } })
+    await loginAs('operator@example.com')
+    const after = await call(api.aiUsage, { query: {} })
+    expect(after.byTeam).toEqual(before.byTeam)
+    expect((await call(api.listTeams)).find((x) => x.id === tf.id)?.name).toBe('AX 추진팀')
 
     await loginAs('admin@example.com')
-    await call(api.updateUser, { params: { id: kim.id }, body: { team: kim.team! } })
+    await call(api.updateUser, { params: { id: kim.id }, body: { teamId: kim.teamId! } })
   })
 
   it('shows request cost to engineering viewers only', async () => {

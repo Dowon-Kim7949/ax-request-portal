@@ -6,7 +6,7 @@ tags:
 status: verified
 doc_type: glossary
 project: ax-request-portal
-last_updated: 2026-11-10
+last_updated: 2026-11-11
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -78,7 +78,8 @@ Terms as the code uses them. Identifiers are kept in English in both UI language
 | Operator | The person running the service's AI side: providers and keys, model per task, prices, AI budget and usage. Provisioned by the service, not by an admin. | `src/domain/roles.ts` |
 | Provider | `anthropic` (Claude) or `openai` (GPT). | `src/domain/ai.ts` |
 | Runtime | How a task drives the model: `api` for precheck and report, `claude_code` or `codex` for AI work. | `src/domain/ai.ts` |
-| Usage entry | One booked AI call or agent run: provider, model, runtime, the person who started it and their team at that moment, normalized tokens and estimated cost, priced once and never re-priced. | `src/domain/ai.ts` |
+| Team | A group people belong to, kept as its own record (`Team { id, name }`) and referred to by id everywhere, so a rename carries its people and history with it. Admins add and rename teams; there is no delete. | `src/domain/model.ts` |
+| Usage entry | One booked AI call or agent run: provider, model, runtime, the person who started it and the id of their team at that moment, normalized tokens and estimated cost, priced once and never re-priced. | `src/domain/ai.ts` |
 | Precheck (`PrecheckIssue`) | Advice on a draft before submission; never blocks. | `src/domain/precheck.ts` |
 | Saved draft (`SavedDraft`; "임시 저장" / "Saved drafts") | An unsubmitted request saved to the person's account: step, content (`DraftContent`) and a `version` that grows with every save. Continued on any device; deleted by the server when a request names it (`draftId`). At most `drafts.maxPerAccount` (20) per account. | `src/api/contract.ts` |
 | Draft on this device (`LocalDraft`) | What the person wrote that the account does not have yet, kept in `localStorage` per person and deleted once the account holds the same. Keyed by a local id (`local-…`) until the server saves it, then by the server id. Shown as "This device only" when it cannot reach the account. | `src/stores/draft.ts` |

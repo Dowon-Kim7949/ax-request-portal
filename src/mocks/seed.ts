@@ -6,7 +6,7 @@
  * contain a state the rules would not allow.
  */
 import type { TransitionCommand } from '../domain/lifecycle'
-import type { NotificationSettings, Project, RequestDraft, User, WorkRequest } from '../domain/model'
+import type { NotificationSettings, Project, RequestDraft, Team, User, WorkRequest } from '../domain/model'
 import { DEFAULT_AI_PRICING, DEFAULT_AI_SELECTIONS } from '../config/ai'
 import type { ServerLanguage } from './copy'
 import {
@@ -24,34 +24,53 @@ export const DEMO_PASSWORD = 'demo'
 /* Users                                                               */
 /* ------------------------------------------------------------------ */
 
-const USERS: Array<Pick<User, 'id' | 'email' | 'role'>> = [
-  { id: 'u-kim', email: 'planner@example.com', role: 'requester' },
-  { id: 'u-lee', email: 'sales@example.com', role: 'requester' },
-  { id: 'u-park', email: 'ceo@example.com', role: 'executive' },
-  { id: 'u-choi', email: 'dev1@example.com', role: 'developer' },
-  { id: 'u-jung', email: 'dev2@example.com', role: 'developer' },
-  { id: 'u-han', email: 'admin@example.com', role: 'admin' },
-  { id: 'u-yoon', email: 'operator@example.com', role: 'operator' },
+const USERS: Array<Pick<User, 'id' | 'email' | 'role' | 'teamId'>> = [
+  { id: 'u-kim', email: 'planner@example.com', role: 'requester', teamId: 't-planning' },
+  { id: 'u-lee', email: 'sales@example.com', role: 'requester', teamId: 't-sales' },
+  { id: 'u-park', email: 'ceo@example.com', role: 'executive', teamId: 't-management' },
+  { id: 'u-choi', email: 'dev1@example.com', role: 'developer', teamId: 't-engineering' },
+  { id: 'u-jung', email: 'dev2@example.com', role: 'developer', teamId: 't-engineering' },
+  { id: 'u-han', email: 'admin@example.com', role: 'admin', teamId: 't-operations' },
+  { id: 'u-yoon', email: 'operator@example.com', role: 'operator', teamId: 't-platform' },
 ]
 
-const USER_COPY: Record<ServerLanguage, Record<string, { name: string; team: string }>> = {
+const USER_NAMES: Record<ServerLanguage, Record<string, string>> = {
   ko: {
-    'u-kim': { name: '김기획', team: '기획팀' },
-    'u-lee': { name: '이영업', team: '영업팀' },
-    'u-park': { name: '박대표', team: '경영' },
-    'u-choi': { name: '최개발', team: '개발팀' },
-    'u-jung': { name: '정개발', team: '개발팀' },
-    'u-han': { name: '한운영', team: '운영팀' },
-    'u-yoon': { name: '윤시스템', team: '플랫폼팀' },
+    'u-kim': '김기획',
+    'u-lee': '이영업',
+    'u-park': '박대표',
+    'u-choi': '최개발',
+    'u-jung': '정개발',
+    'u-han': '한운영',
+    'u-yoon': '윤시스템',
   },
   en: {
-    'u-kim': { name: 'Mina Kim', team: 'Planning' },
-    'u-lee': { name: 'Leo Lee', team: 'Sales' },
-    'u-park': { name: 'Daniel Park', team: 'Management' },
-    'u-choi': { name: 'Chris Choi', team: 'Engineering' },
-    'u-jung': { name: 'Sam Jung', team: 'Engineering' },
-    'u-han': { name: 'Hana Han', team: 'Operations' },
-    'u-yoon': { name: 'Yuna Yoon', team: 'Platform' },
+    'u-kim': 'Mina Kim',
+    'u-lee': 'Leo Lee',
+    'u-park': 'Daniel Park',
+    'u-choi': 'Chris Choi',
+    'u-jung': 'Sam Jung',
+    'u-han': 'Hana Han',
+    'u-yoon': 'Yuna Yoon',
+  },
+}
+
+const TEAM_NAMES: Record<ServerLanguage, Record<string, string>> = {
+  ko: {
+    't-planning': '기획팀',
+    't-sales': '영업팀',
+    't-management': '경영',
+    't-engineering': '개발팀',
+    't-operations': '운영팀',
+    't-platform': '플랫폼팀',
+  },
+  en: {
+    't-planning': 'Planning',
+    't-sales': 'Sales',
+    't-management': 'Management',
+    't-engineering': 'Engineering',
+    't-operations': 'Operations',
+    't-platform': 'Platform',
   },
 }
 
@@ -59,7 +78,11 @@ const USER_COPY: Record<ServerLanguage, Record<string, { name: string; team: str
 export const DEMO_ACCOUNT_IDS = ['u-kim', 'u-park', 'u-choi', 'u-han', 'u-yoon'] as const
 
 export function seedUsers(lang: ServerLanguage): User[] {
-  return USERS.map((u) => ({ ...u, ...USER_COPY[lang][u.id]!, active: true }))
+  return USERS.map((u) => ({ ...u, name: USER_NAMES[lang][u.id]!, active: true }))
+}
+
+export function seedTeams(lang: ServerLanguage): Team[] {
+  return Object.entries(TEAM_NAMES[lang]).map(([id, name]) => ({ id, name }))
 }
 
 /* ------------------------------------------------------------------ */
@@ -1085,6 +1108,7 @@ function emptyState(now: Date, lang: ServerLanguage): MockState {
     seq: 0,
     nextRequestId: 990,
     users,
+    teams: seedTeams(lang),
     projects: seedProjects(lang),
     requests: [],
     notifications: [],

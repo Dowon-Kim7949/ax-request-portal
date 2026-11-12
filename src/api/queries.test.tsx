@@ -103,11 +103,11 @@ describe('changing a user', () => {
     qc.setQueryData(keys.me(), admin)
     const { result } = renderHook(() => useUpdateUser(), { wrapper })
 
-    result.current.mutate({ id: 'u-kim', body: { team: '전략기획팀' } })
+    result.current.mutate({ id: 'u-kim', body: { teamId: 't-sales' } })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(qc.getQueryState(keys.me())?.isInvalidated).toBe(false)
 
-    result.current.mutate({ id: admin.id, body: { team: '플랫폼운영팀' } })
+    result.current.mutate({ id: admin.id, body: { teamId: 't-platform' } })
     await waitFor(() => expect(result.current.variables?.id).toBe(admin.id))
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(qc.getQueryState(keys.me())?.isInvalidated).toBe(true)

@@ -5,16 +5,18 @@ import { PeopleList, TeamBars, TOP_PEOPLE } from './usage-charts'
 
 const names: Record<string, string> = { 'u-1': '김하나' }
 const userName = (id: string) => names[id] ?? id
+const teams: Record<string, string> = { 't-plan': '기획팀', 't-dev': '개발팀' }
+const teamName = (id: string) => teams[id] ?? id
 
 describe('people', () => {
   it('names the ten who spent most and sums everyone else in one row', () => {
     const rows = Array.from({ length: TOP_PEOPLE + 3 }, (_, i) => ({
       userId: `u-${i + 1}`,
-      ...(i % 2 ? {} : { team: '기획팀' }),
+      ...(i % 2 ? {} : { teamId: 't-plan' }),
       calls: 2,
       costKrw: 1_000 * (TOP_PEOPLE + 3 - i),
     }))
-    render(<PeopleList rows={rows} userName={userName} />)
+    render(<PeopleList rows={rows} userName={userName} teamName={teamName} />)
     const items = screen.getAllByRole('listitem')
     expect(items).toHaveLength(TOP_PEOPLE + 1)
     expect(items[0]).toHaveTextContent('김하나 기획팀')
@@ -29,20 +31,27 @@ describe('people', () => {
   })
 
   it('has no "everyone else" row when ten or fewer people spent', () => {
-    render(<PeopleList rows={[{ userId: 'u-1', calls: 1, costKrw: 500 }]} userName={userName} />)
+    render(
+      <PeopleList
+        rows={[{ userId: 'u-1', calls: 1, costKrw: 500 }]}
+        userName={userName}
+        teamName={teamName}
+      />,
+    )
     expect(screen.getAllByRole('listitem')).toHaveLength(1)
     expect(screen.queryByText(/그 외/)).not.toBeInTheDocument()
   })
 })
 
 describe('teams', () => {
-  it('names the row of people without a team', () => {
+  it('names each team by its current name, and the row of people without a team', () => {
     render(
       <TeamBars
         rows={[
-          { team: '개발팀', calls: 4, costKrw: 8_000 },
+          { teamId: 't-dev', calls: 4, costKrw: 8_000 },
           { calls: 1, costKrw: 500 },
         ]}
+        teamName={teamName}
       />,
     )
     const items = screen.getAllByRole('listitem')

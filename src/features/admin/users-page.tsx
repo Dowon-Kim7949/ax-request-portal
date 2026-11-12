@@ -1,13 +1,14 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { UserPlus } from 'lucide-react'
-import { useState } from 'react'
+import { Plus, UserPlus, Users } from 'lucide-react'
+import { useId, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { toast } from 'sonner'
 import { ApiError } from '@/api/client'
 import { UserCreate } from '@/api/contract'
-import { useCreateUser, useUpdateUser } from '@/api/queries'
-import { useCurrentUser, useDirectory } from '@/app/hooks'
+import { useCreateUser, useSaveTeam, useUpdateUser } from '@/api/queries'
+import { useCurrentUser, useDirectory, useTeamDirectory } from '@/app/hooks'
 import { Page, PageHeader, PageScroll, PageTop } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { Badge } from '@/components/ui/badge'
@@ -18,7 +19,7 @@ import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { Field, Input } from '@/components/ui/field'
 import { Sheet } from '@/components/ui/sheet'
 import { appConfig } from '@/config/app.config'
-import type { Role, User } from '@/domain/model'
+import { TEAM_NAME_MAX, type Role, type Team, type User } from '@/domain/model'
 
 /** Operator accounts belong to the service, not the organization: an admin cannot assign the role. */
 const ASSIGNABLE_ROLES = appConfig.enabledRoles.filter((r) => r !== 'operator')
@@ -26,12 +27,29 @@ import type * as z from 'zod'
 
 type InviteValues = z.input<typeof UserCreate>
 
-function InviteForm({ onDone }: { onDone: () => void }) {
+type TeamDirectory = ReturnType<typeof useTeamDirectory>
+
+/** Team picker: "no team" first, then the teams by name. */
+function TeamOptions({ teams }: { teams: Team[] }) {
+  const { t } = useTranslation()
+  return (
+    <>
+      <option value="">{t('users.noTeam')}</option>
+      {teams.map((team) => (
+        <option key={team.id} value={team.id}>
+          {team.name}
+        </option>
+      ))}
+    </>
+  )
+}
+
+function InviteForm({ teams, onDone }: { teams: Team[]; onDone: () => void }) {
   const { t } = useTranslation()
   const create = useCreateUser()
   const form = useForm<InviteValues>({
     resolver: zodResolver(UserCreate),
-    defaultValues: { name: '', email: '', role: 'requester', team: '' },
+    defaultValues: { name: '', email: '', role: 'requester', teamId: '' },
   })
   const err = form.formState.errors
   return (
@@ -40,7 +58,7 @@ function InviteForm({ onDone }: { onDone: () => void }) {
       className="flex flex-col gap-4"
       onSubmit={form.handleSubmit((values) =>
         create.mutate(
-          { ...values, ...(values.team?.trim() ? { team: values.team.trim() } : { team: undefined }) },
+          { ...values, teamId: values.teamId || undefined },
           {
             onSuccess: () => {
               toast.success(t('users.invited'))
@@ -72,7 +90,11 @@ function InviteForm({ onDone }: { onDone: () => void }) {
           )}
         </Field>
         <Field label={t('users.team')} optional optionalLabel={t('common.optional')}>
-          {(p) => <Input {...p} {...form.register('team')} />}
+          {(p) => (
+            <Select {...p} {...form.register('teamId')}>
+              <TeamOptions teams={teams} />
+            </Select>
+          )}
         </Field>
       </div>
       <Button type="submit" size="lg" block loading={create.isPending}>
@@ -82,13 +104,162 @@ function InviteForm({ onDone }: { onDone: () => void }) {
   )
 }
 
-function UserRow({ user, isMe }: { user: User; isMe: boolean }) {
+function teamNameError(name: string, t: TFunction) {
+  const trimmed = name.trim()
+  if (!trimmed) return t('common.requiredField')
+  if (trimmed.length > TEAM_NAME_MAX) return t('users.teamNameTooLong', { max: TEAM_NAME_MAX })
+  return undefined
+}
+
+/** A team name box; its label is read by screen readers only, the row says what it is. */
+function TeamNameInput({
+  label,
+  value,
+  onChange,
+  error,
+  placeholder,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  error?: string
+  placeholder?: string
+}) {
+  return (
+    <Input
+      aria-label={label}
+      aria-invalid={error ? true : undefined}
+      placeholder={placeholder}
+      maxLength={TEAM_NAME_MAX + 10}
+      autoComplete="off"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+    />
+  )
+}
+
+function TeamNameError({ error, id }: { error?: string; id?: string }) {
+  return error ? (
+    <p id={id} className="col-span-2 text-[13px] font-medium text-danger-fg" role="alert">
+      {error}
+    </p>
+  ) : null
+}
+
+/** One team: its name, editable in place. */
+function TeamRow({ team }: { team: Team }) {
+  const { t } = useTranslation()
+  const save = useSaveTeam()
+  const [name, setName] = useState(team.name)
+  const trimmed = name.trim()
+  const error = teamNameError(name, t)
+  const changed = trimmed !== team.name
+  const errorId = `${useId()}-error`
+  return (
+    <li>
+      <form
+        noValidate
+        className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (error || !changed) return
+          save.mutate(
+            { id: team.id, body: { name: trimmed } },
+            {
+              onSuccess: () => toast.success(t('users.teamRenamed')),
+              onError: (err) => toast.error(err instanceof ApiError ? err.message : t('errors.generic')),
+            },
+          )
+        }}
+      >
+        <TeamNameInput
+          label={`${t('users.teamName')}: ${team.name}`}
+          value={name}
+          onChange={setName}
+          error={changed ? error : undefined}
+        />
+        <Button
+          type="submit"
+          variant="secondary"
+          className="h-12"
+          disabled={!changed || !!error}
+          loading={save.isPending}
+          aria-label={`${team.name} ${t('users.rename')}`}
+        >
+          {t('users.rename')}
+        </Button>
+        <TeamNameError id={errorId} error={changed ? error : undefined} />
+      </form>
+    </li>
+  )
+}
+
+function TeamsPanel({ dir }: { dir: TeamDirectory }) {
+  const { t } = useTranslation()
+  const save = useSaveTeam()
+  const [name, setName] = useState('')
+  const [tried, setTried] = useState(false)
+  const error = teamNameError(name, t)
+  return (
+    <div className="flex flex-col gap-5">
+      <p className="text-sm leading-relaxed text-ink-600">{t('users.teamsHint')}</p>
+      <form
+        noValidate
+        className="grid grid-cols-[minmax(0,1fr)_auto] gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          setTried(true)
+          if (error) return
+          save.mutate(
+            { body: { name: name.trim() } },
+            {
+              onSuccess: () => {
+                toast.success(t('users.teamAdded'))
+                setName('')
+                setTried(false)
+              },
+              onError: (err) => toast.error(err instanceof ApiError ? err.message : t('errors.generic')),
+            },
+          )
+        }}
+      >
+        <TeamNameInput
+          label={t('users.newTeam')}
+          placeholder={t('users.newTeam')}
+          value={name}
+          onChange={setName}
+          error={tried ? error : undefined}
+        />
+        <Button type="submit" className="h-12" loading={save.isPending}>
+          <Plus aria-hidden />
+          {t('users.addTeam')}
+        </Button>
+        <TeamNameError error={tried ? error : undefined} />
+      </form>
+      {dir.loading ? (
+        <ListSkeleton />
+      ) : dir.error ? (
+        <LoadFailed error={dir.error} onRetry={dir.retry} retrying={dir.retrying} />
+      ) : dir.teams.length ? (
+        <ul className="flex flex-col gap-2" aria-label={t('users.teamsTitle')}>
+          {dir.teams.map((team) => (
+            <TeamRow key={`${team.id}:${team.name}`} team={team} />
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-ink-500">{t('users.noTeams')}</p>
+      )}
+    </div>
+  )
+}
+
+function UserRow({ user, isMe, teams }: { user: User; isMe: boolean; teams: TeamDirectory }) {
   const { t } = useTranslation()
   const update = useUpdateUser()
   const operator = user.role === 'operator'
   const locked = isMe || operator
   const lockedReason = isMe ? t('users.selfLocked') : operator ? t('users.operatorLocked') : undefined
-  const patch = (body: { role?: Role; active?: boolean }) =>
+  const patch = (body: { role?: Role; teamId?: string | null; active?: boolean }) =>
     update.mutate(
       { id: user.id, body },
       {
@@ -110,12 +281,24 @@ function UserRow({ user, isMe }: { user: User; isMe: boolean }) {
           </p>
           <p className="truncate text-[13px] text-ink-500">
             {user.email}
-            {user.team ? ` · ${user.team}` : ''}
+            {user.teamId ? ` · ${teams.teamName(user.teamId)}` : ''}
           </p>
           {operator ? <p className="text-[13px] text-ink-500">{t('users.operatorLocked')}</p> : null}
         </div>
       </div>
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:w-72">
+      <div className="grid grid-cols-2 gap-2 sm:w-[28rem] sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+        <Select
+          aria-label={`${user.name} ${t('users.team')}`}
+          value={user.teamId ?? ''}
+          disabled={operator || update.isPending}
+          title={operator ? lockedReason : undefined}
+          onChange={(e) => patch({ teamId: e.target.value || null })}
+        >
+          <TeamOptions teams={teams.teams} />
+          {user.teamId && !teams.teams.some((x) => x.id === user.teamId) ? (
+            <option value={user.teamId}>{teams.teamName(user.teamId)}</option>
+          ) : null}
+        </Select>
         <Select
           aria-label={`${user.name} ${t('users.role')}`}
           value={user.role}
@@ -131,6 +314,7 @@ function UserRow({ user, isMe }: { user: User; isMe: boolean }) {
         </Select>
         <Button
           variant="secondary"
+          className="col-span-2 h-12 sm:col-span-1"
           disabled={locked || update.isPending}
           title={lockedReason}
           onClick={() => patch({ active: !user.active })}
@@ -148,7 +332,9 @@ export default function UsersPage() {
   usePageTitle(t('users.title'))
   const me = useCurrentUser()
   const dir = useDirectory()
+  const teams = useTeamDirectory()
   const [inviting, setInviting] = useState(false)
+  const [managingTeams, setManagingTeams] = useState(false)
 
   return (
     <Page>
@@ -157,10 +343,16 @@ export default function UsersPage() {
           title={t('users.title')}
           description={t('users.subtitle')}
           actions={
-            <Button onClick={() => setInviting(true)}>
-              <UserPlus aria-hidden />
-              {t('users.invite')}
-            </Button>
+            <>
+              <Button variant="secondary" onClick={() => setManagingTeams(true)}>
+                <Users aria-hidden />
+                {t('users.teams')}
+              </Button>
+              <Button onClick={() => setInviting(true)}>
+                <UserPlus aria-hidden />
+                {t('users.invite')}
+              </Button>
+            </>
           }
         />
         <RefreshFailed failed={dir.usersStale} onRetry={dir.retry} retrying={dir.retrying} className="mb-3" />
@@ -173,7 +365,7 @@ export default function UsersPage() {
         ) : (
           <ul className="flex flex-col gap-2">
             {dir.users.map((u) => (
-              <UserRow key={u.id} user={u} isMe={u.id === me.id} />
+              <UserRow key={u.id} user={u} isMe={u.id === me.id} teams={teams} />
             ))}
           </ul>
         )}
@@ -184,7 +376,15 @@ export default function UsersPage() {
         title={t('users.inviteTitle')}
         closeLabel={t('common.close')}
       >
-        {inviting ? <InviteForm onDone={() => setInviting(false)} /> : null}
+        {inviting ? <InviteForm teams={teams.teams} onDone={() => setInviting(false)} /> : null}
+      </Sheet>
+      <Sheet
+        open={managingTeams}
+        onOpenChange={setManagingTeams}
+        title={t('users.teamsTitle')}
+        closeLabel={t('common.close')}
+      >
+        {managingTeams ? <TeamsPanel dir={teams} /> : null}
       </Sheet>
     </Page>
   )

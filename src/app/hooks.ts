@@ -1,8 +1,8 @@
 import { useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useProjects, useUsers } from '@/api/queries'
+import { useProjects, useTeams, useUsers } from '@/api/queries'
 import { appConfig } from '@/config/app.config'
-import type { Project, User } from '@/domain/model'
+import type { Project, Team, User } from '@/domain/model'
 import { hasPermission, type Permission } from '@/domain/roles'
 import { useSession } from '@/stores/session'
 
@@ -24,6 +24,28 @@ export function userCan(user: Pick<User, 'role'> | null | undefined, permission:
 export function useCan(): (permission: Permission) => boolean {
   const user = useSession((s) => s.user)
   return useCallback((p: Permission) => userCan(user, p), [user])
+}
+
+/**
+ * Team names by id. Records keep a team's id, so a renamed team shows its new
+ * name everywhere; read the name through `teamName` (never blank once loaded).
+ */
+export function useTeamDirectory() {
+  const { t } = useTranslation()
+  const teams = useTeams()
+  const { refetch } = teams
+  return useMemo(() => {
+    const map = new Map<string, Team>((teams.data ?? []).map((x) => [x.id, x]))
+    return {
+      teams: teams.data ?? [],
+      teamName: (id: string) => map.get(id)?.name ?? (teams.isPending ? '' : t('common.unknownTeam')),
+      loading: teams.isPending,
+      error: teams.data ? null : teams.error,
+      stale: teams.isRefetchError,
+      retrying: teams.isFetching,
+      retry: () => void refetch(),
+    }
+  }, [t, teams.data, teams.isPending, teams.error, teams.isRefetchError, teams.isFetching, refetch])
 }
 
 /**

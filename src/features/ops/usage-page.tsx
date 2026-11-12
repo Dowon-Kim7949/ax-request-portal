@@ -7,7 +7,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAiUsage } from '@/api/queries'
 import { refreshOf } from '@/api/refresh'
-import { useDirectory } from '@/app/hooks'
+import { useDirectory, useTeamDirectory } from '@/app/hooks'
 import { Page, PageHeader, PageScroll, PageTop } from '@/app/page'
 import { usePageTitle } from '@/app/title'
 import { Badge } from '@/components/ui/badge'
@@ -35,6 +35,7 @@ export default function UsagePage() {
   const { t } = useTranslation()
   usePageTitle(t('usage.title'))
   const dir = useDirectory()
+  const teams = useTeamDirectory()
   const [month, setMonth] = useState(() => hqToday().slice(0, 7))
   const query = useAiUsage(month)
   const u = query.data
@@ -207,7 +208,7 @@ export default function UsagePage() {
                     <CardHeader>
                       <CardTitle id="by-team">{t('usage.byTeam')}</CardTitle>
                     </CardHeader>
-                    <TeamBars rows={u.byTeam} />
+                    <TeamBars rows={u.byTeam} teamName={teams.teamName} />
                     <p className="mt-4 text-xs leading-relaxed text-ink-500">{t('usage.byTeamNote')}</p>
                   </Card>
 
@@ -215,7 +216,7 @@ export default function UsagePage() {
                     <CardHeader>
                       <CardTitle id="by-person">{t('usage.byPerson')}</CardTitle>
                     </CardHeader>
-                    <PeopleList rows={u.byPerson} userName={dir.userName} />
+                    <PeopleList rows={u.byPerson} userName={dir.userName} teamName={teams.teamName} />
                     <p className="mt-4 text-xs leading-relaxed text-ink-500">{t('usage.byPersonNote')}</p>
                   </Card>
                 </div>

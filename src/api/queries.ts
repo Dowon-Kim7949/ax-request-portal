@@ -26,6 +26,7 @@ export const keys = {
   all: ['api'] as const,
   me: () => [...keys.all, 'me'] as const,
   users: () => [...keys.all, 'users'] as const,
+  teams: () => [...keys.all, 'teams'] as const,
   projects: () => [...keys.all, 'projects'] as const,
   requests: () => [...keys.all, 'requests'] as const,
   requestList: (query: QueryOf<typeof api.listRequests>) => [...keys.requests(), 'list', query] as const,
@@ -65,6 +66,14 @@ export function useUsers() {
   return useQuery({
     queryKey: keys.users(),
     queryFn: ({ signal }) => call(api.listUsers, { signal }),
+    staleTime: 60_000,
+  })
+}
+
+export function useTeams() {
+  return useQuery({
+    queryKey: keys.teams(),
+    queryFn: ({ signal }) => call(api.listTeams, { signal }),
     staleTime: 60_000,
   })
 }
@@ -410,6 +419,16 @@ export function useCreateUser() {
   return useMutation({
     mutationFn: (body: BodyOf<typeof api.createUser>) => call(api.createUser, { body }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.users() }),
+  })
+}
+
+export function useSaveTeam() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, body }: { id?: string; body: BodyOf<typeof api.createTeam> }) =>
+      id ? call(api.updateTeam, { params: { id }, body }) : call(api.createTeam, { body }),
+    // A rename changes how people and AI usage are labelled; both read names from this list.
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.teams() }),
   })
 }
 

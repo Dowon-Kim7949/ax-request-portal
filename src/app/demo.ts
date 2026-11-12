@@ -6,7 +6,10 @@
 import type { User } from '@/domain/model'
 import type { Locale } from '@/i18n/locales'
 
-export async function loadDemoAccounts(): Promise<{ accounts: User[]; password: string } | null> {
+/** A demo account on the login screen, with its team's name (the screen is shown signed out). */
+export type DemoAccount = User & { teamName?: string }
+
+export async function loadDemoAccounts(): Promise<{ accounts: DemoAccount[]; password: string } | null> {
   if (__API_MOCK__) {
     const [{ demoAccounts }, { DEMO_PASSWORD }] = await Promise.all([
       import('@/mocks/browser'),

@@ -31,6 +31,7 @@ import {
   RequestStatus,
   RequestType,
   Role,
+  Team,
   Timestamp,
   User,
   VcsProvider,
@@ -137,12 +138,19 @@ export type Session = z.infer<typeof Session>
 export const UserList = named('UserList', z.array(User))
 export const UserCreate = named(
   'UserCreate',
-  z.object({ name: z.string().trim().min(1), email: z.email(), role: Role, team: z.string().optional() }),
+  z.object({ name: z.string().trim().min(1), email: z.email(), role: Role, teamId: z.string().optional() }),
 )
 export const UserPatch = named(
   'UserPatch',
-  z.object({ role: Role.optional(), team: z.string().optional(), active: z.boolean().optional() }),
+  z.object({
+    role: Role.optional(),
+    teamId: z.string().nullable().optional().describe('null takes the person out of their team'),
+    active: z.boolean().optional(),
+  }),
 )
+
+export const TeamList = named('TeamList', z.array(Team))
+export const TeamInput = named('TeamInput', Team.pick({ name: true }))
 
 export const ProjectList = named('ProjectList', z.array(Project))
 export const ProjectInput = named(
@@ -423,6 +431,33 @@ export const api = {
     params: StringIdParam,
     body: UserPatch,
     response: User,
+  }),
+
+  /* teams */
+  listTeams: endpoint({
+    method: 'GET',
+    path: '/teams',
+    tag: 'users',
+    summary: 'Teams, by name (team names are shown with people and in AI usage)',
+    response: TeamList,
+  }),
+  createTeam: endpoint({
+    method: 'POST',
+    path: '/teams',
+    tag: 'users',
+    summary: 'Add a team (user:manage); 400 when the name is taken',
+    body: TeamInput,
+    status: 201,
+    response: Team,
+  }),
+  updateTeam: endpoint({
+    method: 'PATCH',
+    path: '/teams/{id}',
+    tag: 'users',
+    summary: 'Rename a team (user:manage); records follow it by id',
+    params: StringIdParam,
+    body: TeamInput,
+    response: Team,
   }),
 
   /* projects */

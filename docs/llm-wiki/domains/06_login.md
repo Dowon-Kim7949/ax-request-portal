@@ -6,7 +6,7 @@ tags:
 status: verified
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-10
+last_updated: 2026-11-11
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -51,7 +51,7 @@ The `/login` screen: e-mail and password sign-in plus, in mock mode, one-click d
    - It matches a route other than the catch-all `*`, and no matched route is `/login` (in any case, trailing slash or percent-encoded form).
    - The new user holds every matched route's `handle.permission` (`userCan`, so `appConfig.rolePermissions` applies). A `handle.redirectTo` (an old address) is followed, at most three times, and the destination is checked the same way.
    - After a session ended in this tab, `next` is the page that person had open: only the same user returns to it; anyone else starts at home.
-5. Demo accounts (mock mode only) are one button per role — requester, executive, developer, admin, operator (`operator@example.com`) — labelled with the role, name and team. The hint shows the shared demo password. Buttons are disabled while a login is in flight.
+5. Demo accounts (mock mode only) are one button per role — requester, executive, developer, admin, operator (`operator@example.com`) — labelled with the role, name and team (the mock adds the team's name, since the teams list needs a sign-in). The hint shows the shared demo password. Buttons are disabled while a login is in flight.
 
 ## Session expiry notice
 

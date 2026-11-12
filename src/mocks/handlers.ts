@@ -188,6 +188,13 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
       ({ store, me, params, body }) => store.engine.updateUser(me, params.id, body),
       edit,
     ),
+    route(api.listTeams, ({ store }) => store.engine.teams()),
+    route(api.createTeam, ({ store, me, body }) => store.engine.createTeam(me, body), edit),
+    route(
+      api.updateTeam,
+      ({ store, me, params, body }) => store.engine.updateTeam(me, params.id, body),
+      edit,
+    ),
 
     /* projects */
     route(api.listProjects, ({ store }) => store.engine.state.projects),

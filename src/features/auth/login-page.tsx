@@ -9,7 +9,7 @@ import { ApiError } from '@/api/client'
 import type { Session } from '@/api/contract'
 import { useLogin } from '@/api/queries'
 import { useBrand } from '@/app/brand'
-import { loadDemoAccounts } from '@/app/demo'
+import { loadDemoAccounts, type DemoAccount } from '@/app/demo'
 import { DemoBanner } from '@/app/demo-banner'
 import { QuickDisplayToggles } from '@/app/display-controls'
 import { usePageTitle } from '@/app/title'
@@ -57,7 +57,7 @@ export default function LoginPage() {
   const [params] = useSearchParams()
   const next = params.get('next')
   const login = useLogin()
-  const [demo, setDemo] = useState<{ accounts: User[]; password: string } | null>(null)
+  const [demo, setDemo] = useState<{ accounts: DemoAccount[]; password: string } | null>(null)
 
   // Reload on language change: untouched demo data is rebuilt in the new language.
   useEffect(() => {
@@ -178,7 +178,8 @@ export default function LoginPage() {
                           {t('auth.demoAs', { role: t(`role.${u.role}`) })}
                         </span>
                         <span className="truncate text-xs text-ink-500">
-                          {u.name} · {u.team}
+                          {u.name}
+                          {u.teamName ? ` · ${u.teamName}` : ''}
                         </span>
                       </span>
                       <ChevronRight className="size-4 text-ink-400" aria-hidden />

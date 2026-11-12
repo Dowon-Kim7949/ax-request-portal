@@ -25,6 +25,23 @@ test('admin changes a role and adds a project', async ({ page }) => {
   await expect(page.getByText('저장했어요.')).toBeVisible()
   await expectNoHorizontalScroll(page)
 
+  // Teams: add one, move someone into it, rename it; the person follows the new name.
+  await page.getByRole('button', { name: '팀 관리' }).click()
+  const teams = page.getByRole('dialog', { name: '팀' })
+  await teams.getByLabel('새 팀 이름').fill('AX 추진팀')
+  await teams.getByRole('button', { name: '팀 추가' }).click()
+  await expect(page.getByText('팀을 추가했어요.')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.getByLabel('이영업 팀').selectOption({ label: 'AX 추진팀' })
+  await expect(page.getByText('sales@example.com · AX 추진팀')).toBeVisible()
+  await page.getByRole('button', { name: '팀 관리' }).click()
+  await teams.getByLabel('팀 이름: AX 추진팀').fill('AX 혁신팀')
+  await teams.getByRole('button', { name: 'AX 추진팀 이름 저장' }).click()
+  await expect(page.getByText('팀 이름을 바꿨어요.')).toBeVisible()
+  await expectNoHorizontalScroll(page)
+  await page.keyboard.press('Escape')
+  await expect(page.getByText('sales@example.com · AX 혁신팀')).toBeVisible()
+
   await openInApp(page, '/admin/projects')
   await page.getByRole('button', { name: '프로젝트 추가' }).click()
   const form = page.getByRole('dialog', { name: '프로젝트 추가' })
