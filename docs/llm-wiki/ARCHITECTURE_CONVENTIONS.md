@@ -2,11 +2,11 @@
 title: Architecture Conventions
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: architecture_conventions
 project: ax-request-portal
-last_updated: 2026-11-11
+last_updated: 2026-11-12
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -212,7 +212,7 @@ Two clocks matter ([Glossary](GLOSSARY.md)):
 
 ## Configuration
 
-- Template users change `src/config/app.config.ts`: brand (per locale), organization (`timeZone`, an IANA name for the head office's business calendar, and `timeZoneLabel` per locale), locales and default locale, enabled roles, role permissions, request types, workflow (`scopeCheck`: ask the requester to confirm the AI's reading before developer review; the mock follows it and a real backend should read the same setting), mock timings, and `drafts.maxPerAccount` (saved drafts per account, 20; the API refuses more). `AppConfigSchema` validates it at start-up and refuses a configuration without `admin`, without an active role that can manage users, with a default locale that is not enabled, or with an unknown time zone.
+- Template users change `src/config/app.config.ts`: brand (per locale), organization (`timeZone`, an IANA name for the head office's business calendar, and `timeZoneLabel` per locale), locales and default locale, enabled roles, role permissions, request types, workflow (`scopeCheck`: ask the requester to confirm the AI's reading before developer review; the mock follows it and a real backend should read the same setting), mock timings, `drafts.maxPerAccount` (saved drafts per account, 20; the API refuses more), and `notifications.channels` (the channels besides in-app that the backend sends; settings offers a switch only for these). `AppConfigSchema` validates it at start-up and refuses a configuration without `admin`, without an active role that can manage users, with a default locale that is not enabled, or with an unknown time zone.
 - Colours are tokens in `src/index.css`; texts are in `src/i18n/`; demo accounts and seed data are in `src/mocks/seed.ts`.
 
 ## i18n

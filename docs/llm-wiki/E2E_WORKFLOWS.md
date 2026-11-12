@@ -2,11 +2,11 @@
 title: E2E Workflows
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: e2e_workflows
 project: ax-request-portal
-last_updated: 2026-11-11
+last_updated: 2026-11-12
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -112,7 +112,7 @@ Every user workflow is tested end to end against the production build with the i
 - Reproducing conditions from a static page (`/favicon.svg`, the app not running): a load failure — store one request's title in `ax-request-portal:mock-db` as a number, which the client rejects as `contract_violation` and does not retry, so `LoadFailed` shows at once; a session expiry — replace the stored token with `mock-token.no-such-user`, so the next call is a `401`.
 - `boot.spec.ts` navigates with `waitUntil: 'commit'` and tolerates an `interrupted` navigation, because the app's own recovery may reload the page once; it then asserts the end state (a visible `h1`, no page errors other than the service-worker ones). Leave the login screen only after the app has started: leaving it during the first load races WebKit's service-worker installation.
 - The worker-restart test in `mock-api.spec.ts` stops the service worker with the Chrome DevTools Protocol (`ServiceWorker.stopAllWorkers`), so it is skipped in the WebKit projects (phone, tablet). It then opens a screen whose data is not cached yet, without reloading, because a reload would register the worker again and hide the bug.
-- `update.spec.ts` fakes a deployment by routing `version.json` and a page chunk on both the page and its context: with the mock's service worker in between, Chromium shows a request the worker passes on only to context routes, and WebKit shows it to neither, so the spec skips WebKit. It waits for each `version.json` response, because checks made while one is in flight share its answer.
+- `update.spec.ts` fakes a deployment by routing `version.json` and a page chunk on both the page and its context: with the mock's service worker in between, Chromium shows a request the worker passes on only to context routes, and WebKit shows it to neither, so the spec skips WebKit. It waits for each `version.json` response, because checks made while one is in flight share its answer. The chunk route is installed before sign-in: the shell preloads the menu's pages once the first screen is up, and a chunk loaded before the route was set would never fail.
 - The wizard registers `beforeunload` while something is written. Playwright accepts that dialog automatically only when no listener is registered, so a test that reloads or leaves a filled wizard must handle the dialog.
 - Saved drafts: `seedSavedDrafts` (signed in, then reload) makes four account drafts plus, on this device, newer words over one of them that was saved elsewhere since (a conflict) and a draft the account does not have; titles per language are `SEEDED_DRAFTS`. `keepDraftOffline` makes saving one draft fail like a lost connection by wrapping `window.fetch` in an init script: `page.route` does not see requests the mock's service worker answers. It relies on the client looking up the global `fetch` at each call (`src/api/client.ts`).
 - A draft is saved to the account about a second after typing stops (`DRAFT_SYNC_DELAY_MS`); wait for "계정에 저장됨" before reloading or switching device.

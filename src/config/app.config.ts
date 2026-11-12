@@ -39,6 +39,10 @@ export const appConfig: AppConfig = AppConfigSchema.parse({
   drafts: {
     maxPerAccount: 20,
   },
+  /** Remove a channel your backend does not send: its switch leaves the settings screen. */
+  notifications: {
+    channels: ['email', 'messenger'],
+  },
   mock: {
     reportSeconds: 6,
     workSeconds: 20,

@@ -50,12 +50,13 @@ test('a new deployment is announced, and the reload button loads it', async ({ p
 })
 
 test('a screen whose code was replaced by a deployment explains why it failed', async ({ page }) => {
+  // After a deployment the old hashed chunk files are gone. Gone from the start: the shell
+  // preloads the menu's pages once the first screen is up, and must not get this one.
+  await intercept(page, SCHEDULE_CHUNK, (route) => route.fulfill({ status: 404 }))
   await loginAs(page, '요청자')
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
 
-  // After a deployment the old hashed chunk files are gone.
   await deployNewBuild(page)
-  await intercept(page, SCHEDULE_CHUNK, (route) => route.fulfill({ status: 404 }))
   await page.getByRole('link', { name: '배포 일정' }).click()
 
   await expect(page.getByText('새 버전이 나왔어요')).toBeVisible()

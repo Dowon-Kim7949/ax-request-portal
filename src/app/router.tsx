@@ -5,6 +5,7 @@ import type { Permission } from '@/domain/roles'
 import { BootScreen } from './boot'
 import { LOGIN_PATH, RequireAuth, RequirePermission, SessionSync } from './guards'
 import { NotFoundPage, RouteErrorPage } from './pages'
+import { setPreloadRoutes } from './page-preload'
 import { checkForUpdateNow } from './update-check'
 import { AppShell } from './shell'
 
@@ -26,6 +27,8 @@ export interface RouteHandle {
   permission?: Permission
   /** An old address that forwards here; the post-login redirect follows it */
   redirectTo?: string
+  /** Loads the page's code ahead of a visit (`preloadPage`, src/app/page-preload.ts) */
+  preload?: () => Promise<unknown>
 }
 
 /**
@@ -34,9 +37,9 @@ export interface RouteHandle {
  */
 function page(
   load: () => Promise<{ default: ComponentType }>,
-  options?: Omit<RouteHandle, 'fit'>,
+  options?: Omit<RouteHandle, 'fit' | 'preload'>,
 ): Pick<RouteObject, 'handle' | 'lazy'> {
-  const handle: RouteHandle = { ...options, fit: true }
+  const handle: RouteHandle = { ...options, fit: true, preload: load }
   const permission = handle.permission
   return {
     handle,
@@ -169,5 +172,6 @@ export const routes: RouteObject[] = [
 ]
 
 export function createRouter() {
+  setPreloadRoutes(routes)
   return createBrowserRouter(routes, { basename: env.base.replace(/\/$/, '') || '/' })
 }

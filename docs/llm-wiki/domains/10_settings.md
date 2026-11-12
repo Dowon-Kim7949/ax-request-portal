@@ -2,11 +2,11 @@
 title: Settings
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-10
+last_updated: 2026-11-12
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -75,7 +75,7 @@ The "Time zone" card decides how timestamps are shown on this device ([Glossary]
 
 ## Notification preferences
 
-Four switches — in-app, e-mail, messenger, only when action is required. Each switch sends the whole settings object.
+Up to four switches — in-app, e-mail, messenger, only when action is required. E-mail and messenger appear only when `notifications.channels` in `src/config/app.config.ts` lists them (both by default), with a note that the backend sends them; a deployment whose backend sends neither shows the two in-app switches and no note (`notificationRows`). The contract keeps every field either way. Each switch sends the whole settings object.
 
 | Hook | Endpoint | Payload → response | Notes |
 | --- | --- | --- | --- |
@@ -102,7 +102,7 @@ The settings apply when a notification is created, not retroactively (see [Notif
 
 ## Open Questions
 
-- E-mail and messenger switches have no delivery behind them in the template; a real backend decides whether to implement or remove them.
+- E-mail and messenger switches have no delivery behind them in the template: a real backend implements the channels it keeps and removes the others from `notifications.channels`.
 
 ## Review Notes
 

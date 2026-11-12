@@ -695,7 +695,8 @@ export const api = {
     method: 'GET',
     path: '/releases',
     tag: 'insights',
-    summary: 'Planned and past releases grouped by date and project',
+    summary:
+      'Planned and past releases grouped by date and project, company-wide for every viewer (schedule:view); cancelled and rejected requests are left out',
     query: z.object({ from: CalendarDate.optional(), to: CalendarDate.optional() }),
     response: ReleaseScheduleList,
   }),

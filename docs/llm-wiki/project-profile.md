@@ -2,11 +2,11 @@
 title: Project Profile
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: project_profile
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-12
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -73,7 +73,7 @@ React 19, TypeScript (strict), Vite 8 (Rolldown), React Router 8 (data router, S
 
 ## Open Questions
 
-- The repository is a template: anything organisation-specific (brand, head-office time zone, roles, request types, repository providers) is expected to change in `src/config/app.config.ts` and the seed, not in feature code.
+- The repository is a template: anything organisation-specific (brand, head-office time zone, roles, request types, notification channels, repository providers) is expected to change in `src/config/app.config.ts` and the seed, not in feature code.
 
 ## Review Notes
 

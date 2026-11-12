@@ -2,8 +2,8 @@
 title: AI Operations
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
 last_updated: 2026-11-12
@@ -134,7 +134,7 @@ All calls carry the bearer token; failed changes show `toast.error` with the loc
 - `src/features/ops/agents-page.tsx#symbol:AgentsPage`, `src/features/ops/pricing-page.tsx#symbol:PricingPage`, `src/features/ops/budget-page.tsx#symbol:BudgetPage` — the editing screens.
 - `src/domain/ai.ts#symbol:normalizeUsage`, `src/domain/ai.ts#symbol:bookUsage`, `src/domain/ai.ts#symbol:resolveSelection`, `src/domain/ai.ts#symbol:overRequestLimit` — the rules, shared by UI, mock and a future backend; `src/domain/ai.test.ts` covers them.
 - `src/components/ai/provider.ts#symbol:useModelLabel` — model display names and provider colours.
-- `src/config/ai.ts#symbol:DEFAULT_AI_PRICING` — starting prices (checked 2026-11-03) and default models; the exchange rate is a placeholder.
+- `src/config/ai.ts#symbol:DEFAULT_AI_PRICING` — starting prices (checked 2026-11-12, against both providers' pricing pages) and default models; the exchange rate is a placeholder.
 - `src/mocks/engine.ts#symbol:bookAi`, `src/mocks/engine.ts#symbol:startedBy`, `src/mocks/engine.ts#symbol:present`, `src/mocks/engine.ts#symbol:aiUsageReport` and the settings/key/pricing methods — server-side behaviour; `src/mocks/api.test.ts#L421-L643` ("AI budget", "AI operations", including who each call is booked against).
 - `src/domain/model.ts#symbol:checkBudgetLimits`, `src/domain/model.ts#symbol:perRequestLimitFits`, `src/domain/model.ts#symbol:BUDGET_LIMIT_MAX_KRW`, `src/domain/model.ts#symbol:YearMonth`, `src/domain/budget.test.ts`, `src/features/ops/budget-page.test.tsx` — budget limits and their form.
 - `src/mocks/engine.ts#symbol:businessDate`, `src/lib/format.ts#L162-L175` (`formatKrw`) — business-calendar totals; Korean amounts. Cited by line range: `format.ts` is a hub file, and only this function matters here.
@@ -142,7 +142,6 @@ All calls carry the bearer token; failed changes show `toast.error` with the loc
 
 ## Open Questions
 
-- OpenAI cache-write prices other than GPT-6 Astra are derived from the 1.25× input rule, and the OpenAI pricing page showed a promotional-price notice when checked; confirm before relying on them.
 - Per-user ChatGPT or Claude subscription sign-in is not offered: as checked on 2026-11-03, Anthropic does not allow third-party products to offer claude.ai login without approval, and OpenAI documents ChatGPT-plan sign-in only for open-source or locally hosted apps.
 
 ## Review Notes

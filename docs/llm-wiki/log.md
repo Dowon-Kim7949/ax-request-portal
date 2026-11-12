@@ -24,6 +24,30 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-12 - Page preloading; the schedule says what may be opened; server search; notification channels; prices checked
+
+- status: needs_review
+- actor: claude-code
+- scope: frontend, contract, mock, config
+- changed:
+  - src/app/page-preload.ts (new), src/app/router.tsx (`handle.preload`, `setPreloadRoutes`), src/app/shell.tsx (preload on intent and when idle), e2e/update.spec.ts
+  - src/domain/model.ts (`ReleaseScheduleItem.requests[].canOpen`), src/api/contract.ts (`GET /releases` states it is company-wide), docs/openapi.json, src/mocks/engine.ts, src/features/schedule/
+  - src/features/requests/my-requests-page.tsx (search through `q`)
+  - src/config/schema.ts, src/config/app.config.ts (`notifications.channels`), src/features/settings/ (`notificationRows`)
+  - src/config/ai.ts (Claude Sonnet 5.5 cache read 0.1, `asOf` 2026-11-12)
+  - docs/llm-wiki/profiles/frontend.md, docs/llm-wiki/ARCHITECTURE_CONVENTIONS.md, docs/llm-wiki/E2E_WORKFLOWS.md, docs/llm-wiki/domains/08_requests.md, docs/llm-wiki/domains/09_schedule.md, docs/llm-wiki/domains/10_settings.md, docs/llm-wiki/domains/13_ops.md
+  - docs/llm-wiki/domains/07_notifications.md, docs/llm-wiki/project-profile.md (a line each); status only, they cite a changed source and still hold: COMPONENT_INVENTORY, DOMAIN_FEATURES, GLOSSARY, WCAG, domains/00, 01, 02, 03, 11, 12
+- summary:
+  - Menu pages load ahead: on pointer, touch or focus over an item, and all of them once the browser is idle after the first screen (not when the viewer saves data).
+  - The schedule is company-wide by contract. Each listed request carries `canOpen`; someone else's request is listed without a link instead of leading to a "not found" page.
+  - My requests searches on the server (`q`, 250 ms after typing pauses); the filter's counts still count every request.
+  - E-mail and messenger switches follow `notifications.channels`.
+  - Seed prices re-checked against both providers' pricing pages: Claude Sonnet 5.5 cache reads are 0.05× input ($0.10); OpenAI lists a cache-write price per model, so none is derived any more.
+- evidence:
+  - src/app/page-preload.test.ts, src/mocks/calendar.test.ts, src/features/schedule/schedule-page.test.tsx, src/features/requests/my-requests-page.test.tsx, src/features/settings/notification-rows.test.ts
+- caveats:
+  - A demo browser that already holds mock data keeps its old Sonnet price until the data is reset; prices are operator data at runtime.
+
 ## 2026-11-12 - Navigation feedback and a page fade; the schedule's empty month and view switch
 
 - status: needs_review
