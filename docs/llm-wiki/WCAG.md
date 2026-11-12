@@ -2,11 +2,11 @@
 title: Accessibility (WCAG)
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: wcag
 project: ax-request-portal
-last_updated: 2026-11-11
+last_updated: 2026-11-12
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -31,8 +31,8 @@ evidence:
   - src/features/wizard/draft-status.tsx#symbol:DraftStatusBar
   - src/theme.test.ts#symbol:PAIRS
   - src/theme.test.ts#L37-L39
-  - src/index.css#L200-L234
-  - src/index.css#L236-L249
+  - src/index.css#L210-L244
+  - src/index.css#L246-L259
   - src/app/shell.tsx#symbol:SkipLink
   - src/app/shell.tsx#symbol:Sidebar
   - src/i18n/en.ts#symbol:skipToContent
@@ -89,7 +89,7 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 - `Button` sets `aria-busy` while `loading`, so the busy cursor and screen-reader state come from one prop.
 - Focus is shown by one global `:focus-visible` outline (2 px, offset 2 px, brand colour).
 - Form controls use 16 px text on coarse pointers so iOS does not zoom on focus.
-- Reduced motion: under `prefers-reduced-motion: reduce` every animation and transition finishes in 0.01 ms and smooth scrolling is off (`src/index.css`). Near-zero rather than `none`, so `animationend` / `transitionend` handlers still run. `e2e/a11y.spec.ts` counts elements that would move and expects none under reduce.
+- Reduced motion: under `prefers-reduced-motion: reduce` every animation and transition finishes in 0.01 ms and smooth scrolling is off (`src/index.css`). Near-zero rather than `none`, so `animationend` / `transitionend` handlers still run. `e2e/a11y.spec.ts` counts elements that would move and expects none under reduce. The page fade on a screen change runs through the Web Animations API, which the stylesheet rule does not reach, so `usePageFade` checks the media query itself and skips it; the navigation progress bar stands still (`motion-reduce:animate-none`).
 - Touch targets are 44 px (`h-11` / `size-11`); the phone tab bar is taller. `Button size="sm"` is the documented exception. Sonner's toast action button is 24 px; a toast whose action matters on a phone raises it to 44 px (`UpdateNotice`).
 
 ## Semantics and focus management
@@ -125,7 +125,7 @@ The target is WCAG 2.2 AA on phone, tablet and desktop. Colour contrast is enfor
 ## Evidence
 
 - `src/theme.test.ts#symbol:PAIRS` — the 43 checked pairs; `src/theme.test.ts#L37-L39` — the 4.5:1 and 3:1 thresholds.
-- `src/index.css#L200-L234` — focus outline and cursor contract; `src/index.css#L236-L249` — reduced-motion rule.
+- `src/index.css#L210-L244` — focus outline and cursor contract; `src/index.css#L246-L259` — reduced-motion rule.
 - `src/components/request/request-card.tsx#symbol:RequestDates` — a past-due date in words as well as colour.
 - `src/app/page.tsx#symbol:PageScroll`, `e2e/fit.spec.ts` — the big-screen list region: when it applies, its name and keyboard access.
 - `src/app/shell.tsx#symbol:Sidebar`, `e2e/a11y.spec.ts` — the tablet rail's menu as a modal dialog.

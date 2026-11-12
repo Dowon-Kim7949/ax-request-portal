@@ -33,7 +33,7 @@ test('the release schedule shows a month at a time on a tablet or a desktop, and
   await openInApp(page, '/schedule')
   await expect(page.getByRole('heading', { level: 1, name: '배포 일정' })).toBeVisible()
 
-  await page.getByRole('radiogroup', { name: '보기' }).getByRole('radio', { name: '월' }).click()
+  await page.getByRole('radiogroup', { name: '보기' }).getByRole('radio', { name: '달력' }).click()
   await expect(page).toHaveURL((url) => url.searchParams.get('view') === 'month')
   const thisMonth = hqDate(0).slice(0, 7)
   await expect(page.getByRole('table', { name: monthName(thisMonth) })).toBeVisible()

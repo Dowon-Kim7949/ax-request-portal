@@ -24,6 +24,25 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-12 - Navigation feedback and a page fade; the schedule's empty month and view switch
+
+- status: needs_review
+- actor: claude-code
+- scope: frontend
+- changed:
+  - src/app/navigation-feedback.ts, src/app/navigation-progress.tsx (new), src/app/shell.tsx, src/index.css (`progress` animation)
+  - src/components/ui/segmented.tsx (optional `icon`)
+  - src/features/schedule/schedule-page.tsx, src/i18n/ko.ts, src/i18n/en.ts (`schedule.viewMonth`: 달력 / Calendar)
+  - docs/llm-wiki/profiles/frontend.md, docs/llm-wiki/WCAG.md, docs/llm-wiki/COMPONENT_INVENTORY.md, docs/llm-wiki/domains/09_schedule.md
+  - docs/llm-wiki/ARCHITECTURE_CONVENTIONS.md, docs/llm-wiki/DOMAIN_FEATURES.md, docs/llm-wiki/E2E_WORKFLOWS.md (status only: they cite a changed source, and what they say still holds)
+- summary:
+  - A navigation pending for more than 150 ms (a page's code loading on its first visit) shows a thin progress bar at the top and marks `main` busy; a change of screen fades the page in over 160 ms. Both respect reduced motion.
+  - The schedule's "No releases this month." moved onto the month's line, after "This month", as a status region. The view switch reads "List | Calendar" with icons.
+- evidence:
+  - src/app/navigation-feedback.test.tsx, src/features/schedule/schedule-page.test.tsx, e2e/schedule.spec.ts, e2e/a11y.spec.ts, e2e/axe.spec.ts
+- caveats:
+  - None.
+
 ## 2026-11-11 - Teams are records; AI usage follows a renamed team
 
 - status: needs_review

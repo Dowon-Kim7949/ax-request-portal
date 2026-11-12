@@ -88,7 +88,7 @@ describe('the month view of the release schedule', () => {
     expect(within(view).getByRole('radio', { name: '목록' })).toHaveAttribute('aria-checked', 'true')
     expect(await screen.findByRole('heading', { name: '이번 주' })).toBeInTheDocument()
 
-    await user.click(within(view).getByRole('radio', { name: '월' }))
+    await user.click(within(view).getByRole('radio', { name: '달력' }))
     expect(await screen.findByRole('table', { name: '2026년 11월' })).toBeInTheDocument()
     expect(where()).toBe('/schedule?view=month')
 

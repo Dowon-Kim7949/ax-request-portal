@@ -1,10 +1,14 @@
+import type { ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 
 interface SegmentedProps<T extends string> {
   value: T
   onChange: (value: T) => void
-  /** `lang` marks a label written in another language (e.g. "한국어" in the English UI) */
-  options: ReadonlyArray<{ value: T; label: string; count?: number; lang?: string }>
+  /**
+   * `lang` marks a label written in another language (e.g. "한국어" in the English UI).
+   * `icon` (decorative, `aria-hidden`) goes before the label, which stays: it is the radio's name.
+   */
+  options: ReadonlyArray<{ value: T; label: string; icon?: ReactNode; count?: number; lang?: string }>
   label: string
   className?: string
 }
@@ -43,6 +47,7 @@ export function Segmented<T extends string>({
                 : 'bg-surface text-ink-600 ring-1 ring-line ring-inset hover:bg-muted',
             )}
           >
+            {o.icon ? <span className="inline-flex [&>svg]:size-4">{o.icon}</span> : null}
             {o.label}
             {o.count !== undefined ? (
               <span className={cn('text-xs', active ? 'text-on-inverse/70' : 'text-ink-400')}>{o.count}</span>
