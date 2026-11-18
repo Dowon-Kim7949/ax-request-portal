@@ -18,6 +18,7 @@ import type {
   RequestSubmission,
   SavedDraft,
   SavedDraftSummary,
+  SetupLink,
 } from '../api/contract'
 import { appConfig } from '../config/app.config'
 import {
@@ -83,10 +84,27 @@ import { renderNotification, type ErrorKey, type NotificationKey, type ServerLan
 /* ------------------------------------------------------------------ */
 
 /** Bump when the stored shape changes: older demo data is discarded and reseeded. */
-export const STATE_VERSION = 8
+export const STATE_VERSION = 9
+
+/** How long a setup link works. The reference server's default is the same. */
+export const SETUP_LINK_HOURS = 72
+
+/** A one-time link to set a password. The token is the link's secret. */
+export interface StoredSetupLink {
+  userId: string
+  token: string
+  expiresAt: string
+}
 
 /** Notifications kept per person; older ones are dropped as new ones arrive. */
 export const NOTIFICATIONS_PER_USER_MAX = 200
+
+/** 192 random bits as hex: the secret of a setup link. */
+function randomToken(): string {
+  return Array.from(crypto.getRandomValues(new Uint8Array(24)), (b) => b.toString(16).padStart(2, '0')).join(
+    '',
+  )
+}
 
 /** What the operator configures. Keys are never stored, only their last four characters. */
 export interface AiOperations {
@@ -155,6 +173,15 @@ export interface MockState {
   attachments: StoredAttachment[]
   /** Unsubmitted requests, saved per person; the most recently changed last */
   drafts: StoredDraft[]
+  /**
+   * Passwords set through setup links, by user id. A seeded account has no
+   * entry and signs in with the demo password; an account added in the app
+   * starts at `null` and cannot sign in until its link is used. Demo data in
+   * the browser, never a real secret store.
+   */
+  passwords: Record<string, string | null>
+  /** At most one per person: making a new link replaces the old one */
+  setupLinks: StoredSetupLink[]
 }
 
 export interface EngineOptions {
@@ -1071,6 +1098,40 @@ export class MockEngine {
     if (input.teamId !== undefined) this.findTeam(input.teamId)
     const user: User = { id: this.newId('u'), active: true, ...input }
     this.state.users.push(user)
+    // No password yet: the person sets one through a setup link.
+    this.state.passwords[user.id] = null
+    return user
+  }
+
+  /** A one-time link for the person to set or reset their password; replaces an unused one. */
+  createSetupLink(actor: User, id: string, now: Date): SetupLink {
+    this.require(actor, 'user:manage')
+    const user = this.state.users.find((u) => u.id === id)
+    if (!user) throw new HttpError(404, 'not_found', 'userNotFound')
+    if (user.role === 'operator') throw new HttpError(403, 'forbidden', 'operatorProvisioned')
+    if (!user.active) throw new HttpError(400, 'bad_request', 'setupLinkInactive')
+    const link: StoredSetupLink = {
+      userId: id,
+      token: randomToken(),
+      expiresAt: new Date(now.getTime() + SETUP_LINK_HOURS * 3_600_000).toISOString(),
+    }
+    this.state.setupLinks = [...this.state.setupLinks.filter((l) => l.userId !== id), link]
+    return { token: link.token, expiresAt: link.expiresAt }
+  }
+
+  /**
+   * Uses a setup link: the person's password becomes `password` and the link
+   * ends. An unknown, used or expired link, or a deactivated account, is
+   * refused the same way.
+   */
+  completeSetup(token: string, password: string, now: Date): User {
+    const link = this.state.setupLinks.find((l) => l.token === token)
+    const user = link && this.state.users.find((u) => u.id === link.userId)
+    if (!link || !user?.active || Date.parse(link.expiresAt) <= now.getTime()) {
+      throw new HttpError(401, 'unauthorized', 'setupLinkInvalid')
+    }
+    this.state.setupLinks = this.state.setupLinks.filter((l) => l !== link)
+    this.state.passwords[user.id] = password
     return user
   }
 

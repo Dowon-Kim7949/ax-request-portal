@@ -262,6 +262,19 @@ export function useLogin() {
   })
 }
 
+/** Sets a password with a setup link and signs in, like `useLogin`: nothing of a previous session survives. */
+export function useCompleteSetup() {
+  const setSession = useSession((s) => s.setSession)
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: BodyOf<typeof api.completeSetup>) => call(api.completeSetup, { body }),
+    onSuccess: (session) => {
+      qc.clear()
+      setSession(session)
+    },
+  })
+}
+
 /**
  * Signing out on purpose: the login screen then starts fresh, without `next`
  * (see RequireAuth), and the person's drafts kept on this device are deleted
@@ -419,6 +432,13 @@ export function useCreateUser() {
   return useMutation({
     mutationFn: (body: BodyOf<typeof api.createUser>) => call(api.createUser, { body }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.users() }),
+  })
+}
+
+/** A one-time link for someone to set or reset their password. Changes nothing a list shows. */
+export function useCreateSetupLink() {
+  return useMutation({
+    mutationFn: ({ id }: { id: string }) => call(api.createSetupLink, { params: { id } }),
   })
 }
 

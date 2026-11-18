@@ -73,6 +73,7 @@ Terms as the code uses them. Identifiers are kept in English in both UI language
 | Requester status (`RequesterStatus`) | Plain-language status shown to people without `report:read`. | `src/domain/lifecycle.ts` |
 | Responsible developer | Holds `request:review` and is an admin, the assignee or a project owner (`isResponsibleDeveloper`). | `src/domain/lifecycle.ts` |
 | Role | `requester`, `executive`, `developer`, `admin`, `operator`. | `src/domain/model.ts` |
+| Setup link (`SetupLink`; "설정 링크") | A one-time link an admin makes for a person to set or reset their password (`/setup#token=…`). Only the newest one of a person works; it ends when used or when it expires. | `src/api/contract.ts` |
 | Permission | One of thirteen capability strings such as `request:create` or `dashboard:view`; roles map to sets of them. | `src/domain/roles.ts` |
 | Executive | A requester who may also read all requests and the dashboard. | `src/domain/roles.ts` |
 | Operator | The person running the service's AI side: providers and keys, model per task, prices, AI budget and usage. Provisioned by the service, not by an admin. | `src/domain/roles.ts` |

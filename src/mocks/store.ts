@@ -95,6 +95,23 @@ export function stateProblem(value: unknown): string | null {
   }
 
   if (!isRecord(value.notificationSettings)) return 'notificationSettings is missing'
+  const passwords = value.passwords
+  if (!isRecord(passwords) || !Object.values(passwords).every((p) => p === null || typeof p === 'string')) {
+    return 'passwords is not a map'
+  }
+  const links = value.setupLinks
+  if (
+    !Array.isArray(links) ||
+    !links.every(
+      (l) =>
+        isRecord(l) &&
+        typeof l.userId === 'string' &&
+        typeof l.token === 'string' &&
+        typeof l.expiresAt === 'string',
+    )
+  ) {
+    return 'setupLinks is not a list of links'
+  }
   const budget = value.budget
   if (
     !isRecord(budget) ||

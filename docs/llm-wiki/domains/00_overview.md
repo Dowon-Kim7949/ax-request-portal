@@ -2,11 +2,11 @@
 title: Domain Overview
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain_overview
 project: ax-request-portal
-last_updated: 2026-11-12
+last_updated: 2026-11-18
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -88,6 +88,7 @@ Thirteen statuses (`RequestStatus`) and sixteen events (`TRANSITIONS` in `src/do
 | --- | --- | --- |
 | [Auth](02_auth.md) | guards, session, permissions | everyone |
 | [Login](06_login.md) | `/login` | anonymous |
+| [Auth](02_auth.md) | `/setup` (a setup link: set a password, then signed in) | anyone holding the link |
 | [Home](05_home.md) | `/` | everyone, composed by permission |
 | [Request Wizard](11_wizard.md) | `/requests/new` | `request:create` |
 | [My Requests](08_requests.md) | `/requests` | `request:read:own` |

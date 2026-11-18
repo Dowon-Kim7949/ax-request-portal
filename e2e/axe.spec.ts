@@ -71,6 +71,20 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await scan(page, '/login')
     })
 
+    test('setup screen', async ({ page }) => {
+      await page.goto('/setup#token=not-a-real-token')
+      await expect(page.getByRole('heading', { level: 1, name: '비밀번호 설정' })).toBeVisible({
+        timeout: COLD_START_TIMEOUT,
+      })
+      await scan(page, '/setup')
+      // A wrong link is only found out on submitting; the answer is part of the screen.
+      await page.getByLabel('새 비밀번호', { exact: true }).fill('a long enough passphrase')
+      await page.getByLabel('새 비밀번호 확인').fill('a long enough passphrase')
+      await page.getByRole('button', { name: '비밀번호 정하고 로그인' }).click()
+      await expect(page.getByRole('alert')).toBeVisible()
+      await scan(page, '/setup (link refused)')
+    })
+
     test('requester screens', async ({ page }) => {
       test.setTimeout(90_000)
       await loginAs(page, '요청자')
@@ -184,6 +198,10 @@ for (const colorScheme of ['light', 'dark'] as const) {
       await page.getByRole('button', { name: '팀 관리' }).click()
       await expect(page.getByRole('dialog', { name: '팀' })).toBeVisible()
       await scan(page, '/admin/users (teams sheet)')
+      await page.keyboard.press('Escape')
+      await page.getByRole('button', { name: '이영업 비밀번호 설정 링크 만들기' }).click()
+      await expect(page.getByRole('dialog', { name: '이영업님의 비밀번호 설정 링크' })).toBeVisible()
+      await scan(page, '/admin/users (setup link sheet)')
       await page.keyboard.press('Escape')
       await visit(page, '/admin/projects')
       await page.getByRole('button', { name: '프로젝트 추가' }).click()

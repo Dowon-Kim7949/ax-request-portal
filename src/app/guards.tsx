@@ -11,6 +11,8 @@ import { PagePlain } from './page'
 import { useSessionSync } from './session-sync'
 
 export const LOGIN_PATH = '/login'
+/** Where a setup link opens (`/setup#token=…`); public, like the login screen. */
+export const SETUP_PATH = '/setup'
 
 /**
  * Sends signed-out visitors to /login and keeps the stored user fresh.

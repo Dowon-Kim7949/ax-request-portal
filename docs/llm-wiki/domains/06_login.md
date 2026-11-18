@@ -2,11 +2,11 @@
 title: Login
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-12
+last_updated: 2026-11-18
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -48,7 +48,7 @@ The `/login` screen: e-mail and password sign-in plus, in mock mode, one-click d
 3. The form (react-hook-form + zod) validates the e-mail inline; a server error is shown in a `role="alert"` paragraph with the localized server message.
 4. On success it navigates with `replace` to `resolvePostLoginPath(next, user)`, the only reader of `?next=` (form, demo buttons and the already-signed-in redirect all use it). It returns `next` only when every rule holds, and `/` otherwise:
    - `parseInAppPath`: starts with exactly one `/` (not `//`), has no backslash or control character, and parses to the same origin.
-   - It matches a route other than the catch-all `*`, and no matched route is `/login` (in any case, trailing slash or percent-encoded form).
+   - It matches a route other than the catch-all `*`, and no matched route is `/login` (in any case, trailing slash or percent-encoded form) or `/setup` (a setup link's token is spent or someone else's).
    - The new user holds every matched route's `handle.permission` (`userCan`, so `appConfig.rolePermissions` applies). A `handle.redirectTo` (an old address) is followed, at most three times, and the destination is checked the same way.
    - After a session ended in this tab, `next` is the page that person had open: only the same user returns to it; anyone else starts at home.
 5. Demo accounts (mock mode only) are one button per role — requester, executive, developer, admin, operator (`operator@example.com`) — labelled with the role, name and team (the mock adds the team's name, since the teams list needs a sign-in). The hint shows the shared demo password. Buttons are disabled while a login is in flight.

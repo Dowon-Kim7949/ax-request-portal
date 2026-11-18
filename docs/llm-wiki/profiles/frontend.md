@@ -2,11 +2,11 @@
 title: Frontend Profile
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: profile
 project: ax-request-portal
-last_updated: 2026-11-12
+last_updated: 2026-11-18
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1

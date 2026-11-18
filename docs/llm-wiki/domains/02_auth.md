@@ -59,7 +59,7 @@ reviewed_at: 2026-11-12
 
 ## Responsibility
 
-Who the user is and what they may do: the session, the auth and permission guards, and the role-to-permission table. The login screen itself is documented in [Login](06_login.md); the logout button lives in the app shell.
+Who the user is and what they may do: the session, the auth and permission guards, and the role-to-permission table. The login screen itself is documented in [Login](06_login.md); the logout button lives in the app shell. The setup screen (`/setup`, below) is the other public route.
 
 ## Session
 
@@ -82,6 +82,13 @@ Who the user is and what they may do: the session, the auth and permission guard
 | `signedIn` | This tab was signed out: takes the session; the login screen moves on by itself. |
 | `switchedUser` | Takes the new session, clears the previous person's cache, goes home and shows a toast (`auth.switchedAccount`). |
 | `refreshed` | Same person, new token or profile: updates it without moving. |
+
+## Setup links
+
+- An admin makes a one-time link for a person ([Admin](01_admin.md)): `/setup#token=…`. `SETUP_PATH` is a public route beside `/login`, outside `RequireAuth`.
+- `SetupPage` reads the token from the fragment once (`tokenFromHash`) and replaces the address without it, so it stays out of the history and off the screen. Without a token it says the link is incomplete and links to `/login`.
+- The form asks for the new password twice: `SETUP_PASSWORD_MIN` (12) to `SETUP_PASSWORD_MAX` (128) characters, and both the same, checked before anything is sent. `useCompleteSetup` (`POST /auth/setup`, public) answers a `Session`; like `useLogin` it clears the query cache, stores the session and goes home. A browser that was signed in as someone else is signed in as the link's person.
+- An unknown, spent or expired link, or a deactivated account, is `401 unauthorized` (`setupLinkInvalid`), shown in a `role="alert"` paragraph. Public, so the 401 never expires a session. A link lasts `SETUP_LINK_HOURS` (72) in the mock; only the newest link of a person works.
 
 ## Guards
 
@@ -110,6 +117,7 @@ The config schema refuses a configuration without `admin`, or without an enabled
 | --- | --- | --- | --- |
 | `useLogin` | `POST /auth/login` (public) | `{ email, password }` → `Session { token, user }` | Clears the whole query cache, then stores the session, so no data from a previous user survives. A refused sign-in (wrong email or password, or a deactivated account, never told apart) is `401 unauthorized`, declared in the contract with `unauthorized`; the endpoint is public, so it never expires a session. |
 | `useMe` | `GET /auth/me` | → `User` | Enabled only with a token. |
+| `useCompleteSetup` | `POST /auth/setup` (public) | `SetupBody { token, password }` → `Session` | Same session handling as `useLogin`. `401` for an unknown, spent or expired link, or a deactivated account. |
 | `useLogout` | `POST /auth/logout` (204) | — | `onSettled` clears the cache and calls `clear('signedOut')` even if the call fails. The button is in the account menu (tablet and desktop) or the phone's "more" sheet. |
 
 ## Evidence
@@ -119,7 +127,8 @@ The config schema refuses a configuration without `admin`, or without an enabled
 - `src/app/sign-out.tsx#symbol:useSignOut`, `src/features/drafts/sync.ts#symbol:flushDraftsBeforeSignOut`, `src/app/sign-out.test.tsx` — drafts sent before signing out, and the question about the ones that could not be.
 - `src/app/session-sync.ts#symbol:expireSession`, `src/app/session-sync.ts#symbol:useSessionSync` — 401 handling and tab synchronisation.
 - `src/app/router.tsx#symbol:RouteHandle`, `src/features/auth/post-login.ts#symbol:resolvePostLoginPath` — route permissions and the redirect that reads them.
-- `src/api/queries.ts#symbol:useLogin`, `src/api/queries.ts#symbol:useMe`, `src/api/queries.ts#symbol:useLogout` — session hooks.
+- `src/api/queries.ts#symbol:useLogin`, `src/api/queries.ts#symbol:useMe`, `src/api/queries.ts#symbol:useLogout`, `src/api/queries.ts#symbol:useCompleteSetup` — session hooks.
+- `src/features/auth/setup-page.tsx#symbol:SetupPage`, `src/features/auth/setup-url.ts`, `src/features/auth/setup-page.test.tsx`, `src/mocks/engine.ts#symbol:MockEngine` (`createSetupLink`, `completeSetup`) — setup links.
 - `src/api/client.ts#symbol:configureClient` — token and 401 wiring.
 - `src/domain/roles.ts#symbol:DEFAULT_ROLE_PERMISSIONS`, `src/app/hooks.ts#symbol:userCan`, `src/app/hooks.ts#symbol:useCan` — permission table and lookup.
 - `src/mocks/handlers.ts#symbol:TOKEN_PREFIX` — mock token format.

@@ -85,7 +85,7 @@ User-facing features by role. Each row names the domain document that holds the 
 | Feature | Domain | E2E |
 | --- | --- | --- |
 | Projects: repository, owners, change targets, rules to keep, wiki path, active flag | [Admin](domains/01_admin.md) | `admin.spec.ts` |
-| Users: invite, change role, deactivate | [Admin](domains/01_admin.md) | `admin.spec.ts` |
+| Users: invite, change role, deactivate; a one-time setup link to set or reset a password | [Admin](domains/01_admin.md) | `admin.spec.ts` |
 
 ## Operator
 
@@ -102,6 +102,7 @@ User-facing features by role. Each row names the domain document that holds the 
 | Feature | Domain | E2E |
 | --- | --- | --- |
 | Sign in, including one-click demo accounts in mock mode | [Login](domains/06_login.md) | `smoke.spec.ts` |
+| Set your own password from a setup link an admin sends, and be signed in | [Auth](domains/02_auth.md) | `admin.spec.ts` |
 | Signing out sends drafts still on their way first and asks before deleting the ones only this device has; the next sign-in starts at home; after an expiry the same person returns to the page they had open; a link someone may not open goes home; tabs follow each other's sign-ins and sign-outs | [Auth](domains/02_auth.md), [Login](domains/06_login.md) | `auth.spec.ts`, `drafts.spec.ts` |
 | Times in the viewer's own time zone, with head-office time beside them where the clocks differ; dates and monthly totals on the head office's calendar; choose the time zone and turn head-office time off in Settings | [Settings](domains/10_settings.md), [Architecture Conventions](ARCHITECTURE_CONVENTIONS.md) | `time-zone.spec.ts` |
 | A demo build says so on every screen | [Login](domains/06_login.md), [Component Inventory](COMPONENT_INVENTORY.md) | `demo-banner.spec.ts` |
@@ -115,7 +116,7 @@ User-facing features by role. Each row names the domain document that holds the 
 
 ## API Services
 
-The 41 endpoints of `src/api/contract.ts` are listed per domain in the domain documents; the generated reference is `docs/openapi.json`.
+The 46 endpoints of `src/api/contract.ts` are listed per domain in the domain documents; the generated reference is `docs/openapi.json`.
 
 ## Evidence
 
