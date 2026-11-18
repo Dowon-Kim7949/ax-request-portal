@@ -80,6 +80,8 @@ function operation(name: string, e: EndpointSpec): JsonSchema {
   if (!e.public) {
     responses['401'] = errorResponse('Missing or invalid session')
     responses['403'] = errorResponse('Not allowed for this user')
+  } else if (e.unauthorized) {
+    responses['401'] = errorResponse(e.unauthorized)
   }
   if (e.params) responses['404'] = errorResponse('Not found')
   if (e.conflict) responses['409'] = errorResponse(e.conflict)

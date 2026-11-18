@@ -2,11 +2,11 @@
 title: Auth
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-10
+last_updated: 2026-11-18
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -108,7 +108,7 @@ The config schema refuses a configuration without `admin`, or without an enabled
 
 | Hook | Endpoint | Payload → response | Notes |
 | --- | --- | --- | --- |
-| `useLogin` | `POST /auth/login` (public) | `{ email, password }` → `Session { token, user }` | Clears the whole query cache, then stores the session, so no data from a previous user survives. |
+| `useLogin` | `POST /auth/login` (public) | `{ email, password }` → `Session { token, user }` | Clears the whole query cache, then stores the session, so no data from a previous user survives. A refused sign-in (wrong email or password, or a deactivated account, never told apart) is `401 unauthorized`, declared in the contract with `unauthorized`; the endpoint is public, so it never expires a session. |
 | `useMe` | `GET /auth/me` | → `User` | Enabled only with a token. |
 | `useLogout` | `POST /auth/logout` (204) | — | `onSettled` clears the cache and calls `clear('signedOut')` even if the call fails. The button is in the account menu (tablet and desktop) or the phone's "more" sheet. |
 

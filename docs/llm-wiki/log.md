@@ -6,7 +6,7 @@ tags:
 status: needs_review
 doc_type: change_log
 project: ax-request-portal
-last_updated: 2026-11-11
+last_updated: 2026-11-18
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -23,6 +23,23 @@ contains_sensitive_info: false
 # LLM-WIKI Change Log
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
+
+## 2026-11-18 - Contract: `login` declares its 401
+
+- status: needs_review
+- actor: claude-code
+- scope: code, docs
+- changed:
+  - src/api/contract.ts (`EndpointSpec.unauthorized`, set on `login`), src/api/openapi.ts, src/api/openapi.test.ts, docs/openapi.json
+  - docs/llm-wiki/domains/02_auth.md, docs/llm-wiki/ARCHITECTURE_CONVENTIONS.md
+  - docs/llm-wiki/domains/11_wizard.md, docs/llm-wiki/DOMAIN_FEATURES.md, docs/llm-wiki/GLOSSARY.md (status only)
+- summary:
+  - `docs/openapi.json` now lists `401` for `POST /auth/login` (wrong email or password, or a deactivated account), which the mock API already answered. Other public endpoints still get no `401` unless they declare one.
+  - 11_wizard, DOMAIN_FEATURES and GLOSSARY cite `src/api/contract.ts`; their claims were re-read against it and still hold. They go back to `needs_review` for a human re-approval.
+- evidence:
+  - src/mocks/handlers.ts (`login` throws `401 unauthorized` / `wrongCredentials`), src/api/openapi.ts#symbol:operation
+- caveats:
+  - None.
 
 ## 2026-11-12 - README: what a real backend must match
 
