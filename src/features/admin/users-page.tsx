@@ -284,7 +284,7 @@ function UserRow({
       },
     )
   return (
-    <li className="flex flex-col gap-3 rounded-(--radius-card) bg-surface p-4 ring-1 ring-line sm:flex-row sm:items-center">
+    <li className="flex flex-col gap-3 rounded-(--radius-card) bg-surface p-4 ring-1 ring-line xl:flex-row xl:items-center">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-50 font-bold text-accent-strong">
           {user.name.slice(0, 1)}
@@ -302,7 +302,9 @@ function UserRow({
           {operator ? <p className="text-[13px] text-ink-500">{t('users.operatorLocked')}</p> : null}
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:w-[36rem] sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto_auto]">
+      {/* Fixed button columns, so rows without a setup link line up with the others. Four controls
+          need the room: below xl they sit under the name. */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7.5rem_9.5rem] xl:w-[38rem]">
         <Select
           aria-label={`${user.name} ${t('users.team')}`}
           value={user.teamId ?? ''}
