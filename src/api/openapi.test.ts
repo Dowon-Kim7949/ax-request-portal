@@ -16,6 +16,15 @@ describe('OpenAPI contract', () => {
     expect(ids.sort()).toEqual(Object.keys(api).sort())
   })
 
+  it('gives a public endpoint only the 401 it declares', () => {
+    type Op = { responses: Record<string, { description: string }> }
+    const doc = buildOpenApiDocument() as { paths: Record<string, Record<string, Op>> }
+    const login = doc.paths['/auth/login']!.post!.responses
+    expect(Object.keys(login).sort()).toEqual(['200', '400', '401'])
+    expect(login['401']!.description).toBe(api.login.unauthorized)
+    expect(doc.paths['/auth/me']!.get!.responses['401']!.description).toBe('Missing or invalid session')
+  })
+
   it('has no dangling $ref', () => {
     const doc = buildOpenApiDocument() as { components: { schemas: Record<string, unknown> } }
     const refs = [...JSON.stringify(doc).matchAll(/"#\/components\/schemas\/([^"]+)"/g)].map((m) => m[1]!)

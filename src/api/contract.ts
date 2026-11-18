@@ -66,6 +66,11 @@ export interface EndpointSpec {
   status?: 200 | 201
   /** What a 409 answer means here, for endpoints that give one (written into docs/openapi.json) */
   conflict?: string
+  /**
+   * What a 401 answer means here, for a public endpoint that gives one (written
+   * into docs/openapi.json). Every other endpoint gets the session 401 and 403.
+   */
+  unauthorized?: string
   /** Registered schema of the success body. `null` = 204 No Content. */
   response: z.ZodType | null
   /**
@@ -394,6 +399,7 @@ export const api = {
     tag: 'auth',
     summary: 'Sign in and receive a bearer token',
     public: true,
+    unauthorized: 'Wrong email or password, or the account is deactivated',
     body: LoginBody,
     response: Session,
   }),

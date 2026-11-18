@@ -85,6 +85,16 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Wrong email or password, or the account is deactivated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
