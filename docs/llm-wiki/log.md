@@ -24,6 +24,28 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-18 - One-time setup links
+
+- status: needs_review
+- actor: claude-code
+- scope: code, docs
+- changed:
+  - src/api/contract.ts (`createSetupLink`, `completeSetup`, `SetupLink`, `SetupBody`, `SETUP_PASSWORD_MIN`/`MAX`), docs/openapi.json
+  - src/mocks/engine.ts, handlers.ts, store.ts, seed.ts, copy.ts (`MockState.passwords`, `setupLinks`, `STATE_VERSION` 9)
+  - src/api/queries.ts (`useCreateSetupLink`, `useCompleteSetup`), src/app/guards.tsx (`SETUP_PATH`), src/app/router.tsx, src/features/auth/post-login.ts
+  - src/features/auth/setup-page.tsx, setup-url.ts, src/features/admin/setup-link.tsx, users-page.tsx, src/i18n/ko.ts, en.ts
+  - e2e/admin.spec.ts, e2e/axe.spec.ts; unit tests for the mock API, the setup screen, the URL helpers and the post-login redirect
+  - docs/llm-wiki: domains 00, 01, 02, 06; E2E_WORKFLOWS, WCAG, DOMAIN_FEATURES, GLOSSARY, ARCHITECTURE_CONVENTIONS, project-profile; README.md, README.ko.md
+  - docs/llm-wiki: domains 03, 04, 05, 07, 08, 09, 10, 12, 13 and profiles/frontend (status only)
+- summary:
+  - People added in the app had no way to get a password. An admin now gets a one-time link when adding someone, and can make a new one from the person's row (a reset); the person opens `/setup#token=…`, sets a password and is signed in. The token stays in the URL fragment and leaves the address bar on arrival.
+  - The mock keeps passwords apart from users: seeded accounts keep the demo password, accounts added in the app cannot sign in until their link is used.
+  - The status-only documents cite `src/api/queries.ts`, `src/mocks/engine.ts`, `src/mocks/copy.ts` or `src/app/router.tsx`; their claims were re-read against those files and still hold. They go back to `needs_review` for a human re-approval.
+- evidence:
+  - src/mocks/api.test.ts (`setup links`), src/features/auth/setup-page.test.tsx, e2e/admin.spec.ts
+- caveats:
+  - The mock's tokens are stateless, so a password reset there cannot end the person's other sessions; the reference server does.
+
 ## 2026-11-18 - Contract: `login` declares its 401
 
 - status: needs_review

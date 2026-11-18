@@ -45,6 +45,7 @@ describe('resolvePostLoginPath', () => {
     ['the login screen with a query', '/login?next=/requests'],
     ['the login screen, other spelling', '/LOGIN/'],
     ['the login screen, percent-encoded', '/%6Cogin'],
+    ['a setup link', '/setup#token=abc'],
     ['a page that does not exist', '/no-such-page'],
     ['a page below an existing one', '/requests/1017/extra'],
   ])('sends home for %s', (_, next) => {

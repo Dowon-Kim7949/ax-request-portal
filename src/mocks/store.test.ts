@@ -67,6 +67,13 @@ describe('loading', () => {
     expect(stateProblem({ ...seed, drafts: [{ id: 'draft-1', ownerId: 'u-kim', version: 1 }] })).toBe(
       'a draft is incomplete',
     )
+    // Data saved before setup links is rebuilt rather than read without passwords.
+    expect(stateProblem({ ...seed, version: 8 })).toMatch(/^version 8/)
+    expect(stateProblem({ ...seed, passwords: undefined })).toBe('passwords is not a map')
+    expect(stateProblem({ ...seed, passwords: { 'u-kim': 1 } })).toBe('passwords is not a map')
+    expect(stateProblem({ ...seed, setupLinks: [{ userId: 'u-kim' }] })).toBe(
+      'setupLinks is not a list of links',
+    )
   })
 
   it('keeps what a previous visit saved', () => {

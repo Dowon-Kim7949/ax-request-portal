@@ -1,13 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Plus, UserPlus, Users } from 'lucide-react'
+import { Link2, Plus, UserPlus, Users } from 'lucide-react'
 import { useId, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { toast } from 'sonner'
 import { ApiError } from '@/api/client'
-import { UserCreate } from '@/api/contract'
-import { useCreateUser, useSaveTeam, useUpdateUser } from '@/api/queries'
+import { UserCreate, type SetupLink } from '@/api/contract'
+import { useCreateSetupLink, useCreateUser, useSaveTeam, useUpdateUser } from '@/api/queries'
 import { useCurrentUser, useDirectory, useTeamDirectory } from '@/app/hooks'
 import { Page, PageHeader, PageScroll, PageTop } from '@/app/page'
 import { usePageTitle } from '@/app/title'
@@ -20,6 +20,7 @@ import { Field, Input } from '@/components/ui/field'
 import { Sheet } from '@/components/ui/sheet'
 import { appConfig } from '@/config/app.config'
 import { TEAM_NAME_MAX, type Role, type Team, type User } from '@/domain/model'
+import { SetupLinkSheet } from './setup-link'
 
 /** Operator accounts belong to the service, not the organization: an admin cannot assign the role. */
 const ASSIGNABLE_ROLES = appConfig.enabledRoles.filter((r) => r !== 'operator')
@@ -44,7 +45,7 @@ function TeamOptions({ teams }: { teams: Team[] }) {
   )
 }
 
-function InviteForm({ teams, onDone }: { teams: Team[]; onDone: () => void }) {
+function InviteForm({ teams, onDone }: { teams: Team[]; onDone: (user: User) => void }) {
   const { t } = useTranslation()
   const create = useCreateUser()
   const form = useForm<InviteValues>({
@@ -60,9 +61,9 @@ function InviteForm({ teams, onDone }: { teams: Team[]; onDone: () => void }) {
         create.mutate(
           { ...values, teamId: values.teamId || undefined },
           {
-            onSuccess: () => {
+            onSuccess: (user) => {
               toast.success(t('users.invited'))
-              onDone()
+              onDone(user)
             },
             onError: (e) => toast.error(e instanceof ApiError ? e.message : t('errors.generic')),
           },
@@ -253,11 +254,26 @@ function TeamsPanel({ dir }: { dir: TeamDirectory }) {
   )
 }
 
-function UserRow({ user, isMe, teams }: { user: User; isMe: boolean; teams: TeamDirectory }) {
+function UserRow({
+  user,
+  isMe,
+  teams,
+  onLink,
+  linking,
+}: {
+  user: User
+  isMe: boolean
+  teams: TeamDirectory
+  /** Makes a setup link for this person and shows it */
+  onLink: (user: User) => void
+  linking: boolean
+}) {
   const { t } = useTranslation()
   const update = useUpdateUser()
   const operator = user.role === 'operator'
   const locked = isMe || operator
+  // Operators get their password from the service; a deactivated person cannot use a link.
+  const canLink = !locked && user.active
   const lockedReason = isMe ? t('users.selfLocked') : operator ? t('users.operatorLocked') : undefined
   const patch = (body: { role?: Role; teamId?: string | null; active?: boolean }) =>
     update.mutate(
@@ -268,7 +284,7 @@ function UserRow({ user, isMe, teams }: { user: User; isMe: boolean; teams: Team
       },
     )
   return (
-    <li className="flex flex-col gap-3 rounded-(--radius-card) bg-surface p-4 ring-1 ring-line sm:flex-row sm:items-center">
+    <li className="flex flex-col gap-3 rounded-(--radius-card) bg-surface p-4 ring-1 ring-line xl:flex-row xl:items-center">
       <div className="flex min-w-0 flex-1 items-center gap-3">
         <span className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-50 font-bold text-accent-strong">
           {user.name.slice(0, 1)}
@@ -286,7 +302,9 @@ function UserRow({ user, isMe, teams }: { user: User; isMe: boolean; teams: Team
           {operator ? <p className="text-[13px] text-ink-500">{t('users.operatorLocked')}</p> : null}
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-2 sm:w-[28rem] sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+      {/* Fixed button columns, so rows without a setup link line up with the others. Four controls
+          need the room: below xl they sit under the name. */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7.5rem_9.5rem] xl:w-[38rem]">
         <Select
           aria-label={`${user.name} ${t('users.team')}`}
           value={user.teamId ?? ''}
@@ -314,7 +332,7 @@ function UserRow({ user, isMe, teams }: { user: User; isMe: boolean; teams: Team
         </Select>
         <Button
           variant="secondary"
-          className="col-span-2 h-12 sm:col-span-1"
+          className={canLink ? 'h-12' : 'col-span-2 h-12 sm:col-span-1'}
           disabled={locked || update.isPending}
           title={lockedReason}
           onClick={() => patch({ active: !user.active })}
@@ -322,6 +340,18 @@ function UserRow({ user, isMe, teams }: { user: User; isMe: boolean; teams: Team
         >
           {user.active ? t('users.inactive') : t('users.active')}
         </Button>
+        {canLink ? (
+          <Button
+            variant="secondary"
+            className="h-12"
+            loading={linking}
+            onClick={() => onLink(user)}
+            aria-label={t('users.setupLinkFor', { name: user.name })}
+          >
+            <Link2 aria-hidden />
+            {t('users.setupLink')}
+          </Button>
+        ) : null}
       </div>
     </li>
   )
@@ -335,6 +365,17 @@ export default function UsersPage() {
   const teams = useTeamDirectory()
   const [inviting, setInviting] = useState(false)
   const [managingTeams, setManagingTeams] = useState(false)
+  const makeLink = useCreateSetupLink()
+  const [issued, setIssued] = useState<{ user: User; link: SetupLink } | null>(null)
+  // A new person gets their link at once; anyone else's row can make a new one (which also resets a password).
+  const issueLink = (user: User) =>
+    makeLink.mutate(
+      { id: user.id },
+      {
+        onSuccess: (link) => setIssued({ user, link }),
+        onError: (e) => toast.error(e instanceof ApiError ? e.message : t('errors.generic')),
+      },
+    )
 
   return (
     <Page>
@@ -365,7 +406,14 @@ export default function UsersPage() {
         ) : (
           <ul className="flex flex-col gap-2">
             {dir.users.map((u) => (
-              <UserRow key={u.id} user={u} isMe={u.id === me.id} teams={teams} />
+              <UserRow
+                key={u.id}
+                user={u}
+                isMe={u.id === me.id}
+                teams={teams}
+                onLink={issueLink}
+                linking={makeLink.isPending && makeLink.variables.id === u.id}
+              />
             ))}
           </ul>
         )}
@@ -376,8 +424,17 @@ export default function UsersPage() {
         title={t('users.inviteTitle')}
         closeLabel={t('common.close')}
       >
-        {inviting ? <InviteForm teams={teams.teams} onDone={() => setInviting(false)} /> : null}
+        {inviting ? (
+          <InviteForm
+            teams={teams.teams}
+            onDone={(user) => {
+              setInviting(false)
+              issueLink(user)
+            }}
+          />
+        ) : null}
       </Sheet>
+      <SetupLinkSheet issued={issued} onClose={() => setIssued(null)} />
       <Sheet
         open={managingTeams}
         onOpenChange={setManagingTeams}

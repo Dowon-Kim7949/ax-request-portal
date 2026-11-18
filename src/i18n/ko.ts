@@ -126,6 +126,21 @@ const ko = {
     toDark: '어두운 화면으로 보기',
     toLight: '밝은 화면으로 보기',
   },
+  setup: {
+    title: '비밀번호 설정',
+    subtitle: '{{brand}}에서 쓸 비밀번호를 정해 주세요. 정하면 바로 로그인돼요.',
+    password: '새 비밀번호',
+    passwordHint: '{{min}}자 이상',
+    confirm: '새 비밀번호 확인',
+    submit: '비밀번호 정하고 로그인',
+    submitting: '설정 중…',
+    tooShort: '{{min}}자 이상 입력해 주세요.',
+    tooLong: '{{max}}자 이하로 입력해 주세요.',
+    mismatch: '두 비밀번호가 같지 않아요.',
+    noToken:
+      '링크가 완전하지 않아요. 받은 링크 전체를 주소창에 붙여 넣거나, 관리자에게 새 링크를 요청해 주세요.',
+    toLogin: '로그인 화면으로',
+  },
   status: {
     // Developer/admin view: precise
     submitted: '접수',
@@ -787,6 +802,17 @@ const ko = {
     teamRenamed: '팀 이름을 바꿨어요.',
     teamNameTooLong: '{{max}}자 이하로 입력해 주세요.',
     noTeams: '아직 팀이 없어요.',
+    setupLink: '설정 링크',
+    setupLinkFor: '{{name}} 비밀번호 설정 링크 만들기',
+    setupLinkTitle: '{{name}}님의 비밀번호 설정 링크',
+    setupLinkHint:
+      '이 링크를 {{name}}님에게 전해 주세요. 링크를 연 사람이 비밀번호를 정하고 바로 로그인해요. {{expires}}까지 한 번만 쓸 수 있어요.',
+    setupLinkOnce:
+      '링크는 지금만 보여요. 잃어버렸거나 비밀번호를 잊었다면 새 링크를 만들면 돼요. 새 링크를 만들면 이전 링크는 쓸 수 없어요.',
+    setupLinkLabel: '설정 링크',
+    copyLink: '링크 복사',
+    linkCopied: '링크를 복사했어요.',
+    copyFailed: '복사하지 못했어요. 링크를 직접 선택해서 복사해 주세요.',
   },
   budget: {
     title: 'AI 비용 한도',

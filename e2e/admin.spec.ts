@@ -1,5 +1,12 @@
 import { expect, test } from './fixtures.ts'
-import { expectNoHorizontalScroll, loginAs, openInApp } from './helpers.ts'
+import {
+  expectNoHorizontalScroll,
+  expectSignedIn,
+  loginAs,
+  openInApp,
+  signOut,
+  viewportOf,
+} from './helpers.ts'
 
 test('executive reads the company dashboard', async ({ page }) => {
   await loginAs(page, '경영진')
@@ -126,4 +133,44 @@ test("executive files a request and reads it among their own, besides reading ev
   await openInApp(page, '/work')
   await expect(page.getByText('이 작업을 할 권한이 없어요.')).toBeVisible()
   await expectNoHorizontalScroll(page)
+})
+
+test('a person an admin adds sets their own password through a setup link', async ({ page }, info) => {
+  const passphrase = 'a long enough passphrase'
+  await loginAs(page, '관리자')
+  await openInApp(page, '/admin/users')
+  await page.getByRole('button', { name: '사용자 추가' }).click()
+  const form = page.getByRole('dialog', { name: '새 사용자' })
+  await form.getByLabel('이름').fill('신입사원')
+  await form.getByLabel('이메일').fill('newcomer@example.com')
+  await form.getByRole('button', { name: '사용자 추가' }).click()
+
+  // The link is shown once, right after the person is added.
+  const sheet = page.getByRole('dialog', { name: '신입사원님의 비밀번호 설정 링크' })
+  const link = await sheet.getByLabel('설정 링크').inputValue()
+  expect(link).toMatch(/\/setup#token=[0-9a-f]+$/)
+  // Closed, it is gone; the person's row can make a new one.
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('button', { name: '신입사원 비밀번호 설정 링크 만들기' })).toBeVisible()
+
+  // Opened here, it replaces the admin's session; the token leaves the address bar.
+  await page.goto(link)
+  await expect(page).toHaveURL((url) => url.pathname === '/setup' && url.hash === '')
+  await page.getByLabel('새 비밀번호', { exact: true }).fill(passphrase)
+  await page.getByLabel('새 비밀번호 확인').fill(passphrase)
+  await page.getByRole('button', { name: '비밀번호 정하고 로그인' }).click()
+  await expectSignedIn(page)
+  await expect(page.getByRole('link', { name: '사용자와 역할' })).toHaveCount(0) // a requester now
+
+  // The new password signs them in again; the link is spent.
+  await signOut(page, viewportOf(info))
+  await page.getByLabel('이메일').fill('newcomer@example.com')
+  await page.getByLabel('비밀번호').fill(passphrase)
+  await page.getByRole('button', { name: '로그인', exact: true }).click()
+  await expectSignedIn(page)
+  await page.goto(link)
+  await page.getByLabel('새 비밀번호', { exact: true }).fill(passphrase)
+  await page.getByLabel('새 비밀번호 확인').fill(passphrase)
+  await page.getByRole('button', { name: '비밀번호 정하고 로그인' }).click()
+  await expect(page.getByRole('alert')).toContainText('링크가 올바르지 않거나 이미 쓰였거나 만료되었습니다')
 })

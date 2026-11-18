@@ -1,5 +1,5 @@
 import { matchRoutes, type RouteObject } from 'react-router'
-import { LOGIN_PATH } from '@/app/guards'
+import { LOGIN_PATH, SETUP_PATH } from '@/app/guards'
 import { userCan } from '@/app/hooks'
 import { routes as appRoutes, type RouteHandle } from '@/app/router'
 import type { User } from '@/domain/model'
@@ -52,7 +52,8 @@ export function resolvePostLoginPath(
     const leaf = matches?.at(-1)?.route
     // No match, or only the catch-all "not found" page.
     if (!matches || !leaf || leaf.path === '*') return HOME
-    if (matches.some((m) => m.route.path === LOGIN_PATH)) return HOME
+    // Never back to the login screen, nor to a setup link (its token is spent or someone else's).
+    if (matches.some((m) => m.route.path === LOGIN_PATH || m.route.path === SETUP_PATH)) return HOME
     const handles = matches.map((m) => m.route.handle as RouteHandle | undefined)
     if (handles.some((h) => h?.permission && !userCan(user, h.permission))) return HOME
     const forward = handles.at(-1)?.redirectTo

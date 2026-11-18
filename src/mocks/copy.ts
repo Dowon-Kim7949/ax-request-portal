@@ -87,6 +87,9 @@ const ERRORS = {
     notificationNotFound: '알림을 찾을 수 없습니다.',
     signInAgain: '다시 로그인해 주세요.',
     wrongCredentials: '이메일 또는 비밀번호가 맞지 않습니다.',
+    setupLinkInvalid:
+      '링크가 올바르지 않거나 이미 쓰였거나 만료되었습니다. 관리자에게 새 링크를 요청해 주세요.',
+    setupLinkInactive: '비활성 사용자에게는 링크를 만들 수 없습니다. 먼저 활성화해 주세요.',
     notFound: '찾을 수 없습니다.',
     badQuery: '잘못된 조회 조건입니다.',
     checkInput: '입력값을 확인해 주세요.',
@@ -140,6 +143,9 @@ const ERRORS = {
     notificationNotFound: 'Notification not found.',
     signInAgain: 'Please sign in again.',
     wrongCredentials: 'The email or password is incorrect.',
+    setupLinkInvalid:
+      'This link is not valid, was already used or has expired. Ask your admin for a new one.',
+    setupLinkInactive: 'Activate this person before making a link.',
     notFound: 'Not found.',
     badQuery: 'The query parameters are invalid.',
     checkInput: 'Please check the input.',

@@ -3,7 +3,7 @@ import { createBrowserRouter, matchRoutes, Navigate, Outlet, type RouteObject } 
 import { env } from '@/config/env'
 import type { Permission } from '@/domain/roles'
 import { BootScreen } from './boot'
-import { LOGIN_PATH, RequireAuth, RequirePermission, SessionSync } from './guards'
+import { LOGIN_PATH, RequireAuth, RequirePermission, SETUP_PATH, SessionSync } from './guards'
 import { NotFoundPage, RouteErrorPage } from './pages'
 import { setPreloadRoutes } from './page-preload'
 import { checkForUpdateNow } from './update-check'
@@ -92,6 +92,7 @@ export const routes: RouteObject[] = [
     errorElement: <RouteErrorPage />,
     children: [
       { path: LOGIN_PATH, HydrateFallback: BootScreen, ...page(() => import('@/features/auth/login-page')) },
+      { path: SETUP_PATH, HydrateFallback: BootScreen, ...page(() => import('@/features/auth/setup-page')) },
       {
         path: '/',
         HydrateFallback: BootScreen,

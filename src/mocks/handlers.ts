@@ -172,13 +172,24 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
     /* auth */
     route(api.login, ({ store, body }) => {
       const user = store.engine.state.users.find((u) => u.email.toLowerCase() === body.email.toLowerCase())
-      if (!user || !user.active || body.password !== DEMO_PASSWORD) {
+      // A password set through a setup link, or the demo password for a seeded account.
+      const own = user && store.engine.state.passwords[user.id]
+      const matches = own === undefined ? body.password === DEMO_PASSWORD : own === body.password
+      if (!user || !user.active || !matches) {
         throw new HttpError(401, 'unauthorized', 'wrongCredentials')
       }
       return { token: tokenFor(user.id), user }
     }),
     route(api.logout, () => undefined),
     route(api.me, ({ me }) => me),
+    route(
+      api.completeSetup,
+      ({ store, body, now }) => {
+        const user = store.engine.completeSetup(body.token, body.password, now)
+        return { token: tokenFor(user.id), user }
+      },
+      edit,
+    ),
 
     /* users */
     route(api.listUsers, ({ store }) => store.engine.state.users),
@@ -186,6 +197,11 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
     route(
       api.updateUser,
       ({ store, me, params, body }) => store.engine.updateUser(me, params.id, body),
+      edit,
+    ),
+    route(
+      api.createSetupLink,
+      ({ store, me, params, now }) => store.engine.createSetupLink(me, params.id, now),
       edit,
     ),
     route(api.listTeams, ({ store }) => store.engine.teams()),

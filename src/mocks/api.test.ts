@@ -8,6 +8,7 @@ import { api, DRAFT_ID_PATTERN, type DraftContent } from '../api/contract'
 import { appConfig } from '../config/app.config'
 import type { RequestDraft } from '../domain/model'
 import { createTestApi } from '../test/mock-api'
+import { SETUP_LINK_HOURS } from './engine'
 import { DEMO_PASSWORD } from './seed'
 
 const t = createTestApi()
@@ -750,7 +751,12 @@ describe('release, regression and settings rules', () => {
     const invited = await call(api.createUser, {
       body: { name: '설정없음', email: 'no-settings@example.com', role: 'requester' },
     })
-    await loginAs(invited.email)
+    // A person added in the app signs in once they have set a password through their link.
+    const link = await call(api.createSetupLink, { params: { id: invited.id } })
+    token = null
+    token = (
+      await call(api.completeSetup, { body: { token: link.token, password: 'a long enough passphrase' } })
+    ).token
     expect(await call(api.getNotificationSettings)).toEqual({
       inApp: true,
       email: true,
@@ -1077,5 +1083,74 @@ describe('demo data language', () => {
     const { id } = await call(api.createDraft, { body: { step: 0, content: { title: '언어를 바꿔도' } } })
     expect(t.store.engine.state.dirty).toBe(true)
     await call(api.deleteDraft, { params: { id } })
+  })
+})
+
+describe('setup links', () => {
+  const PASSPHRASE = 'a long enough passphrase'
+  const setup = (setupToken: string, password = PASSPHRASE) =>
+    call(api.completeSetup, { body: { token: setupToken, password } })
+
+  async function addPerson(email: string) {
+    await loginAs('admin@example.com')
+    return call(api.createUser, { body: { name: '링크사용자', email, role: 'requester' } })
+  }
+
+  it('let a person added in the app set a password once, then sign in with it', async () => {
+    const person = await addPerson('link@example.com')
+    // No password yet, not even the demo one.
+    await expectApiError(
+      call(api.login, { body: { email: 'link@example.com', password: DEMO_PASSWORD } }),
+      401,
+    )
+
+    const first = await call(api.createSetupLink, { params: { id: person.id } })
+    const link = await call(api.createSetupLink, { params: { id: person.id } })
+    expect(link.token).not.toBe(first.token)
+    expect(Date.parse(link.expiresAt)).toBe(t.store.now().getTime() + SETUP_LINK_HOURS * 3_600_000)
+    token = null
+
+    // A newer link replaces the older one; a short password is refused before the link is spent.
+    await expectApiError(setup(first.token), 401, 'unauthorized')
+    await expectApiError(setup(link.token, 'short'), 400, 'bad_request')
+
+    const session = await setup(link.token)
+    expect(session.user.id).toBe(person.id)
+    token = session.token
+    expect(await call(api.me)).toEqual(session.user)
+    token = null
+    await expectApiError(setup(link.token, 'another long passphrase'), 401)
+
+    await call(api.login, { body: { email: 'link@example.com', password: PASSPHRASE } })
+    await expectApiError(
+      call(api.login, { body: { email: 'link@example.com', password: DEMO_PASSWORD } }),
+      401,
+    )
+  })
+
+  it('end a link after its time', async () => {
+    const person = await addPerson('late@example.com')
+    const link = await call(api.createSetupLink, { params: { id: person.id } })
+    token = null
+    t.advance(SETUP_LINK_HOURS * 3600 + 1)
+    await expectApiError(setup(link.token), 401)
+  })
+
+  it('are made only by admins, only for active people who are not operators', async () => {
+    await loginAs('planner@example.com')
+    await expectApiError(call(api.createSetupLink, { params: { id: 'u-han' } }), 403, 'forbidden')
+
+    await loginAs('admin@example.com')
+    await expectApiError(call(api.createSetupLink, { params: { id: 'u-none' } }), 404, 'not_found')
+    const operator = (await call(api.listUsers)).find((u) => u.role === 'operator')!
+    await expectApiError(call(api.createSetupLink, { params: { id: operator.id } }), 403, 'forbidden')
+
+    const person = await addPerson('off@example.com')
+    const link = await call(api.createSetupLink, { params: { id: person.id } })
+    await call(api.updateUser, { params: { id: person.id }, body: { active: false } })
+    await expectApiError(call(api.createSetupLink, { params: { id: person.id } }), 400, 'bad_request')
+    token = null
+    // A link made before the deactivation does not let them in either.
+    await expectApiError(setup(link.token), 401)
   })
 })

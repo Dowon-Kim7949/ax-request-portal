@@ -124,6 +124,21 @@ const en: Messages = {
     toDark: 'Use dark mode',
     toLight: 'Use light mode',
   },
+  setup: {
+    title: 'Set your password',
+    subtitle: 'Choose the password you will use for {{brand}}. You are signed in right after.',
+    password: 'New password',
+    passwordHint: 'At least {{min}} characters',
+    confirm: 'Repeat the new password',
+    submit: 'Set password and sign in',
+    submitting: 'Setting…',
+    tooShort: 'Use at least {{min}} characters.',
+    tooLong: 'Use {{max}} characters or fewer.',
+    mismatch: 'The two passwords differ.',
+    noToken:
+      'This link is incomplete. Paste the whole link you received into the address bar, or ask your admin for a new one.',
+    toLogin: 'Go to sign in',
+  },
   status: {
     submitted: 'Submitted',
     reporting: 'Writing report',
@@ -791,6 +806,17 @@ const en: Messages = {
     teamRenamed: 'Team renamed.',
     teamNameTooLong: 'Use {{max}} characters or fewer.',
     noTeams: 'No teams yet.',
+    setupLink: 'Setup link',
+    setupLinkFor: 'Make a password setup link for {{name}}',
+    setupLinkTitle: 'Password setup link for {{name}}',
+    setupLinkHint:
+      'Send this link to {{name}}. Whoever opens it sets a password and is signed in. It works once, until {{expires}}.',
+    setupLinkOnce:
+      'The link is shown only now. If it is lost, or the password is forgotten, make a new one; the previous link then stops working.',
+    setupLinkLabel: 'Setup link',
+    copyLink: 'Copy link',
+    linkCopied: 'Link copied.',
+    copyFailed: 'Could not copy. Select the link and copy it yourself.',
   },
   budget: {
     title: 'AI budget',

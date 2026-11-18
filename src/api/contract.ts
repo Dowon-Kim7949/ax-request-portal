@@ -140,6 +140,33 @@ export const Session = named(
 )
 export type Session = z.infer<typeof Session>
 
+/** Shortest password a setup link accepts; the reference server enforces the same. */
+export const SETUP_PASSWORD_MIN = 12
+/** Longest one: room for any passphrase, nothing a server must hash for long. */
+export const SETUP_PASSWORD_MAX = 128
+
+export const SetupLink = named(
+  'SetupLink',
+  z.object({
+    token: z
+      .string()
+      .describe(
+        'One-time secret for POST /auth/setup. The app puts it in the fragment of /setup#token=…, which never reaches a server.',
+      ),
+    expiresAt: Timestamp,
+  }),
+  "A one-time link to set or reset someone's password. Only the newest link of a person works; it ends when used or at expiresAt.",
+)
+export type SetupLink = z.infer<typeof SetupLink>
+
+export const SetupBody = named(
+  'SetupBody',
+  z.object({
+    token: z.string().min(1),
+    password: z.string().min(SETUP_PASSWORD_MIN).max(SETUP_PASSWORD_MAX),
+  }),
+)
+
 export const UserList = named('UserList', z.array(User))
 export const UserCreate = named(
   'UserCreate',
@@ -411,6 +438,16 @@ export const api = {
     response: null,
   }),
   me: endpoint({ method: 'GET', path: '/auth/me', tag: 'auth', summary: 'Current user', response: User }),
+  completeSetup: endpoint({
+    method: 'POST',
+    path: '/auth/setup',
+    tag: 'auth',
+    summary: 'Set a password with a one-time setup link, and sign in',
+    public: true,
+    unauthorized: 'The link is unknown, used or expired, or the account is deactivated',
+    body: SetupBody,
+    response: Session,
+  }),
 
   /* users */
   listUsers: endpoint({
@@ -437,6 +474,16 @@ export const api = {
     params: StringIdParam,
     body: UserPatch,
     response: User,
+  }),
+  createSetupLink: endpoint({
+    method: 'POST',
+    path: '/users/{id}/setup-link',
+    tag: 'users',
+    summary:
+      'A one-time link for the person to set or reset their password (user:manage); replaces an unused one. 400 for a deactivated person, 403 for an operator.',
+    params: StringIdParam,
+    status: 201,
+    response: SetupLink,
   }),
 
   /* teams */
