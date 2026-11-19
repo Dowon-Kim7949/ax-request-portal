@@ -224,7 +224,7 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
     /* requests — note: /requests/precheck must be registered before /requests/:id */
     route(
       api.precheckRequest,
-      ({ store, me, body, now, lang }) => ({ issues: store.engine.precheck(me, body, now, lang) }),
+      ({ store, me, body, now, lang }) => store.engine.precheck(me, body, now, lang),
       touch,
     ),
     route(api.listRequests, ({ store, me, query }) => store.engine.listRequests(me, query)),

@@ -396,6 +396,8 @@ const ko = {
       issues: '확인해 보면 좋은 점 {{count}}개',
       issuesHint: '고치지 않아도 제출할 수 있어요.',
       checkFailed: '점검을 하지 못했어요. 다시 점검하거나 그대로 제출해도 괜찮아요.',
+      aiNotConnected: '요청서 점검 AI가 연결되지 않아 기본 규칙으로만 점검했어요.',
+      aiFailed: 'AI 점검이 응답하지 않아 기본 규칙으로만 점검했어요.',
       recheck: '다시 점검하기',
       submit: '요청 제출',
       submitting: '제출 중…',

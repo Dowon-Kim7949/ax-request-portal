@@ -2,11 +2,11 @@
 title: AI Operations
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-18
+last_updated: 2026-11-19
 author: claude-code
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -81,7 +81,7 @@ The sidebar shows these under an "AI operations" heading (`NavGroup` `ops`); the
 - **Tasks**: `precheck` (draft advice), `report` (feasibility report) and `work` (code change and merge request). `runtimeFor` maps precheck and report to `api` and work to `claude_code` or `codex`.
 - **Selection**: per-task defaults plus per-project overrides; `resolveSelection` picks the override, else the default.
 - **Usage entry**: one ledger row per AI call or agent run with provider, model, runtime, request id (absent for a precheck), the person who started it (`userId`) and the id of their team at that moment (`teamId`, absent for someone without one), normalized tokens, and cost in USD and KRW.
-- **Caller**: every call is booked against the person whose action started it. A precheck is the author's (it runs when they reach the wizard's review step). A report is the requester's: the one made automatically on submission (a `system` step in the timeline) as well as a new reading after `reviseScope` or `provideInfo`. AI work is the developer's who chose `runWork` or `requestRevision`. There is no "system" caller, so the people add up to the month's total. The mock books reports and runs when they finish, so it finds that person in the request's timeline (`startedBy`).
+- **Caller**: every call is booked against the person whose action started it. A precheck is the author's (it runs when they reach the wizard's review step); without a key for the precheck model's provider only the rules answer and nothing is booked. A report is the requester's: the one made automatically on submission (a `system` step in the timeline) as well as a new reading after `reviseScope` or `provideInfo`. AI work is the developer's who chose `runWork` or `requestRevision`. There is no "system" caller, so the people add up to the month's total. The mock books reports and runs when they finish, so it finds that person in the request's timeline (`startedBy`).
 - **Team at the time**: the team id is copied onto the entry when it is booked (`bookAi`). Someone who moves to another team ([Admin](01_admin.md)) keeps their earlier calls under the old one, so monthly team totals do not change after the fact; renaming a team keeps one row under the new name, because rows are by id and the name is looked up (`useTeamDirectory`).
 
 ## Workflows

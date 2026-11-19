@@ -399,6 +399,8 @@ const en: Messages = {
       issues: 'Worth a look: {{count}}',
       issuesHint: 'You can submit without changing anything.',
       checkFailed: 'The check could not run. Run it again, or submit as is.',
+      aiNotConnected: 'The AI for draft checks is not connected, so only the basic rules checked this draft.',
+      aiFailed: 'The AI check did not answer, so only the basic rules checked this draft.',
       recheck: 'Check again',
       submit: 'Submit request',
       submitting: 'Submitting…',

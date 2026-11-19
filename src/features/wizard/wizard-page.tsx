@@ -25,7 +25,7 @@ import { Button } from '@/components/ui/button'
 import { ErrorState, Spinner } from '@/components/ui/feedback'
 import { LoadFailed } from '@/components/ui/load-failed'
 import { Sheet } from '@/components/ui/sheet'
-import type { PrecheckIssue } from '@/domain/model'
+import type { PrecheckAiAdvice, PrecheckIssue } from '@/domain/model'
 import { DraftsNotice } from '@/features/drafts/drafts-section'
 import { useDiscardDraft, useDraftSaveState, useLocalDraftWrittenAt } from '@/features/drafts/hooks'
 import { DRAFT_SETTLE_TIMEOUT_MS, draftSync } from '@/features/drafts/sync'
@@ -721,10 +721,17 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
   /* ---- submission check on the review step ---- */
   const precheck = usePrecheck()
   const [issues, setIssues] = useState<PrecheckIssue[]>([])
+  const [aiAdvice, setAiAdvice] = useState<PrecheckAiAdvice>('included')
   // Advice from an earlier check must not outlive a new one, failed or not.
   const runPrecheck = () => {
     setIssues([])
-    precheck.mutate(toDraft(form.getValues()), { onSuccess: (r) => setIssues(r.issues) })
+    setAiAdvice('included')
+    precheck.mutate(toDraft(form.getValues()), {
+      onSuccess: (r) => {
+        setIssues(r.issues)
+        setAiAdvice(r.aiAdvice)
+      },
+    })
   }
   useEffect(() => {
     if (current.key === 'review') runPrecheck()
@@ -860,6 +867,7 @@ function WizardForm({ start, owned }: { start: FormStart; owned: Set<string> }) 
     review: (
       <ReviewStep
         issues={issues}
+        aiAdvice={aiAdvice}
         checking={precheck.isPending}
         checkFailed={precheck.isError}
         onRecheck={runPrecheck}
