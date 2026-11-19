@@ -2,11 +2,11 @@
 title: Architecture Conventions
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: architecture_conventions
 project: ax-request-portal
-last_updated: 2026-11-18
+last_updated: 2026-11-19
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -155,7 +155,7 @@ A front-end-only SPA whose backend is a contract. One table of endpoints (`src/a
 
 ## API contract
 
-- `EndpointSpec`: `method`, OpenAPI-style `path` (`/requests/{id}`), `summary`, `tag`, optional `public`, `params`, `query`, `body` (Zod), `multipart`, `status` (200/201), `conflict` (what a `409` means there, written into `docs/openapi.json`), `unauthorized` (what a `401` means on a public endpoint, likewise; `login` and `completeSetup` have one), `response` (`null` → 204) and `timeoutMs`. The table is `api`; it has 46 endpoints.
+- `EndpointSpec`: `method`, OpenAPI-style `path` (`/requests/{id}`), `summary`, `tag`, optional `public`, `params`, `query`, `body` (Zod), `multipart`, `status` (200/201), `conflict` (what a `409` means there, written into `docs/openapi.json`; every endpoint the mock answers with a `409` declares one), `unauthorized` (what a `401` means on a public endpoint, likewise; `login` and `completeSetup` have one), `response` (`null` → 204) and `timeoutMs`. The table is `api`; it has 46 endpoints.
 - Time limits belong to the endpoint, the same for every caller: `timeoutOf(spec)` is the spec's `timeoutMs`, else `UPLOAD_TIMEOUT_MS` (120 s) for multipart, else `DEFAULT_TIMEOUT_MS` (30 s); `0` means no limit. `call` takes no time-limit argument.
 - `call` in `client.ts` builds the URL from the spec, adds `Authorization: Bearer`, `Accept: application/json` and `Accept-Language`, and runs the whole call — sending, the mock's re-send and reading the body — under one deadline combined with the caller's `signal` (`anySignal`: `AbortSignal.any`, or a manual merge where it is missing). Every failure becomes an `ApiError`: `timeout` when the deadline passed, `network` when the request could not be sent or read, `contract_violation` when a success body is not JSON (typically an HTML page behind a wrong API base URL) or does not match the spec's schema, otherwise the server's code. Two exceptions pass through: a cancel through the caller's `signal` stays an `AbortError` (how TanStack Query drops a superseded fetch), and a bug such as a missing path parameter is thrown as is.
 - A `401` from a non-public endpoint calls `onUnauthorized(token)` with the token the refused request carried ([Auth](domains/02_auth.md)). The optional `recover` hook (set only in mock mode) sees every response first; when it resolves `true` the request is sent exactly once more. `ClientHooks.messages` holds the texts for errors the client raises itself; English fills any gap. Error bodies follow `ApiErrorBody` (`bad_request`, `unauthorized`, `forbidden`, `not_found`, `invalid_transition`, `guard_failed`, `conflict` (a saved draft was saved again since it was read), `limit_reached` (no room for another saved draft), `internal`) with a localized `message` and optional `issues[]` (`path`, `message`).
@@ -163,6 +163,7 @@ A front-end-only SPA whose backend is a contract. One table of endpoints (`src/a
 - Every URL field in the contract is validated with the rules in `src/domain/url.ts` (`isSafeUrl` with a kind: `web` absolute http(s); `link` http(s) or a path on this site; `file` adds `data:` images and PDFs and `blob:`; `image` adds `data:image/*` and `blob:`), so a `javascript:` or `data:text/html` URL fails as `contract_violation`. Screens check again before they render a link or an image.
 - Every schema used by the contract is registered with `named()` (`src/domain/registry.ts`); an unregistered schema makes OpenAPI generation throw.
 - `npm run openapi` regenerates `docs/openapi.json`. `src/api/openapi.test.ts` fails when the committed file differs byte for byte, when an endpoint lacks a unique `operationId`, or when a `$ref` is broken. The file is excluded from Prettier for that reason.
+- `npm run lifecycle` regenerates `docs/lifecycle.json` (`src/domain/lifecycle-document.ts`): the lifecycle's table-shaped rules as data — statuses, terminal statuses, `TRANSITIONS` (from, to, who sends it), the user events, which guard belongs to which event (`GUARD_EVENTS`), the scope-revision limit, turns and stages. A backend pins it with `docs/openapi.json` and tests its port against it; the guards' conditions stay in `assertGuards`. `src/domain/lifecycle-document.test.ts` fails while the committed file is stale, and Prettier skips it too.
 
 **Adding or changing an endpoint:** edit `contract.ts` (and `domain/model.ts` for new shapes; set `timeoutMs` if it is slow by nature), implement it in `src/mocks/handlers.ts` + `engine.ts`, add or adjust the hook in `queries.ts`, run `npm run openapi`, and add a case to `src/mocks/api.test.ts`.
 

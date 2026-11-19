@@ -1,0 +1,196 @@
+{
+  "description": "The request lifecycle of AX Request Portal, generated from src/domain/lifecycle.ts by `npm run lifecycle`. Do not edit. Guards are named here; their conditions are in lifecycle.ts (assertGuards).",
+  "statuses": [
+    "submitted",
+    "reporting",
+    "scope_check",
+    "review",
+    "info_needed",
+    "rejected",
+    "in_progress",
+    "code_review",
+    "verification",
+    "changes_requested",
+    "release_scheduled",
+    "done",
+    "cancelled"
+  ],
+  "terminal": [
+    "done",
+    "rejected",
+    "cancelled"
+  ],
+  "transitions": {
+    "startReport": {
+      "from": [
+        "submitted"
+      ],
+      "to": "reporting",
+      "by": "system"
+    },
+    "reportReady": {
+      "from": [
+        "reporting"
+      ],
+      "to": "review",
+      "by": "ai"
+    },
+    "scopeReady": {
+      "from": [
+        "reporting"
+      ],
+      "to": "scope_check",
+      "by": "ai"
+    },
+    "approveScope": {
+      "from": [
+        "scope_check"
+      ],
+      "to": "review",
+      "by": "requester"
+    },
+    "reviseScope": {
+      "from": [
+        "scope_check"
+      ],
+      "to": "reporting",
+      "by": "requester"
+    },
+    "requestInfo": {
+      "from": [
+        "review"
+      ],
+      "to": "info_needed",
+      "by": "developer"
+    },
+    "provideInfo": {
+      "from": [
+        "info_needed"
+      ],
+      "to": "reporting",
+      "by": "requester"
+    },
+    "reject": {
+      "from": [
+        "review",
+        "info_needed"
+      ],
+      "to": "rejected",
+      "by": "developer"
+    },
+    "runWork": {
+      "from": [
+        "review",
+        "changes_requested"
+      ],
+      "to": "in_progress",
+      "by": "developer"
+    },
+    "workFinished": {
+      "from": [
+        "in_progress"
+      ],
+      "to": "code_review",
+      "by": "ai"
+    },
+    "requestRevision": {
+      "from": [
+        "code_review"
+      ],
+      "to": "in_progress",
+      "by": "developer"
+    },
+    "approveMerge": {
+      "from": [
+        "code_review"
+      ],
+      "to": "verification",
+      "by": "developer"
+    },
+    "reportIssue": {
+      "from": [
+        "verification"
+      ],
+      "to": "changes_requested",
+      "by": "requester"
+    },
+    "confirmResult": {
+      "from": [
+        "verification"
+      ],
+      "to": "release_scheduled",
+      "by": "requester"
+    },
+    "markReleased": {
+      "from": [
+        "release_scheduled"
+      ],
+      "to": "done",
+      "by": "developer"
+    },
+    "cancel": {
+      "from": [
+        "submitted",
+        "reporting",
+        "scope_check",
+        "review",
+        "info_needed"
+      ],
+      "to": "cancelled",
+      "by": "requester"
+    }
+  },
+  "userEvents": [
+    "requestInfo",
+    "provideInfo",
+    "approveScope",
+    "reviseScope",
+    "reject",
+    "runWork",
+    "requestRevision",
+    "approveMerge",
+    "reportIssue",
+    "confirmResult",
+    "markReleased",
+    "cancel"
+  ],
+  "guards": {
+    "criteriaAllPassed": "confirmResult",
+    "criteriaOneFailed": "reportIssue",
+    "assumptionsUnchecked": "runWork",
+    "scopeUnanswered": "approveScope",
+    "scopeRevisionsUsed": "reviseScope",
+    "releaseUnscheduled": "markReleased"
+  },
+  "scopeRevisionsMax": 2,
+  "turn": {
+    "submitted": "ai",
+    "reporting": "ai",
+    "scope_check": "requester",
+    "review": "developer",
+    "info_needed": "requester",
+    "rejected": "none",
+    "in_progress": "ai",
+    "code_review": "developer",
+    "verification": "requester",
+    "changes_requested": "developer",
+    "release_scheduled": "developer",
+    "done": "none",
+    "cancelled": "none"
+  },
+  "stage": {
+    "submitted": "submitted",
+    "reporting": "report",
+    "scope_check": "review",
+    "review": "review",
+    "info_needed": "review",
+    "rejected": "review",
+    "in_progress": "work",
+    "code_review": "work",
+    "verification": "verification",
+    "changes_requested": "work",
+    "release_scheduled": "release",
+    "done": "done",
+    "cancelled": null
+  }
+}

@@ -2,11 +2,11 @@
 title: Project Profile
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: project_profile
 project: ax-request-portal
-last_updated: 2026-11-18
+last_updated: 2026-11-19
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -53,7 +53,7 @@ React 19, TypeScript (strict), Vite 8 (Rolldown), React Router 8 (data router, S
 
 - Node `^22.22.2 || ^24.15.0 || >=26.0.0` (`engines`); `.nvmrc` is 24. React Router 8 and jsdom 30 set the floor; CI verifies the lowest version of each line.
 - `npm run dev` (mock mode by default), `npm run build`, `npm run preview`.
-- `npm run verify` = lint → format check → typecheck → unit tests → build → `check:real-build` (a real-backend build must contain no mock code, service worker or demo accounts). `npm run test:e2e` runs Playwright against a production build served by `vite preview`, under the production Content-Security-Policy. `npm run openapi` regenerates the contract document.
+- `npm run verify` = lint → format check → typecheck → unit tests → build → `check:real-build` (a real-backend build must contain no mock code, service worker or demo accounts). `npm run test:e2e` runs Playwright against a production build served by `vite preview`, under the production Content-Security-Policy. `npm run openapi` regenerates the contract document, and `npm run lifecycle` the lifecycle as data (`docs/lifecycle.json`).
 - `npx llm-wiki validate` checks this wiki (the CLI is a dev dependency; never call the unrelated npm package `llm-wiki` through `npx -y`).
 
 ## Deployment

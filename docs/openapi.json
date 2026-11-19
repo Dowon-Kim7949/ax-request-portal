@@ -1293,6 +1293,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "invalid_transition: the request is not in verification",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -1369,6 +1379,16 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "invalid_transition: there is no preview to react to (only in code review, once the AI made one)",
             "content": {
               "application/json": {
                 "schema": {
@@ -1459,6 +1479,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "invalid_transition: the request is done, rejected or cancelled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -1535,6 +1565,16 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "invalid_transition: a release is planned only in code_review, verification, changes_requested or release_scheduled",
             "content": {
               "application/json": {
                 "schema": {
@@ -2710,6 +2750,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "guard_failed: a task or a project override still uses the provider",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
         }
       }
@@ -2803,6 +2853,16 @@
           },
           "403": {
             "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "guard_failed: a model a task or project still uses was left out of the table",
             "content": {
               "application/json": {
                 "schema": {
@@ -3423,7 +3483,7 @@
         ]
       },
       "ApiError": {
-        "description": "Error body for every 4xx/5xx response. 409 codes: invalid_transition and guard_failed (request lifecycle), conflict (a saved draft was saved again since it was read), limit_reached (no room for another saved draft).",
+        "description": "Error body for every 4xx/5xx response. 409 codes: invalid_transition and guard_failed (request lifecycle; guard_failed also for AI settings still in use), conflict (a saved draft was saved again since it was read), limit_reached (no room for another saved draft).",
         "type": "object",
         "properties": {
           "code": {
