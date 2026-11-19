@@ -2,8 +2,8 @@
 title: Request Wizard
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain
 project: ax-request-portal
 last_updated: 2026-11-19
@@ -192,7 +192,7 @@ A layout effect on step change scrolls the window and, on a big screen, the step
 
 | Hook | Endpoint | Payload → response | Errors and cache |
 | --- | --- | --- | --- |
-| `usePrecheck` | `POST /requests/precheck` | `RequestDraft` → `{ issues: PrecheckIssue[] }` | Runs on entering the review step; each run clears the previous advice first. Issues are advice shown next to their fields (also on earlier steps); they never block submission. Failure shows an inline note with a "check again" button, no toast. Submit is disabled while it runs. |
+| `usePrecheck` | `POST /requests/precheck` | `RequestDraft` → `{ issues: PrecheckIssue[], aiAdvice }` | Runs on entering the review step; each run clears the previous advice first. Issues are advice shown next to their fields (also on earlier steps); they never block submission. Failure shows an inline note with a "check again" button, no toast. Submit is disabled while it runs. When `aiAdvice` is `notConnected` or `failed`, the result panel adds a line saying only the basic rules checked the draft. |
 | `useUploadAttachment` | `POST /attachments` (multipart, 120 s time limit) | `File` → `Attachment` | Files upload one by one; over 10 MB is rejected client-side with a toast. Only attachment ids are submitted, and only the uploader may attach an upload. |
 | `useCreateRequest` | `POST /requests` (201) | `RequestSubmission` (project, type, title, targets, current/desired behaviour, 1–5 acceptance criteria — or, for `checklist`, `checklistSource` and 1–30 `checklist` items — out of scope, attachment ids, desired date and its reason; optional `draftId`) → `WorkRequest` | Success: `onRequestChanged`, the named draft leaves the drafts cache (`dropSavedDraft`), then the hook-level handling above. Failure: toast with the server message, or the missing-attachment handling. The server turns each finding into one acceptance criterion (`[number] fixed-when`, or the finding when that is empty). |
 | `draftApi` (sync engine, through `call`) | `GET /drafts/{id}`, `POST /drafts` (201), `PUT /drafts/{id}` | `SavedDraftInput` (`step`, `content: DraftContent`, `clientId`) / `SavedDraftUpdate` (`step`, `content`, `baseVersion`) → `SavedDraft` | `409 conflict` (saved since `baseVersion`), `409 limit_reached` (create only), `404` (not the caller's, or gone), `400` with `content.attachmentIds.<i>` for a missing or someone else's attachment. Saves go to the cache through `storeSavedDraft`. |
@@ -204,7 +204,7 @@ There are no query hooks for saving a draft: the sync engine sends each draft's 
 
 The desired-date input's minimum is today on the head-office business calendar (`hqToday`); a person whose clock differs sees the "dates follow head office" hint under it ([Glossary](../GLOSSARY.md)). If the project list cannot be loaded, the project step shows a compact `LoadFailed` with a retry, and a `?project=` preset is kept instead of cleared.
 
-`toDraft` trims strings, turns empty values into `undefined`, drops empty criteria and finding rows, sends findings only for `checklist` (and no criteria then) and omits the date reason when there is no date. The precheck also flags a repeated finding number and a finding without "fixed when". The mock precheck (`precheckDraft`) is deterministic, recognises Korean and English text and answers in the request language; it also books a small light-model cost against the author, with their team ([AI Operations](13_ops.md)), so every visit to the review step is a paid call.
+`toDraft` trims strings, turns empty values into `undefined`, drops empty criteria and finding rows, sends findings only for `checklist` (and no criteria then) and omits the date reason when there is no date. The precheck also flags a repeated finding number and a finding without "fixed when". The mock precheck (`precheckDraft`) is deterministic, recognises Korean and English text and answers in the request language; it also books a small light-model cost against the author, with their team ([AI Operations](13_ops.md)), so every visit to the review step is a paid call. Without a key for the precheck model's provider it books nothing and answers `aiAdvice: notConnected`.
 
 ## Accessibility
 

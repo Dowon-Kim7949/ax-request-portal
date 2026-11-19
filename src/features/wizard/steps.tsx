@@ -12,7 +12,12 @@ import { Spinner } from '@/components/ui/feedback'
 import { Field, Input, Textarea, type Advice } from '@/components/ui/field'
 import { LoadFailed } from '@/components/ui/load-failed'
 import { appConfig } from '@/config/app.config'
-import { ACCEPTANCE_CRITERIA_MAX, CHECKLIST_ITEMS_MAX, type PrecheckIssue } from '@/domain/model'
+import {
+  ACCEPTANCE_CRITERIA_MAX,
+  CHECKLIST_ITEMS_MAX,
+  type PrecheckAiAdvice,
+  type PrecheckIssue,
+} from '@/domain/model'
 import { cn } from '@/lib/cn'
 import { formatBytes, formatDate } from '@/lib/format'
 import { hqToday } from '@/lib/time-zone'
@@ -681,6 +686,7 @@ function ReviewRow({ label, children, onEdit }: { label: string; children: React
 
 export function ReviewStep({
   issues,
+  aiAdvice,
   checking,
   checkFailed,
   onRecheck,
@@ -688,6 +694,8 @@ export function ReviewStep({
   missing,
 }: {
   issues: PrecheckIssue[]
+  /** Whether the precheck model added its advice; otherwise only the rules answered */
+  aiAdvice: PrecheckAiAdvice
   checking: boolean
   /** The check could not run; submitting is still allowed (it is advisory) */
   checkFailed: boolean
@@ -768,6 +776,11 @@ export function ReviewStep({
           ) : (
             <p className="font-semibold text-success-fg">{t('wizard.review.clean')}</p>
           )}
+          {!checking && !checkFailed && aiAdvice !== 'included' ? (
+            <p className="text-ink-600">
+              {t(aiAdvice === 'notConnected' ? 'wizard.review.aiNotConnected' : 'wizard.review.aiFailed')}
+            </p>
+          ) : null}
         </div>
       </div>
 

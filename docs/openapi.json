@@ -4321,6 +4321,15 @@
           "onlyActionRequired"
         ]
       },
+      "PrecheckAiAdvice": {
+        "description": "Whether the precheck model added its advice to the rules': `included` (it ran, and may have added nothing), `notConnected` (the precheck model's provider has no key, so only the rules answered), `failed` (the call failed or took too long; only the rules answered).",
+        "type": "string",
+        "enum": [
+          "included",
+          "notConnected",
+          "failed"
+        ]
+      },
       "PrecheckIssue": {
         "description": "Shown next to the field. Never blocks submission.",
         "type": "object",
@@ -4354,10 +4363,14 @@
             "items": {
               "$ref": "#/components/schemas/PrecheckIssue"
             }
+          },
+          "aiAdvice": {
+            "$ref": "#/components/schemas/PrecheckAiAdvice"
           }
         },
         "required": [
-          "issues"
+          "issues",
+          "aiAdvice"
         ]
       },
       "PreviewFeedback": {

@@ -237,6 +237,14 @@ export const PrecheckIssue = named(
 )
 export type PrecheckIssue = z.infer<typeof PrecheckIssue>
 
+export const PRECHECK_AI_ADVICE = ['included', 'notConnected', 'failed'] as const
+export const PrecheckAiAdvice = named(
+  'PrecheckAiAdvice',
+  z.enum(PRECHECK_AI_ADVICE),
+  "Whether the precheck model added its advice to the rules': `included` (it ran, and may have added nothing), `notConnected` (the precheck model's provider has no key, so only the rules answered), `failed` (the call failed or took too long; only the rules answered).",
+)
+export type PrecheckAiAdvice = z.infer<typeof PrecheckAiAdvice>
+
 /* ------------------------------------------------------------------ */
 /* Lifecycle                                                           */
 /* ------------------------------------------------------------------ */

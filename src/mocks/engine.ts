@@ -62,6 +62,7 @@ import type {
   DashboardSummary,
   Notification,
   NotificationSettings,
+  PrecheckAiAdvice,
   PrecheckIssue,
   Project,
   ReleaseScheduleItem,
@@ -626,8 +627,20 @@ export class MockEngine {
 
   /* ---------- requests ---------- */
 
-  precheck(user: User, draft: RequestDraft, now: Date, lang: ServerLanguage): PrecheckIssue[] {
+  /**
+   * The rules' advice, and whether the precheck model ran: without a key for
+   * its provider only the rules answer, and nothing is booked.
+   */
+  precheck(
+    user: User,
+    draft: RequestDraft,
+    now: Date,
+    lang: ServerLanguage,
+  ): { issues: PrecheckIssue[]; aiAdvice: PrecheckAiAdvice } {
     this.require(user, 'request:create')
+    const issues = precheckDraft(draft, this.today(now), lang)
+    const selection = this.selectionFor(draft.projectId, 'precheck')
+    if (!this.state.ai.providers[selection.provider]) return { issues, aiAdvice: 'notConnected' }
     if (this.project(draft.projectId)) {
       const shape = {
         seed: draft.title.length + draft.desiredBehavior.length,
@@ -635,15 +648,9 @@ export class MockEngine {
         targets: draft.targetIds.length,
         attempt: 1,
       }
-      this.bookAi(
-        'precheck',
-        this.selectionFor(draft.projectId, 'precheck'),
-        shape,
-        now.toISOString(),
-        user.id,
-      )
+      this.bookAi('precheck', selection, shape, now.toISOString(), user.id)
     }
-    return precheckDraft(draft, this.today(now), lang)
+    return { issues, aiAdvice: 'included' }
   }
 
   createRequest(user: User, draft: RequestSubmission, now: Date, lang: ServerLanguage): WorkRequest {

@@ -24,6 +24,25 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-19 - The precheck says when only the rules answered
+
+- status: needs_review
+- actor: claude-code
+- scope: code, docs
+- changed:
+  - src/domain/model.ts (`PrecheckAiAdvice`), src/api/contract.ts (`PrecheckResult.aiAdvice`), docs/openapi.json
+  - src/mocks/engine.ts, src/mocks/handlers.ts: without a key for the precheck model's provider, `notConnected` and nothing booked
+  - src/features/wizard/wizard-page.tsx, src/features/wizard/steps.tsx (`ReviewStep`), src/i18n/ko.ts, src/i18n/en.ts
+  - docs/llm-wiki/domains/11_wizard.md, domains/13_ops.md
+  - docs/llm-wiki: ARCHITECTURE_CONVENTIONS, COMPONENT_INVENTORY, DOMAIN_FEATURES, GLOSSARY, WCAG, profiles/frontend, domains 00, 01, 02, 03, 07, 09, 12 (status only)
+- summary:
+  - `precheckRequest` answers `aiAdvice` (`included`, `notConnected`, `failed`). The review step says when only the basic rules checked the draft, so a deployment without an AI key does not pass the rules off as the AI's check.
+  - The status-only documents cite a changed source file; nothing they say changed, so they only go back to `needs_review` for a re-approval.
+- evidence:
+  - src/features/wizard/wizard-page.test.tsx ("says when only the rules checked the draft"), src/mocks/api.test.ts
+- caveats:
+  - Advice stored with a new request is unchanged.
+
 ## 2026-11-19 - The lifecycle as data; every 409 declared
 
 - status: needs_review
