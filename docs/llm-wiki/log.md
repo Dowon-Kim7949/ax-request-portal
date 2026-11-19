@@ -24,6 +24,25 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-19 - The lifecycle as data; every 409 declared
+
+- status: needs_review
+- actor: claude-code
+- scope: code, docs
+- changed:
+  - src/domain/lifecycle.ts (`GUARD_NAMES`, `GUARD_EVENTS`), src/domain/lifecycle-document.ts, scripts/generate-lifecycle.ts, package.json (`npm run lifecycle`), docs/lifecycle.json, .prettierignore
+  - src/api/contract.ts: `conflict` on saveVerification, sendPreviewFeedback, updateRegression, updateRelease, removeProviderKey, updateAiPricing; docs/openapi.json
+  - docs/llm-wiki: ARCHITECTURE_CONVENTIONS, project-profile, README, GLOSSARY; README.md, README.ko.md
+  - docs/llm-wiki: domains 00, 04, 05, 08, 09, 11, 12 and DOMAIN_FEATURES (status only)
+- summary:
+  - `docs/lifecycle.json` gives backends the lifecycle's table as data, pinned with the contract, to test a port against.
+  - Six endpoints the mock answers with a `409` now declare it in `docs/openapi.json`.
+  - The status-only documents cite `src/domain/lifecycle.ts` or `src/api/contract.ts`; nothing they say changed, so they only go back to `needs_review` for a re-approval.
+- evidence:
+  - src/domain/lifecycle-document.test.ts, src/api/openapi.test.ts, src/mocks/engine.ts (the `HttpError(409, …)` calls)
+- caveats:
+  - None.
+
 ## 2026-11-18 - One-time setup links
 
 - status: needs_review

@@ -129,7 +129,7 @@ export const ApiErrorBody = named(
     message: z.string(),
     issues: z.array(z.object({ path: z.string(), message: z.string() })).optional(),
   }),
-  'Error body for every 4xx/5xx response. 409 codes: invalid_transition and guard_failed (request lifecycle), conflict (a saved draft was saved again since it was read), limit_reached (no room for another saved draft).',
+  'Error body for every 4xx/5xx response. 409 codes: invalid_transition and guard_failed (request lifecycle; guard_failed also for AI settings still in use), conflict (a saved draft was saved again since it was read), limit_reached (no room for another saved draft).',
 )
 export type ApiErrorBody = z.infer<typeof ApiErrorBody>
 
@@ -595,6 +595,7 @@ export const api = {
     path: '/requests/{id}/verification',
     tag: 'requests',
     summary: 'Save QA checklist progress (requester, while in verification)',
+    conflict: 'invalid_transition: the request is not in verification',
     params: IdParam,
     body: VerificationDraft,
     response: WorkRequest,
@@ -605,6 +606,8 @@ export const api = {
     tag: 'requests',
     summary:
       "The requester's reaction to the preview while the change is in code review (advisory; status unchanged)",
+    conflict:
+      'invalid_transition: there is no preview to react to (only in code review, once the AI made one)',
     params: IdParam,
     body: PreviewFeedbackInput,
     response: WorkRequest,
@@ -615,6 +618,7 @@ export const api = {
     tag: 'requests',
     summary:
       'Record regression check results (responsible developer; 409 once the request is done, rejected or cancelled)',
+    conflict: 'invalid_transition: the request is done, rejected or cancelled',
     params: IdParam,
     body: RegressionUpdate,
     response: WorkRequest,
@@ -625,6 +629,8 @@ export const api = {
     tag: 'requests',
     summary:
       'Set or change the planned release date (responsible developer; 400 when a new date is before today on the head-office calendar)',
+    conflict:
+      'invalid_transition: a release is planned only in code_review, verification, changes_requested or release_scheduled',
     params: IdParam,
     body: ReleaseInput,
     response: WorkRequest,
@@ -800,6 +806,7 @@ export const api = {
     path: '/ai/providers/{provider}/key',
     tag: 'ai',
     summary: 'Disconnect a provider (agent:manage); refused while a task or project still uses it',
+    conflict: 'guard_failed: a task or a project override still uses the provider',
     params: ProviderParam,
     response: null,
   }),
@@ -815,6 +822,7 @@ export const api = {
     path: '/ai/pricing',
     tag: 'ai',
     summary: 'Edit prices and the exchange rate (agent:manage). Applies to usage booked from now on.',
+    conflict: 'guard_failed: a model a task or project still uses was left out of the table',
     body: AiPricing,
     response: AiPricing,
   }),

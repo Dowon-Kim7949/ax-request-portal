@@ -2,11 +2,11 @@
 title: LLM-WIKI README
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: wiki_readme
 project: ax-request-portal
-last_updated: 2026-11-05
+last_updated: 2026-11-19
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -50,7 +50,7 @@ Use the short `npx llm-wiki` only after `npm ci`; without the local install it w
 
 ## Files the tool manages
 
-`CLAUDE.md` (the adapter block), `.claude/skills/llm-wiki-*`, `.llm-wiki/prompts/` and `llm-wiki.config.json` are written by the CLI and excluded from Prettier so the two do not fight. `.claude/worktrees/` (other checkouts that agent workflows create inside this one) is excluded too, so `npm run verify` checks only this checkout.
+`CLAUDE.md` (the adapter block), `.claude/skills/llm-wiki-*`, `.llm-wiki/prompts/` and `llm-wiki.config.json` are written by the CLI and excluded from Prettier so the two do not fight. `.claude/worktrees/` (other checkouts that agent workflows create inside this one) is excluded too, so `npm run verify` checks only this checkout. The generated `docs/openapi.json` and `docs/lifecycle.json` are excluded because their tests compare them byte for byte.
 
 ## Citing without false alarms
 

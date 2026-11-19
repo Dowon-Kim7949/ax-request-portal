@@ -121,13 +121,28 @@ export const USER_EVENTS = TransitionCommand.options.map((o) => o.shape.event.va
 export type LifecycleErrorCode = 'invalid_transition' | 'forbidden' | 'guard_failed'
 
 /** Which rule a `guard_failed` broke, so the caller can explain it. */
-export type GuardName =
-  | 'criteriaAllPassed'
-  | 'criteriaOneFailed'
-  | 'assumptionsUnchecked'
-  | 'scopeUnanswered'
-  | 'scopeRevisionsUsed'
-  | 'releaseUnscheduled'
+export const GUARD_NAMES = [
+  'criteriaAllPassed',
+  'criteriaOneFailed',
+  'assumptionsUnchecked',
+  'scopeUnanswered',
+  'scopeRevisionsUsed',
+  'releaseUnscheduled',
+] as const
+export type GuardName = (typeof GUARD_NAMES)[number]
+
+/**
+ * The event each guard belongs to (see `assertGuards`). Written into
+ * docs/lifecycle.json, so a backend knows which rules to port.
+ */
+export const GUARD_EVENTS: Record<GuardName, LifecycleEvent> = {
+  criteriaAllPassed: 'confirmResult',
+  criteriaOneFailed: 'reportIssue',
+  assumptionsUnchecked: 'runWork',
+  scopeUnanswered: 'approveScope',
+  scopeRevisionsUsed: 'reviseScope',
+  releaseUnscheduled: 'markReleased',
+}
 
 export class LifecycleError extends Error {
   readonly code: LifecycleErrorCode
