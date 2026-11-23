@@ -290,6 +290,28 @@ describe('the submission check', () => {
     expect(await screen.findByText(/확인해 보면 좋은 점 \d+개/)).toBeInTheDocument()
     expect(screen.queryByText(/점검을 하지 못했어요/)).toBeNull()
   })
+
+  it('says when only the rules checked the draft', async () => {
+    keepLocal(READY)
+    let aiAdvice = 'notConnected'
+    t.server.use(http.post('*/api/requests/precheck', () => HttpResponse.json({ issues: [], aiAdvice })))
+    const router = renderWizard(REVIEW)
+    expect(await screen.findByText('빠진 내용이 없어 보여요.')).toBeInTheDocument()
+    expect(screen.getByText(/요청서 점검 AI가 연결되지 않아/)).toBeInTheDocument()
+
+    aiAdvice = 'failed'
+    const draft = draftParam(router)
+    await act(() => router.navigate(`/requests/new?draft=${draft}&step=5`))
+    await act(() => router.navigate(`/requests/new?draft=${draft}&step=6`))
+    expect(await screen.findByText(/AI 점검이 응답하지 않아/)).toBeInTheDocument()
+    expect(screen.queryByText(/요청서 점검 AI가 연결되지 않아/)).toBeNull()
+
+    aiAdvice = 'included'
+    await act(() => router.navigate(`/requests/new?draft=${draft}&step=5`))
+    await act(() => router.navigate(`/requests/new?draft=${draft}&step=6`))
+    expect(await screen.findByText('빠진 내용이 없어 보여요.')).toBeInTheDocument()
+    expect(screen.queryByText(/기본 규칙으로만 점검했어요/)).toBeNull()
+  })
 })
 
 describe('the draft in the account', () => {

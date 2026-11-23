@@ -19,6 +19,7 @@ import {
   DashboardSummary,
   Notification,
   NotificationSettings,
+  PrecheckAiAdvice,
   PrecheckIssue,
   Project,
   PROJECT_CONSTRAINTS_MAX,
@@ -225,7 +226,11 @@ export const RequestSubmission = named(
 export type RequestSubmission = z.infer<typeof RequestSubmission>
 
 export const RequestSummaryList = named('WorkRequestSummaryList', z.array(WorkRequestSummary))
-export const PrecheckResult = named('PrecheckResult', z.object({ issues: z.array(PrecheckIssue) }))
+export const PrecheckResult = named(
+  'PrecheckResult',
+  z.object({ issues: z.array(PrecheckIssue), aiAdvice: PrecheckAiAdvice }),
+)
+export type PrecheckResult = z.infer<typeof PrecheckResult>
 
 export const VerificationDraft = named(
   'VerificationDraft',

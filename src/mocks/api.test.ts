@@ -73,10 +73,11 @@ describe('auth', () => {
 describe('request lifecycle through the API', () => {
   it('runs a request from submission to release', async () => {
     await loginAs('planner@example.com')
-    const { issues } = await call(api.precheckRequest, {
+    const { issues, aiAdvice } = await call(api.precheckRequest, {
       body: { ...draft, desiredBehavior: '좀 편하게 해 주세요' },
     })
     expect(issues.some((i) => i.field === 'desiredBehavior')).toBe(true)
+    expect(aiAdvice).toBe('included')
 
     const created = await call(api.createRequest, { body: draft })
     const id = created.id
