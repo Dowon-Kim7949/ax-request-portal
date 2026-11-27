@@ -24,6 +24,28 @@ contains_sensitive_info: false
 
 This is an append-only change log. Do not edit existing entries; add new changes at the top.
 
+## 2026-11-27 - A project names the branch the AI works from
+
+- status: needs_review
+- actor: claude-code
+- scope: code, docs
+- changed:
+  - src/domain/model.ts (`BranchName`, `ProjectRepository`), src/api/contract.ts (`ProjectInput.repository`, `RepositoryBranches`, `listRepositoryBranches`, `EndpointSpec.notFound`), src/api/openapi.ts, docs/openapi.json (47 endpoints)
+  - src/mocks/branches.ts (`demoBranches`), src/mocks/engine.ts (`repositoryBranches`), src/mocks/handlers.ts, src/mocks/copy.ts (`repositoryNotFound`)
+  - src/api/queries.ts (`useRepositoryBranches`), src/features/admin/projects-page.tsx (`BranchField`, the branch on each card), src/i18n/ko.ts, src/i18n/en.ts
+  - README.md, README.ko.md ("Connect a real backend", step 4)
+  - docs/llm-wiki: domains/01_admin, ARCHITECTURE_CONVENTIONS, DOMAIN_FEATURES, E2E_WORKFLOWS, GLOSSARY
+  - docs/llm-wiki: project-profile, WCAG, domains 00, 02, 03, 04, 05, 07, 08, 09, 10, 11, 12, 13 (status only)
+- summary:
+  - `Project.repository` may name a `branch`: the AI reads it, works from it and opens its pull request into it; without one, the repository's default branch. The name follows git's branch-name rules (`BranchName`).
+  - `GET /repositories/branches` (`project:manage`) lists a repository's branches for the project form, the default first. A repository the server cannot find or reach is a `404`; the form then says why and lets the admin type the name.
+  - `EndpointSpec.notFound` says what a `404` means on an endpoint without path parameters.
+  - The status-only documents cite a changed source file; nothing they say changed, so they only go back to `needs_review` for a re-approval.
+- evidence:
+  - src/domain/branch-name.test.ts, src/mocks/api.test.ts ("keeps the branch the AI works from", "lists a repository branches"), e2e/admin.spec.ts (picks a branch when adding a project)
+- caveats:
+  - The mock reaches no repository host: its branch lists are made up (`demoBranches`), and only a URL without `owner/name` is "not found".
+
 ## 2026-11-19 - The precheck says when only the rules answered
 
 - status: needs_review

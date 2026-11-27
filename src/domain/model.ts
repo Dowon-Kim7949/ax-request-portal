@@ -60,6 +60,38 @@ export type Team = z.infer<typeof Team>
 export const VcsProvider = named('VcsProvider', z.enum(['gitlab', 'github']))
 export type VcsProvider = z.infer<typeof VcsProvider>
 
+export const BRANCH_NAME_MAX = 200
+
+/**
+ * A branch name git accepts (`git check-ref-format --branch`), kept to what can
+ * also travel safely as a command argument: no whitespace or control
+ * characters, none of `~ ^ : ? * [ \`, no `..`, `//` or `@{`, no part that
+ * starts with `.` or ends with `.lock`, no leading `-` or `/`, no trailing `/`
+ * or `.`, and not `@` alone. A backend checks the same rules.
+ */
+export const BRANCH_NAME_PATTERN =
+  // eslint-disable-next-line no-control-regex -- control characters are what it refuses
+  /^(?![-/.])(?!@$)(?!.*\.\.)(?!.*\/\/)(?!.*\/\.)(?!.*@\{)(?!.*\.lock(?:\/|$))(?!.*[/.]$)[^\x00-\x20\x7f~^:?*[\\]+$/
+
+export const BranchName = named(
+  'BranchName',
+  z.string().trim().min(1).max(BRANCH_NAME_MAX).regex(BRANCH_NAME_PATTERN),
+  'A git branch name',
+)
+
+export const ProjectRepository = named(
+  'ProjectRepository',
+  z.object({
+    provider: VcsProvider,
+    url: WebUrl.describe('Absolute http(s) URL'),
+    branch: BranchName.optional().describe(
+      'Branch the AI reads, works from and opens pull requests into; without one, the repository default branch',
+    ),
+  }),
+  'Where a project keeps its code',
+)
+export type ProjectRepository = z.infer<typeof ProjectRepository>
+
 export const ProjectTarget = named(
   'ProjectTarget',
   z.object({
@@ -103,7 +135,7 @@ export const Project = named(
     name: z.string(),
     description: z.string(),
     icon: ProjectIcon,
-    repository: z.object({ provider: VcsProvider, url: WebUrl.describe('Absolute http(s) URL') }),
+    repository: ProjectRepository,
     /** Path of the project wiki inside the repository, e.g. docs/llm-wiki */
     wikiPath: z.string(),
     wikiStats: z.object({

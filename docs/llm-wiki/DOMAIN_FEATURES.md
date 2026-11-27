@@ -2,11 +2,11 @@
 title: Domain Features
 tags:
   - llm-wiki
-  - verified
-status: verified
+  - needs-review
+status: needs_review
 doc_type: domain_overview
 project: ax-request-portal
-last_updated: 2026-11-19
+last_updated: 2026-11-27
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -84,7 +84,7 @@ User-facing features by role. Each row names the domain document that holds the 
 
 | Feature | Domain | E2E |
 | --- | --- | --- |
-| Projects: repository, owners, change targets, rules to keep, wiki path, active flag | [Admin](domains/01_admin.md) | `admin.spec.ts` |
+| Projects: repository and the branch the AI works from (picked from the repository's branches or typed), owners, change targets, rules to keep, wiki path, active flag | [Admin](domains/01_admin.md) | `admin.spec.ts` |
 | Users: invite, change role, deactivate; a one-time setup link to set or reset a password | [Admin](domains/01_admin.md) | `admin.spec.ts` |
 
 ## Operator
@@ -116,7 +116,7 @@ User-facing features by role. Each row names the domain document that holds the 
 
 ## API Services
 
-The 46 endpoints of `src/api/contract.ts` are listed per domain in the domain documents; the generated reference is `docs/openapi.json`.
+The 47 endpoints of `src/api/contract.ts` are listed per domain in the domain documents; the generated reference is `docs/openapi.json`.
 
 ## Evidence
 

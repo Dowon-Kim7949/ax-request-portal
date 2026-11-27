@@ -840,6 +840,87 @@
         }
       }
     },
+    "/repositories/branches": {
+      "get": {
+        "operationId": "listRepositoryBranches",
+        "summary": "Branches of a repository, to pick a project's branch before saving it (project:manage)",
+        "tags": [
+          "projects"
+        ],
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/VcsProvider"
+            }
+          },
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "description": "Absolute http(s) URL of the repository",
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepositoryBranches"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such repository, or the server cannot read it: its credentials do not reach it, or it does not connect to this host. The branch can still be typed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/requests": {
       "get": {
         "operationId": "listRequests",
@@ -3558,6 +3639,13 @@
           "url"
         ]
       },
+      "BranchName": {
+        "description": "A git branch name",
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 200,
+        "pattern": "^(?![-/.])(?!@$)(?!.*\\.\\.)(?!.*\\/\\/)(?!.*\\/\\.)(?!.*@\\{)(?!.*\\.lock(?:\\/|$))(?!.*[/.]$)[^\\x00-\\x20\\x7f~^:?*[\\\\]+$"
+      },
       "Budget": {
         "type": "object",
         "properties": {
@@ -4460,21 +4548,7 @@
             "$ref": "#/components/schemas/ProjectIcon"
           },
           "repository": {
-            "type": "object",
-            "properties": {
-              "provider": {
-                "$ref": "#/components/schemas/VcsProvider"
-              },
-              "url": {
-                "type": "string",
-                "format": "uri",
-                "description": "Absolute http(s) URL"
-              }
-            },
-            "required": [
-              "provider",
-              "url"
-            ]
+            "$ref": "#/components/schemas/ProjectRepository"
           },
           "wikiPath": {
             "type": "string"
@@ -4591,21 +4665,7 @@
             "$ref": "#/components/schemas/ProjectIcon"
           },
           "repository": {
-            "type": "object",
-            "properties": {
-              "provider": {
-                "$ref": "#/components/schemas/VcsProvider"
-              },
-              "url": {
-                "type": "string",
-                "format": "uri",
-                "description": "Absolute http(s) URL"
-              }
-            },
-            "required": [
-              "provider",
-              "url"
-            ]
+            "$ref": "#/components/schemas/ProjectRepository"
           },
           "wikiPath": {
             "type": "string",
@@ -4685,6 +4745,28 @@
         "items": {
           "$ref": "#/components/schemas/Project"
         }
+      },
+      "ProjectRepository": {
+        "description": "Where a project keeps its code",
+        "type": "object",
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/VcsProvider"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Absolute http(s) URL"
+          },
+          "branch": {
+            "description": "Branch the AI reads, works from and opens pull requests into; without one, the repository default branch",
+            "$ref": "#/components/schemas/BranchName"
+          }
+        },
+        "required": [
+          "provider",
+          "url"
+        ]
       },
       "ProjectTarget": {
         "description": "A screen or feature a requester can pick. Normally extracted from the project wiki.",
@@ -4947,6 +5029,32 @@
           "conditional",
           "out_of_scope",
           "undetermined"
+        ]
+      },
+      "RepositoryBranches": {
+        "description": "Branches of a repository, read from its host when someone asks",
+        "type": "object",
+        "properties": {
+          "defaultBranch": {
+            "type": "string",
+            "description": "The branch a project uses when it names none"
+          },
+          "branches": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Branch names: the default branch first, then by name"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "The repository has more branches than were listed; a missing one can still be typed"
+          }
+        },
+        "required": [
+          "defaultBranch",
+          "branches",
+          "truncated"
         ]
       },
       "RequestAiUsage": {

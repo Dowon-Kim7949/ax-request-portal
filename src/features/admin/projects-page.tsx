@@ -1,12 +1,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { GitBranch, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
-import { Controller, useFieldArray, useForm } from 'react-hook-form'
+import { Controller, useFieldArray, useForm, type UseFormReturn } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+import * as z from 'zod'
 import { ApiError } from '@/api/client'
-import { ProjectInput } from '@/api/contract'
-import { useSaveProject } from '@/api/queries'
+import { ProjectInput, type RepositoryBranches } from '@/api/contract'
+import { useRepositoryBranches, useSaveProject } from '@/api/queries'
 import { useDirectory } from '@/app/hooks'
 import { Page, PageHeader, PageScroll, PageTop } from '@/app/page'
 import { usePageTitle } from '@/app/title'
@@ -18,16 +19,32 @@ import { ListSkeleton } from '@/components/ui/feedback'
 import { LoadFailed, RefreshFailed } from '@/components/ui/load-failed'
 import { Field, Input, Label, Textarea } from '@/components/ui/field'
 import { Sheet } from '@/components/ui/sheet'
-import { PROJECT_CONSTRAINTS_MAX, ProjectIcon as ProjectIconSchema, type Project } from '@/domain/model'
+import {
+  BranchName,
+  PROJECT_CONSTRAINTS_MAX,
+  ProjectIcon as ProjectIconSchema,
+  ProjectRepository,
+  type Project,
+} from '@/domain/model'
+import { WebUrl } from '@/domain/url'
 import { cn } from '@/lib/cn'
 
-type FormValues = ProjectInput
+/** The form keeps "no branch" as '' (what the input holds); saving leaves the branch out. */
+const FormSchema = ProjectInput.extend({
+  repository: ProjectRepository.extend({
+    branch: z
+      .string()
+      .trim()
+      .refine((s) => s === '' || BranchName.safeParse(s).success),
+  }),
+})
+type FormValues = z.infer<typeof FormSchema>
 
 const EMPTY: FormValues = {
   name: '',
   description: '',
   icon: 'box',
-  repository: { provider: 'gitlab', url: '' },
+  repository: { provider: 'gitlab', url: '', branch: '' },
   wikiPath: 'docs/llm-wiki',
   ownerIds: [],
   targets: [{ name: '', wikiDoc: '' }],
@@ -40,7 +57,7 @@ function toForm(p: Project): FormValues {
     name: p.name,
     description: p.description,
     icon: p.icon,
-    repository: { ...p.repository },
+    repository: { ...p.repository, branch: p.repository.branch ?? '' },
     wikiPath: p.wikiPath,
     ownerIds: [...p.ownerIds],
     targets: p.targets.map((t) => ({ id: t.id, name: t.name, wikiDoc: t.wikiDoc ?? '' })),
@@ -49,12 +66,100 @@ function toForm(p: Project): FormValues {
   }
 }
 
+/**
+ * The branch the AI works from. "Load branches" asks the server, which asks the
+ * repository host; a host the server cannot reach is no dead end, the name can
+ * be typed. An answer counts only for the repository it was asked about.
+ */
+function BranchField({ form }: { form: UseFormReturn<FormValues> }) {
+  const { t } = useTranslation()
+  const load = useRepositoryBranches()
+  const [provider, url, value] = form.watch(['repository.provider', 'repository.url', 'repository.branch'])
+  const repo = `${provider} ${url}`
+  const [answer, setAnswer] = useState<{ repo: string; list?: RepositoryBranches; error?: string } | null>(
+    null,
+  )
+  const current = answer?.repo === repo ? answer : null
+  const list = current?.list
+  const invalid = form.formState.errors.repository?.branch
+
+  const ask = () => {
+    const asked = repo
+    load.mutate(
+      { provider, url },
+      {
+        onSuccess: (branches) => setAnswer({ repo: asked, list: branches }),
+        onError: (e) =>
+          setAnswer({ repo: asked, error: e instanceof ApiError ? e.message : t('errors.generic') }),
+      },
+    )
+  }
+
+  const hint = list
+    ? t(list.truncated ? 'projects.form.branchTruncated' : 'projects.form.branchLoaded', {
+        count: list.branches.length,
+      })
+    : current?.error
+      ? `${current.error} ${t('projects.form.branchTypeInstead')}`
+      : t('projects.form.branchHint')
+
+  return (
+    <Field
+      label={t('projects.form.branch')}
+      optional
+      optionalLabel={t('common.optional')}
+      hint={hint}
+      error={invalid ? t('projects.form.branchInvalid') : undefined}
+    >
+      {(p) => (
+        <div className="flex gap-2">
+          {list ? (
+            <Select {...p} className="min-w-0 flex-1" {...form.register('repository.branch')}>
+              <option value="">{t('projects.form.branchDefault', { name: list.defaultBranch })}</option>
+              {value && !list.branches.includes(value) ? <option value={value}>{value}</option> : null}
+              {list.branches.map((b) => (
+                <option key={b} value={b}>
+                  {b}
+                </option>
+              ))}
+            </Select>
+          ) : (
+            <Input
+              {...p}
+              className="min-w-0 flex-1 font-mono"
+              placeholder={t('projects.form.branchPlaceholder')}
+              autoComplete="off"
+              spellCheck={false}
+              {...form.register('repository.branch')}
+            />
+          )}
+          {list ? (
+            <Button variant="secondary" className="h-12" onClick={() => setAnswer(null)}>
+              {t('projects.form.branchType')}
+            </Button>
+          ) : (
+            <Button
+              variant="secondary"
+              className="h-12"
+              loading={load.isPending}
+              disabled={!WebUrl.safeParse(url).success}
+              onClick={ask}
+            >
+              {t('projects.form.branchLoad')}
+            </Button>
+          )}
+        </div>
+      )}
+    </Field>
+  )
+}
+
 function ProjectForm({ project, onDone }: { project: Project | null; onDone: () => void }) {
   const { t } = useTranslation()
   const dir = useDirectory()
   const save = useSaveProject()
   const form = useForm<FormValues>({
-    resolver: zodResolver(ProjectInput),
+    resolver: zodResolver(FormSchema),
     defaultValues: project ? toForm(project) : EMPTY,
   })
   const targets = useFieldArray({ control: form.control, name: 'targets' })
@@ -63,8 +168,10 @@ function ProjectForm({ project, onDone }: { project: Project | null; onDone: () 
   const err = form.formState.errors
 
   const submit = form.handleSubmit((values) => {
-    const body: FormValues = {
+    const { branch, ...repository } = values.repository
+    const body: ProjectInput = {
       ...values,
+      repository: { ...repository, ...(branch ? { branch } : {}) },
       targets: values.targets
         .filter((x) => x.name.trim())
         .map((x) => ({
@@ -130,6 +237,7 @@ function ProjectForm({ project, onDone }: { project: Project | null; onDone: () 
           />
         )}
       </Field>
+      <BranchField form={form} />
       <Field label={t('projects.form.wikiPath')}>
         {(p) => <Input className="font-mono" {...p} {...form.register('wikiPath')} />}
       </Field>
@@ -357,6 +465,11 @@ export default function ProjectsPage() {
                       <dd className="flex min-w-0 items-center gap-1 font-mono text-[13px]">
                         <GitBranch className="size-3.5 shrink-0 text-ink-400" aria-hidden />
                         <span className="truncate">{p.repository.url.replace(/^https?:\/\//, '')}</span>
+                        {p.repository.branch ? (
+                          <span className="max-w-[40%] shrink-0 truncate text-ink-500">
+                            · {p.repository.branch}
+                          </span>
+                        ) : null}
                       </dd>
                     </div>
                     <div className="flex gap-2">

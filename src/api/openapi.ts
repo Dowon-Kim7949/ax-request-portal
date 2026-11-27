@@ -83,7 +83,7 @@ function operation(name: string, e: EndpointSpec): JsonSchema {
   } else if (e.unauthorized) {
     responses['401'] = errorResponse(e.unauthorized)
   }
-  if (e.params) responses['404'] = errorResponse('Not found')
+  if (e.params || e.notFound) responses['404'] = errorResponse(e.notFound ?? 'Not found')
   if (e.conflict) responses['409'] = errorResponse(e.conflict)
 
   const params = parameters(e)

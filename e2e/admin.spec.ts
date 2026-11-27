@@ -55,6 +55,10 @@ test('admin changes a role and adds a project', async ({ page }) => {
   await form.getByLabel('이름', { exact: true }).fill('사내 위키 검색')
   await form.getByLabel('설명').fill('사내 문서를 찾는 검색 화면')
   await form.getByLabel('저장소 주소').fill('https://gitlab.example.com/acme/wiki-search')
+  // The branch: typed by hand, or picked from what the server reads from the repository.
+  await form.getByRole('button', { name: '목록 불러오기' }).click()
+  await expect(form.getByText('브랜치 2개를 불러왔어요.')).toBeVisible()
+  await form.getByLabel('기준 브랜치').selectOption('develop')
   await form.getByRole('button', { name: '정개발' }).click()
   await form.getByRole('textbox', { name: '화면 이름' }).first().fill('검색 결과')
   await form.getByRole('button', { name: '제약 추가' }).click()
@@ -63,6 +67,7 @@ test('admin changes a role and adds a project', async ({ page }) => {
   await form.getByRole('button', { name: '저장' }).click()
   await expect(page.getByText('프로젝트를 저장했어요.')).toBeVisible()
   await expect(page.getByText('사내 위키 검색')).toBeVisible()
+  await expect(page.getByText('· develop')).toBeVisible()
   await expectNoHorizontalScroll(page)
 
   // The AI side of the service is the operator's: no budget menu, and operator rows are locked.

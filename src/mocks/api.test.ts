@@ -393,6 +393,76 @@ describe('visibility and permissions', () => {
     )
   })
 
+  it('keeps the branch the AI works from with the project, or none for the default branch', async () => {
+    await loginAs('admin@example.com')
+    const [portal] = await call(api.listProjects)
+    const { id, wikiStats: _stats, ...input } = portal!
+    expect(input.repository.branch).toBeUndefined()
+
+    const saved = await call(api.updateProject, {
+      params: { id },
+      body: { ...input, repository: { ...input.repository, branch: ' release/2026.11 ' } },
+    })
+    expect(saved.repository.branch).toBe('release/2026.11')
+
+    const cleared = await call(api.updateProject, {
+      params: { id },
+      body: { ...input, repository: { provider: input.repository.provider, url: input.repository.url } },
+    })
+    expect(cleared.repository).not.toHaveProperty('branch')
+
+    for (const branch of ['', 'a..b', '-x', 'has space']) {
+      await expectApiError(
+        call(api.updateProject, {
+          params: { id },
+          body: { ...input, repository: { ...input.repository, branch } },
+        }),
+        400,
+        'bad_request',
+      )
+    }
+  })
+
+  it('lists a repository branches for the project form, to project managers only', async () => {
+    await loginAs('admin@example.com')
+    const seeded = await call(api.listRepositoryBranches, {
+      query: { provider: 'gitlab', url: 'https://gitlab.example.com/acme/admin-console' },
+    })
+    expect(seeded).toEqual({ defaultBranch: 'master', branches: ['master', 'develop'], truncated: false })
+
+    // The default branch first, then by name; a trailing .git names the same repository.
+    const portal = await call(api.listRepositoryBranches, {
+      query: { provider: 'gitlab', url: 'https://gitlab.example.com/acme/customer-portal.git' },
+    })
+    expect(portal.branches).toEqual(['main', 'develop', 'feature/notice-search', 'release/2026.11'])
+
+    const other = await call(api.listRepositoryBranches, {
+      query: { provider: 'github', url: 'https://github.com/acme/new-service' },
+    })
+    expect(other).toMatchObject({ defaultBranch: 'main', branches: ['main', 'develop'] })
+
+    // Not a repository: the form falls back to typing the name.
+    await expectApiError(
+      call(api.listRepositoryBranches, { query: { provider: 'github', url: 'https://github.com/acme' } }),
+      404,
+      'not_found',
+    )
+    await expectApiError(
+      call(api.listRepositoryBranches, { query: { provider: 'github', url: 'javascript:alert(1)' } }),
+      400,
+      'bad_request',
+    )
+
+    await loginAs('planner@example.com')
+    await expectApiError(
+      call(api.listRepositoryBranches, {
+        query: { provider: 'github', url: 'https://github.com/acme/field-worker-app' },
+      }),
+      403,
+      'forbidden',
+    )
+  })
+
   it('lets admins manage users but not demote themselves', async () => {
     await loginAs('admin@example.com')
     const created = await call(api.createUser, {
