@@ -427,6 +427,18 @@ export function useSaveProject() {
   })
 }
 
+/**
+ * A repository's branches, read when someone asks (the project form's button),
+ * not as the form loads: the host may be slow or out of the server's reach.
+ * Kept out of the cache, so asking again reads the host again.
+ */
+export function useRepositoryBranches() {
+  return useMutation({
+    mutationFn: (query: QueryOf<typeof api.listRepositoryBranches>) =>
+      call(api.listRepositoryBranches, { query }),
+  })
+}
+
 export function useCreateUser() {
   const qc = useQueryClient()
   return useMutation({

@@ -25,6 +25,7 @@ import {
   PROJECT_CONSTRAINTS_MAX,
   ProjectConstraint,
   ProjectIcon,
+  ProjectRepository,
   ProjectTarget,
   RegressionCheck,
   ReleaseScheduleItem,
@@ -67,6 +68,11 @@ export interface EndpointSpec {
   status?: 200 | 201
   /** What a 409 answer means here, for endpoints that give one (written into docs/openapi.json) */
   conflict?: string
+  /**
+   * What a 404 answer means here (written into docs/openapi.json). Endpoints
+   * with path parameters give "Not found" without it.
+   */
+  notFound?: string
   /**
    * What a 401 answer means here, for a public endpoint that gives one (written
    * into docs/openapi.json). Every other endpoint gets the session 401 and 403.
@@ -192,7 +198,7 @@ export const ProjectInput = named(
     name: z.string().trim().min(1).max(60),
     description: z.string().max(300),
     icon: ProjectIcon,
-    repository: z.object({ provider: VcsProvider, url: WebUrl.describe('Absolute http(s) URL') }),
+    repository: ProjectRepository,
     wikiPath: z.string().trim().min(1),
     ownerIds: z.array(z.string()).min(1),
     targets: z.array(ProjectTarget.extend({ id: z.string().optional() })),
@@ -203,6 +209,19 @@ export const ProjectInput = named(
   }),
 )
 export type ProjectInput = z.infer<typeof ProjectInput>
+
+export const RepositoryBranches = named(
+  'RepositoryBranches',
+  z.object({
+    defaultBranch: z.string().describe('The branch a project uses when it names none'),
+    branches: z.array(z.string()).describe('Branch names: the default branch first, then by name'),
+    truncated: z
+      .boolean()
+      .describe('The repository has more branches than were listed; a missing one can still be typed'),
+  }),
+  'Branches of a repository, read from its host when someone asks',
+)
+export type RepositoryBranches = z.infer<typeof RepositoryBranches>
 
 export const RequestScope = named(
   'RequestScope',
@@ -543,6 +562,19 @@ export const api = {
     params: StringIdParam,
     body: ProjectInput,
     response: Project,
+  }),
+  listRepositoryBranches: endpoint({
+    method: 'GET',
+    path: '/repositories/branches',
+    tag: 'projects',
+    summary: "Branches of a repository, to pick a project's branch before saving it (project:manage)",
+    query: z.object({
+      provider: VcsProvider,
+      url: WebUrl.describe('Absolute http(s) URL of the repository'),
+    }),
+    notFound:
+      'No such repository, or the server cannot read it: its credentials do not reach it, or it does not connect to this host. The branch can still be typed.',
+    response: RepositoryBranches,
   }),
 
   /* requests */

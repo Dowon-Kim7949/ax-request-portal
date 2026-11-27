@@ -220,6 +220,7 @@ export function createHandlers(store: MockStore, options: HandlerOptions = {}): 
       ({ store, me, params, body }) => store.engine.saveProject(me, body, params.id),
       edit,
     ),
+    route(api.listRepositoryBranches, ({ store, me, query }) => store.engine.repositoryBranches(me, query)),
 
     /* requests — note: /requests/precheck must be registered before /requests/:id */
     route(

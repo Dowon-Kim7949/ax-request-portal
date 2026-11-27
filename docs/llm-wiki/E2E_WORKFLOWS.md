@@ -6,7 +6,7 @@ tags:
 status: verified
 doc_type: e2e_workflows
 project: ax-request-portal
-last_updated: 2026-11-18
+last_updated: 2026-11-27
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -52,7 +52,7 @@ related:
 visibility: public
 contains_sensitive_info: false
 reviewed_by: Kim Dowon
-reviewed_at: 2026-11-18
+reviewed_at: 2026-11-27
 ---
 
 # E2E Workflows
@@ -81,7 +81,7 @@ Every user workflow is tested end to end against the production build with the i
 | `attachments.spec.ts` | A PNG attached in the wizard is kept inline by the demo and, from the request page, opens in a new tab through a `blob:` URL. |
 | `time-zone.spec.ts` | A viewer in Los Angeles sees local time with Korea time beside it on detail screens, can turn Korea time off, and a zone picked in Settings wins over the device; a viewer in Seoul sees nothing added; date-only values read the same date in both zones. |
 | `developer.spec.ts` | Developer reads the report's assumptions and a rule conflict (#1026), ticks the assumption to enable the run, runs AI work and approves the merge request, sees the preview and that the requester has not reacted (#1024), asks questions, requests a revision and sees the rework, marks a release done; the assigned and regression queues fit the screen. |
-| `admin.spec.ts` | Executive reads the dashboard, and files a request through the wizard, finds it in My requests, reads someone else's, and finds no developer queue in the menu or at its address; admin changes a role, adds a team, moves someone into it and renames it (the person's row follows the new name), and adds a project with a rule to keep, and cannot assign or change the operator role; a person the admin adds gets a setup link at once, sets a password through it (which replaces the admin's session), signs in again with it, and finds the link spent; notifications are read and their settings changed. |
+| `admin.spec.ts` | Executive reads the dashboard, and files a request through the wizard, finds it in My requests, reads someone else's, and finds no developer queue in the menu or at its address; admin changes a role, adds a team, moves someone into it and renames it (the person's row follows the new name), and adds a project, picking its branch from the list loaded from the repository, with a rule to keep, and cannot assign or change the operator role; a person the admin adds gets a setup link at once, sets a password through it (which replaces the admin's session), signs in again with it, and finds the link spent; notifications are read and their settings changed. |
 | `operator.spec.ts` | Operator replaces a provider key (only the last four characters come back), moves a task to another model, cannot disconnect a provider in use, edits the exchange rate, reads the usage dashboard, its table view and the team and person cards, and sets the budget at `/admin/budget` → `/ops/budget`; a developer then sees the request's AI usage and the run button disabled with the reason. |
 | `smoke.spec.ts` | Login screen fits each viewport; per-device navigation (phone tab bar, tablet rail, desktop sidebar) reaches My requests and Schedule. |
 | `schedule.spec.ts` | On a tablet and a desktop the release schedule switches to the month view (`?view=month`), finds #1019 on the head office's tomorrow (stepping to the next month when tomorrow falls there), opens it and comes Back to the same month, steps months and returns with "This month", and switches back to the list. On a phone a `?view=month` link opens the list, with no switch. |

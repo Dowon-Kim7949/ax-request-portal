@@ -14,6 +14,7 @@ import type {
   PreviewFeedbackInput,
   ProjectInput,
   RegressionQueue,
+  RepositoryBranches,
   RequestScope,
   RequestSubmission,
   SavedDraft,
@@ -78,6 +79,7 @@ import { precheckDraft } from '../domain/precheck'
 import { hasPermission, type Permission, type RolePermissions } from '../domain/roles'
 import { addCalendarDays, dateInTimeZone, hqTimeZone } from '../lib/time-zone'
 import { finishWork, generateReport, generateScope, phaseAt, simulateUsage, type UsageShape } from './ai'
+import { demoBranches } from './branches'
 import { renderNotification, type ErrorKey, type NotificationKey, type ServerLanguage } from './copy'
 
 /* ------------------------------------------------------------------ */
@@ -1223,6 +1225,18 @@ export class MockEngine {
     if (existing) this.state.projects[this.state.projects.indexOf(existing)] = project
     else this.state.projects.push(project)
     return project
+  }
+
+  /**
+   * Branches of a repository, for the project form. The demo reaches no host:
+   * a URL that names no `owner/name` is a repository it cannot find, and the
+   * rest get made-up branches (`demoBranches`).
+   */
+  repositoryBranches(actor: User, repository: { url: string }): RepositoryBranches {
+    this.require(actor, 'project:manage')
+    const path = new URL(repository.url).pathname.split('/').filter(Boolean)
+    if (path.length < 2) throw new HttpError(404, 'not_found', 'repositoryNotFound')
+    return demoBranches(repository.url)
   }
 
   /* ---------- notifications ---------- */

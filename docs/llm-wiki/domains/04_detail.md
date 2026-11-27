@@ -53,7 +53,7 @@ related:
 visibility: public
 contains_sensitive_info: false
 reviewed_by: Kim Dowon
-reviewed_at: 2026-11-19
+reviewed_at: 2026-11-27
 ---
 
 # Request Detail

@@ -6,7 +6,7 @@ tags:
 status: verified
 doc_type: domain
 project: ax-request-portal
-last_updated: 2026-11-19
+last_updated: 2026-11-27
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -16,7 +16,11 @@ evidence:
   - src/features/admin/projects-page.tsx#symbol:ProjectsPage
   - src/features/admin/users-page.tsx#symbol:UsersPage
   - src/api/queries.ts#symbol:useSaveProject
+  - src/api/queries.ts#symbol:useRepositoryBranches
   - src/mocks/engine.ts#symbol:saveProject
+  - src/mocks/engine.ts#symbol:repositoryBranches
+  - src/mocks/branches.ts#symbol:demoBranches
+  - src/domain/model.ts#symbol:BranchName
   - src/mocks/engine.ts#symbol:createUser
   - src/mocks/engine.ts#symbol:updateUser
   - src/domain/roles.ts#symbol:DEFAULT_ROLE_PERMISSIONS
@@ -35,7 +39,7 @@ related:
 visibility: public
 contains_sensitive_info: false
 reviewed_by: Kim Dowon
-reviewed_at: 2026-11-23
+reviewed_at: 2026-11-27
 ---
 
 # Admin
@@ -51,7 +55,7 @@ Administration of the organization's side of the workflow: projects (repositorie
 
 ## Workflows
 
-- **Projects**: list plus an edit sheet (`editing` is a project, `'new'` or `null`). Fields: name, description, icon, repository (`provider` + URL), wiki path (default `docs/llm-wiki`), owners, targets (name + wiki document), rules to keep (`constraints`: text + optional source such as "Security policy 3.2", at most 20) and an active switch. The AI checks every rule in its report and the work instructions carry them, so requesters never have to repeat them. Owner candidates are active developers and admins only. The provider decides whether review links say MR (GitLab) or PR (GitHub). The repository URL must be an absolute `http(s)` URL (`WebUrl`), in the form and in the contract. Each project card lists repository and owners as a `<dl>`; the target and rule counts sit outside it, because a `<dl>` holds only term–description pairs.
+- **Projects**: list plus an edit sheet (`editing` is a project, `'new'` or `null`). Fields: name, description, icon, repository (`provider` + URL + optional branch), wiki path (default `docs/llm-wiki`), owners, targets (name + wiki document), rules to keep (`constraints`: text + optional source such as "Security policy 3.2", at most 20) and an active switch. The AI checks every rule in its report and the work instructions carry them, so requesters never have to repeat them. Owner candidates are active developers and admins only. The provider decides whether review links say MR (GitLab) or PR (GitHub). The repository URL must be an absolute `http(s)` URL (`WebUrl`), in the form and in the contract. The branch (`BranchField`) is the one the AI works from and opens its pull request into; empty means the repository's default branch, and saving then leaves `branch` out. "목록 불러오기" asks the server for the repository's branches (enabled once the URL is valid) and turns the text box into a select: the default branch first as "기본 브랜치 (name)" (value empty), then the rest, plus the saved name if the list lacks it; "직접 입력" goes back to typing. When the server cannot read the repository, the hint shows its message and says the name can be typed. An answer counts only for the provider and URL it was asked about, so changing either drops the list but keeps the typed or picked name. A name must pass `BranchName` (git's branch-name rules, at most 200 characters); the form keeps "no branch" as `''` and checks the rest against the same rule. Each project card lists repository (with `· branch` when one is set) and owners as a `<dl>`; the target and rule counts sit outside it, because a `<dl>` holds only term–description pairs.
 - Both screens show `LoadFailed` with a retry when their list cannot be loaded (never an empty list), and keep the list with a `RefreshFailed` line when a refresh fails (`useDirectory().projectsError` / `usersError`, `projectsStale` / `usersStale`).
 - **Users**: one row per user with a role select, an active toggle and, for an active person who is neither the admin themselves nor an operator, a "설정 링크" (setup link) button; invitations open a sheet. Adding a person makes their setup link at once, and the row's button makes a new one (a password reset): both show it in a sheet (`SetupLinkSheet`) with the expiry and a copy button, once. The link is `<origin><base>/setup#token=…` (`setupUrl`); the token rides in the fragment, which never reaches a server. The select offers `appConfig.enabledRoles` minus `operator`. An admin cannot change their own role or deactivate themselves, and cannot change an operator's row: the controls are disabled with a `title`, an operator row also says so in visible text, and the server rejects both.
 
@@ -64,7 +68,8 @@ Administration of the organization's side of the workflow: projects (repositorie
 | Hook | Endpoint | Payload → response | Errors and cache |
 | --- | --- | --- | --- |
 | `useDirectory` (`useProjects`, `useUsers`) | `GET /projects`, `GET /users` | → `Project[]`, `User[]` | 60 s stale time; shared with every page that shows names. |
-| `useSaveProject` | `POST /projects` or `PUT /projects/{id}` (chosen by presence of `id`) | `ProjectInput` (name 1–60, description ≤ 300, repository, ≥ 1 owner, targets with optional id, constraints with optional id) → `Project` | Server: owners must be developers/admins (`ownersMustBeDevelopers`, 400), unknown id 404, missing target and constraint ids are generated; an empty rule text is 400. Invalidates projects. |
+| `useSaveProject` | `POST /projects` or `PUT /projects/{id}` (chosen by presence of `id`) | `ProjectInput` (name 1–60, description ≤ 300, repository with optional `branch` (`BranchName`, trimmed), ≥ 1 owner, targets with optional id, constraints with optional id) → `Project` | Server: owners must be developers/admins (`ownersMustBeDevelopers`, 400), unknown id 404, missing target and constraint ids are generated; an empty rule text is 400. Invalidates projects. |
+| `useRepositoryBranches` | `GET /repositories/branches?provider=&url=` | → `RepositoryBranches { defaultBranch, branches (default first, then by name), truncated }` | `project:manage`. A mutation, run by the button and never cached, since the host may be slow or out of reach. 404 `repositoryNotFound` when the server cannot find or reach the repository (the mock: a URL without `owner/name`); the mock lists made-up branches (`demoBranches`): the seed repositories' own, `main` and `develop` for any other. |
 | `useCreateUser` | `POST /users` | `UserCreate { name, email, role, teamId? }` → `User` | Duplicate e-mail → 400 `emailTaken`; unknown team → 404 `teamNotFound`. Invalidates users. |
 | `useCreateSetupLink` | `POST /users/{id}/setup-link` (201) | → `SetupLink { token, expiresAt }` | `user:manage`. Replaces the person's unused link. A deactivated person → 400 `setupLinkInactive`; an operator → 403 `operatorProvisioned`; unknown id → 404. Changes no list. |
 | `useUpdateUser` | `PATCH /users/{id}` | `UserPatch { role?, teamId? (null = no team), active? }` → `User` | Self-change of role or active → 400 `cannotChangeSelf` (one's own team may change); unknown team → 404. Invalidates users, and `GET /auth/me` too when the changed user is the one signed in. |
@@ -85,6 +90,8 @@ All calls carry the bearer token; mutation failures show `toast.error` with the 
 
 - `src/features/admin/projects-page.tsx#symbol:ProjectsPage`, `src/features/admin/users-page.tsx#symbol:UsersPage` — the two screens; `ASSIGNABLE_ROLES` in the users page leaves out `operator`.
 - `src/api/queries.ts#symbol:useSaveProject`, `src/api/queries.ts#symbol:useUpdateUser` — create-or-update; refreshing the signed-in user.
+- `src/api/queries.ts#symbol:useRepositoryBranches`, `src/mocks/engine.ts#symbol:repositoryBranches`, `src/mocks/branches.ts#symbol:demoBranches` — the branch list, its refusal and the demo's made-up branches.
+- `src/domain/model.ts#symbol:BranchName` — branch name rule, shared by the form and the contract.
 - `src/app/hooks.ts#symbol:useDirectory` — shared lists with their load and refresh failures.
 - `src/domain/url.ts#symbol:WebUrl` — repository URL rule.
 - `src/mocks/engine.ts#symbol:saveProject`, `src/mocks/engine.ts#symbol:createUser`, `src/mocks/engine.ts#symbol:updateUser` — server-side rules, including the `operatorProvisioned` refusal.

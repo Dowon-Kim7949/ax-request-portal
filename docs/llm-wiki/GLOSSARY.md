@@ -6,7 +6,7 @@ tags:
 status: verified
 doc_type: glossary
 project: ax-request-portal
-last_updated: 2026-11-19
+last_updated: 2026-11-27
 author: cli-generated
 last_edited_by: claude-code
 wiki_block_version: v1
@@ -46,7 +46,7 @@ related:
 visibility: public
 contains_sensitive_info: false
 reviewed_by: Kim Dowon
-reviewed_at: 2026-11-23
+reviewed_at: 2026-11-27
 ---
 
 # Glossary
@@ -64,6 +64,7 @@ Terms as the code uses them. Identifiers are kept in English in both UI language
 | Event / transition (`TRANSITIONS`) | One of sixteen moves between statuses, each owned by a party. | `src/domain/lifecycle.ts` |
 | Scope check (`scope_check`, `ScopeProposal`) | The requester confirms the AI's reading of the request before a developer reviews it: summary, what changes, what does not, choices where the request reads two ways. | `src/domain/model.ts` |
 | Assumption (`ReportAssumption`) | A fact the report's plan relies on that neither the code nor a reviewed wiki confirmed; the developer confirms each before the first AI run. | `src/domain/model.ts` |
+| Project branch (`ProjectRepository.branch`, 기준 브랜치) | The branch the AI reads, works from and opens its pull request into; none means the repository's default branch. Its name follows git's rules (`BranchName`). | `src/domain/model.ts` |
 | Project rule (`ProjectConstraint`) | A rule every change to a project must keep (security, data, operations), kept by the project and checked in every report (`ConstraintCheck`). | `src/domain/model.ts` |
 | Preview (`WorkPreview`, `PreviewFeedback`) | Screens and a link of the change before the merge, and the requester's advisory reaction to them. | `src/domain/model.ts` |
 | Party | Who performs an event: `requester`, `developer`, `ai`, `system`. | `src/domain/lifecycle.ts` |
